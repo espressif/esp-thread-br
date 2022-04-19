@@ -1,0 +1,220 @@
+# OpenThread Border Router Example
+
+## Overview
+
+This example demonstrates an [OpenThread border router](https://openthread.io/guides/border-router).
+
+## How to use example
+
+### Hardware Required
+
+The following SoCs are required to run this example:
+* An ESP32 series Wi-Fi SoC (ESP32, ESP32-C, ESP32-S, etc) loaded with this ot_br example.
+* An ESP32-H2 802.15.4 SoC loaded with [ot_rcp](../ot_rcp) example.
+* Another ESP32-H2 SoC loaded with [ot_cli](../ot_cli) example. Enable `OPENTHREAD_JOINER` option in menuconfig before compiling the example.
+
+Connect the two SoCs via UART, below is an example setup with ESP32 DevKitC and ESP32-H2 DevKitC:
+
+ESP32 pin | ESP32-H2 pin
+----------|-------------
+   GND    |      G 
+   GPIO6  |      TX      
+   GPIO7  |      RX
+   GPIO18 |      GPIO9 
+   GPIO19 |      RST
+
+### Configure the project
+
+```
+idf.py menuconfig
+```
+The Wi-Fi network's ssid and psk needs to be pre-configured with `CONFIG_EXAMPLE_WIFI_SSID` and `CONFIG_EXAMPLE_WIFI_PASSWORD`.
+The device will connect to Wi-Fi and form a Thread network automatically after bootup.
+
+### Create the RCP firmware image
+
+The border router supports updating the RCP upon boot.
+
+First build the `ot_rcp` example in IDF. In the building process, the built RCP image will be automatically packed into the border router firmware.
+
+### Build, Flash, and Run
+
+Build the project and flash it to the board, then run monitor tool to view serial output:
+
+```
+idf.py -p PORT build flash monitor
+```
+If the `OPENTHREAD_BR_AUTO_START` option is enabled, The device will be connected to the configured Wi-Fi and Thread network automatically then act as the border router.
+
+Otherwise, you need to manually configure the networks with CLI commands.
+
+`wifi` command can be used to configure the Wi-Fi network.
+
+```bash
+> wifi
+--wifi parameter---
+connect
+-s                   :     wifi ssid
+-p                   :     wifi psk
+---example---
+join a wifi:
+ssid: threadcertAP
+psk: threadcertAP    :     wifi connect -s threadcertAP -p threadcertAP
+state                :     get wifi state, disconnect or connect
+---example---
+get wifi state       :     wifi state
+Done
+```
+
+To join a Wi-Fi network, please use the `wifi connect` command:
+
+```bash
+> wifi connect -s threadcertAP -p threadcertAP
+ssid: threadcertAP
+psk: threadcertAP
+I (11331) wifi:wifi driver task: 3ffd06e4, prio:23, stack:6656, core=0
+I (11331) system_api: Base MAC address is not set
+I (11331) system_api: read default base MAC address from EFUSE
+I (11341) wifi:wifi firmware version: 45c46a4
+I (11341) wifi:wifi certification version: v7.0
+
+
+..........
+
+I (13741) esp_netif_handlers: sta ip: 192.168.3.10, mask: 255.255.255.0, gw: 192.168.3.1
+W (13771) wifi:<ba-add>idx:0 (ifx:0, 02:0f:c1:32:3b:2b), tid:0, ssn:2, winSize:64
+wifi sta is connected successfully
+Done
+```
+
+To get the state of the Wi-Fi network:
+
+```bash
+> wifi state
+connected
+Done
+```
+
+For forming the Thread network, please refer to the [ot_cli_README](../ot_cli/README.md).
+
+## Example Output
+
+```bash
+I (2729) esp_netif_handlers: example_connect: sta ip: 192.168.1.100, mask: 255.255.255.0, gw: 192.168.1.1
+I (2729) example_connect: Got IPv4 event: Interface "example_connect: sta" address: 192.168.1.100
+I (3729) example_connect: Got IPv6 event: Interface "example_connect: sta" address: fe80:0000:0000:0000:266f:28ff:fe80:2920, type: ESP_IP6_ADDR_IS_LINK_LOCAL
+I (3729) example_connect: Connected to example_connect: sta
+I (3739) example_connect: - IPv4 address: 192.168.1.100
+I (3739) example_connect: - IPv6 address: fe80:0000:0000:0000:266f:28ff:fe80:2920, type: ESP_IP6_ADDR_IS_LINK_LOCAL
+
+......
+
+
+I(8139) OPENTHREAD:[INFO]-MLE-----: AttachState ParentReqReeds -> Idle
+I(8139) OPENTHREAD:[NOTE]-MLE-----: Allocate router id 50
+I(8139) OPENTHREAD:[NOTE]-MLE-----: RLOC16 fffe -> c800
+I(8159) OPENTHREAD:[NOTE]-MLE-----: Role Detached -> Leader
+```
+
+## Bidirectional IPv6 connectivity
+
+The border router will automatically publish the prefix and the route table rule to the Wi-Fi network via ICMPv6 router advertisement packages.
+
+### Host configuration
+
+The automatically configure your host's route table rules you need to set these sysctl options:
+
+Please replace `wlan0` with the real name of your Wi-Fi network interface.
+```
+sudo sysctl -w net/ipv6/conf/wlan0/accept_ra=2
+sudo sysctl -w net/ipv6/conf/wlan0/accept_ra_rt_info_max_plen=128
+```
+
+For mobile devices, the route table rules will be automatically configured after iOS 14 and Android 8.1.
+
+
+### Testing IPv6 connectivity 
+
+Now in the joining device, check the IP addresses:
+
+```
+> ipaddr                                                              
+fde6:75ff:def4:3bc3:9e9e:3ef:4245:28b5
+fdde:ad00:beef:0:0:ff:fe00:c402                                       
+fdde:ad00:beef:0:ad4a:9a9a:3cd6:e423
+fe80:0:0:0:f011:2951:569e:9c4a                                        
+```
+
+You'll notice an IPv6 global prefix with only on address assigned under it. This is the routable address of this Thread node.
+You can ping this address on your host:
+
+``` bash
+$ ping fde6:75ff:def4:3bc3:9e9e:3ef:4245:28b5
+PING fde6:75ff:def4:3bc3:9e9e:3ef:4245:28b5(fde6:75ff:def4:3bc3:9e9e:3ef:4245:28b5) 56 data bytes
+64 bytes from fde6:75ff:def4:3bc3:9e9e:3ef:4245:28b5: icmp_seq=1 ttl=63 time=459 ms
+64 bytes from fde6:75ff:def4:3bc3:9e9e:3ef:4245:28b5: icmp_seq=2 ttl=63 time=109 ms
+64 bytes from fde6:75ff:def4:3bc3:9e9e:3ef:4245:28b5: icmp_seq=3 ttl=63 time=119 ms
+64 bytes from fde6:75ff:def4:3bc3:9e9e:3ef:4245:28b5: icmp_seq=4 ttl=63 time=117 ms
+```
+
+## Service discovery
+
+The newly introduced service registration protocol([SRP](https://datatracker.ietf.org/doc/html/draft-ietf-dnssd-srp-10)) allows devices in the Thread network to register a service. The border router will forward the service to the Wi-Fi network via mDNS.
+
+Now we'll publish the service `my-service._test._udp` with hostname `test0` and port 12345
+
+```
+> srp client host name test0
+Done
+> srp client host address fde6:75ff:def4:3bc3:9e9e:3ef:4245:28b5
+Done
+> srp client service add my-service _test._udp 12345
+Done
+> srp client autostart enable
+Done
+```
+
+This service will also become visible on the Wi-Fi network:
+
+```bash
+$ avahi-browse -r _test._udp -t   
+
++ enp1s0 IPv6 my-service                                    _test._udp           local
+= enp1s0 IPv6 my-service                                    _test._udp           local
+   hostname = [test0.local]
+   address = [fde6:75ff:def4:3bc3:9e9e:3ef:4245:28b5]
+   port = [12345]
+   txt = []
++ enp1s0 IPv4 my-service                                    _test._udp           local
+= enp1s0 IPv4 my-service                                    _test._udp           local
+   hostname = [test0.local]
+   address = [fde6:75ff:def4:3bc3:9e9e:3ef:4245:28b5]
+   port = [12345]
+   txt = []
+```
+
+## Updating the RCP from HTTPS server
+
+To test with a local https server, you need to first create a folder with content:
+```
+├── bt
+│   └── bt.bin
+├── esp_ot_rcp.bin
+├── flash_args
+├── pt
+│   └── pt.bin
+└── rcp_version
+```
+The content of the folder can be found at `build/esp-idf/main/spiffs_image/ot_rcp_0`.
+
+Enter this folder and create a new self-signed certificate and key, with the command `openssl req -x509 -newkey rsa:2048 -keyout ca_key.pem -out ca_cert.pem -days 365 -nodes`.
+
+Start the HTTPS server with command `openssl s_server -WWW -key ca_key.pem -cert ca_cert.pem -port 8070`.
+
+Replace `server_certs/ca_cert.pem` with the one generated by the command. Then build and flash the device.
+
+To download the image from the server, run the following command on the border router:
+
+```
+> rcpupdate download https://${HOST_URL}:8070
+```
