@@ -62,3 +62,6 @@ dependencies.lock
 compile_commands.json
 tmp
 managed_components
+
+# Docs build output
+docs/_build

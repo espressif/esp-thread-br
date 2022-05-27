@@ -16,6 +16,8 @@ To enable OpenThread extension commands, the following Kconfig option needs to b
 * [udpsockserver](#udpsockserver)
 * [wifi](#wifi)
 * [ota](#ota)
+* [dns64server](#dns64server)
+* [curl](#curl)
 
 ### iperf
 
@@ -177,3 +179,27 @@ After downloading the device will restart and update itself with the new firmwar
 ```
 
 This command will enforce a RCP update regardless of the RCP version.
+
+### dns64server
+
+Used for setting the dns64 server. Note that the border router must support NAT64.
+
+```
+> dns64server 8.8.8.8
+```
+
+### curl
+
+Used for fetching the content of a HTTP web page. Note that the border router must support NAT64.
+
+```
+> curl http://www.espressif.com
+Done
+<html>
+<head><title>301 Moved Permanently</title></head>
+<body bgcolor="white">
+<center><h1>301 Moved Permanently</h1></center>
+<hr><center>CloudFront</center>
+</body>
+</html>
+```
