@@ -32,6 +32,29 @@ typedef struct esp_rcp_update_handle {
     esp_rcp_update_config_t update_config;
 } esp_rcp_update_handle;
 
+typedef enum {
+    RCP_FILETAG_VERSION = 0,
+    RCP_FILETAG_FLASH_ARGS = 1,
+    RCP_FILETAG_BOOTLOADER = 2,
+    RCP_FILETAG_PARTITION_TABLE = 3,
+    RCP_FILETAG_FIRMWARE = 4,
+    RCP_FILETAG_IMAGE_HEADER = 0xff,
+} rcp_filetag_t;
+
+struct rcp_subfile_info_t {
+    uint32_t tag;
+    uint32_t size;
+    uint32_t offset;
+} __attribute__((packed));
+
+struct rcp_flash_arg_t {
+    uint32_t tag;
+    uint32_t offset;
+} __attribute__((packed));
+
+typedef struct rcp_subfile_info_t rcp_subfile_info_t;
+typedef struct rcp_flash_arg_t rcp_flash_arg_t;
+
 static esp_rcp_update_handle s_handle;
 
 static esp_loader_error_t connect_to_target(target_chip_t target_chip, uint32_t higher_baudrate)
@@ -53,23 +76,52 @@ static esp_loader_error_t connect_to_target(target_chip_t target_chip, uint32_t 
     return ESP_LOADER_SUCCESS;
 }
 
+static esp_err_t seek_to_subfile(FILE *fp, rcp_filetag_t tag, rcp_subfile_info_t *found_info)
+{
+    if (fseek(fp, 0, SEEK_SET) != 0) {
+        return ESP_FAIL;
+    }
+    rcp_subfile_info_t subfile_info;
+    if (fread(&subfile_info, 1, sizeof(subfile_info), fp) != sizeof(subfile_info)) {
+        return ESP_FAIL;
+    }
+    if (subfile_info.tag != RCP_FILETAG_IMAGE_HEADER || subfile_info.size % sizeof(rcp_subfile_info_t) != 0) {
+        return ESP_FAIL;
+    }
+
+    int num_subfiles = subfile_info.size / sizeof(rcp_subfile_info_t);
+    for (int i = 1; i < num_subfiles; i++) {
+        if (fread(&subfile_info, 1, sizeof(subfile_info), fp) != sizeof(subfile_info)) {
+            return ESP_FAIL;
+        }
+        if (subfile_info.tag == tag) {
+            *found_info = subfile_info;
+            return fseek(fp, subfile_info.offset, SEEK_SET) == 0 ? ESP_OK : ESP_FAIL;
+        }
+    }
+    return ESP_ERR_NOT_FOUND;
+}
+
 esp_err_t esp_rcp_load_version_in_storage(char *version_str, size_t size)
 {
     char fullpath[RCP_FILENAME_MAX_SIZE];
     int8_t update_seq = s_handle.update_seq;
 
-    sprintf(fullpath, "%s_%d/rcp_version", s_handle.update_config.firmware_dir, update_seq);
+    sprintf(fullpath, "%s_%d/rcp_image", s_handle.update_config.firmware_dir, update_seq);
     FILE *fp = fopen(fullpath, "r");
     if (fp == NULL) {
         return ESP_ERR_NOT_FOUND;
     }
+    rcp_subfile_info_t version_info;
+    ESP_RETURN_ON_ERROR(seek_to_subfile(fp, RCP_FILETAG_VERSION, &version_info), TAG, "Failed to find version subfile");
     memset(version_str, 0, size);
-    fread(version_str, 1, size, fp);
+    int read_size = MIN(size, version_info.size);
+    fread(version_str, 1, read_size, fp);
     fclose(fp);
     return ESP_OK;
 }
 
-esp_loader_error_t flash_binary(FILE *firmware, size_t size, size_t address)
+static esp_loader_error_t flash_binary(FILE *firmware, size_t size, size_t address)
 {
     esp_loader_error_t err;
     static uint8_t payload[1024];
@@ -196,43 +248,32 @@ esp_err_t esp_rcp_update(void)
 
     char fullpath[RCP_FILENAME_MAX_SIZE];
     int update_seq = esp_rcp_get_update_seq();
-    sprintf(fullpath, "%s_%d/flash_args", s_handle.update_config.firmware_dir, update_seq);
+    sprintf(fullpath, "%s_%d/rcp_image", s_handle.update_config.firmware_dir, update_seq);
     FILE *fp = fopen(fullpath, "r");
-    ESP_RETURN_ON_FALSE(fp != NULL, ESP_ERR_NOT_FOUND, TAG, "Cannot find flash arguments");
+    ESP_RETURN_ON_FALSE(fp != NULL, ESP_ERR_NOT_FOUND, TAG, "Cannot find rcp image");
+    rcp_subfile_info_t subfile;
+    seek_to_subfile(fp, RCP_FILETAG_FLASH_ARGS, &subfile);
+    int num_flash_binaries = subfile.size / sizeof(rcp_flash_arg_t);
 
-    char flash_args[RCP_FILENAME_MAX_SIZE];
-    while (fgets(flash_args, sizeof(flash_args), fp)) {
-        uint32_t offset;
-        if (sscanf(flash_args, "%x", &offset) != 1) {
-            return ESP_FAIL;
-        }
-        char *filename = strchr(flash_args, ' ');
-        while (isspace(*filename)) {
-            filename++;
-        }
-        char *filename_end = filename;
-        while (!isspace(*filename_end)) {
-            filename_end++;
-        }
-        *filename_end = '\0';
-        sprintf(fullpath, "%s_%d/%s", s_handle.update_config.firmware_dir, update_seq, filename);
-
-        ESP_LOGI(TAG, "Flashing %s to offset 0x%x", fullpath, offset);
-        FILE *binary_fp = fopen(fullpath, "r");
-        ESP_RETURN_ON_FALSE(binary_fp != NULL, ESP_ERR_NOT_FOUND, TAG, "Failed to open %s", fullpath);
-        fseek(binary_fp, 0, SEEK_END);
-        size_t binary_size = ftell(binary_fp);
-        fseek(binary_fp, 0, SEEK_SET);
+    for (int i = 0; i < num_flash_binaries; i++) {
+        rcp_flash_arg_t flash_args;
+        fread(&flash_args, 1, sizeof(flash_args), fp);
         int num_retry = 0;
-        while (flash_binary(binary_fp, binary_size, offset) != ESP_LOADER_SUCCESS) {
+        long current = ftell(fp);
+        if (seek_to_subfile(fp, flash_args.tag, &subfile) != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to seek to subfile with tag %d", flash_args.tag);
+            abort();
+        }
+        while (flash_binary(fp, subfile.size, flash_args.offset) != ESP_LOADER_SUCCESS) {
             ESP_LOGW(TAG, "Failed to flash %s, retrying...", fullpath);
             num_retry++;
             if (num_retry > RCP_UPDATE_MAX_RETRY) {
                 ESP_LOGE(TAG, "Failed to update RCP, abort and reboot");
                 abort();
             }
+            seek_to_subfile(fp, flash_args.tag, &subfile);
         }
-        fclose(binary_fp);
+        fseek(fp, current, SEEK_SET);
     }
     fclose(fp);
     set_rcp_seq(update_seq);

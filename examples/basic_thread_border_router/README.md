@@ -195,17 +195,9 @@ $ avahi-browse -r _test._udp -t
 
 ## Updating the RCP from HTTPS server
 
-To test with a local https server, you need to first create a folder with content:
-```
-├── bt
-│   └── bt.bin
-├── esp_ot_rcp.bin
-├── flash_args
-├── pt
-│   └── pt.bin
-└── rcp_version
-```
-The content of the folder can be found at `build/esp-idf/main/spiffs_image/ot_rcp_0`.
+To test with a local https server, you need to first create a folder with the rcp update image.
+
+The rcp image can be found at `build/esp-idf/main/spiffs_image/ot_rcp_0/rcp_image`.
 
 Enter this folder and create a new self-signed certificate and key, with the command `openssl req -x509 -newkey rsa:2048 -keyout ca_key.pem -out ca_cert.pem -days 365 -nodes`.
 

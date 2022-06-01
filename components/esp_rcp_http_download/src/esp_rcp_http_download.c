@@ -165,15 +165,7 @@ esp_err_t esp_rcp_download_image(esp_http_client_config_t *http_config, const ch
     ESP_RETURN_ON_FALSE(http_config->url != NULL, ESP_ERR_INVALID_ARG, TAG, "NULL http url");
 
     int8_t update_seq = esp_rcp_get_next_update_seq();
-    ESP_RETURN_ON_ERROR(download_to_spiffs(http_config, firmware_dir, update_seq, "/flash_args"), TAG,
-                        "Failed to download flash_args");
-    ESP_RETURN_ON_ERROR(download_to_spiffs(http_config, firmware_dir, update_seq, "/rcp_version"), TAG,
-                        "Failed to download rcp_version");
-    ESP_RETURN_ON_ERROR(download_to_spiffs(http_config, firmware_dir, update_seq, "/bt/bt.bin"), TAG,
-                        "Failed to download bt.bin");
-    ESP_RETURN_ON_ERROR(download_to_spiffs(http_config, firmware_dir, update_seq, "/pt/pt.bin"), TAG,
-                        "Failed to download pt.bin");
-    ESP_RETURN_ON_ERROR(download_to_spiffs(http_config, firmware_dir, update_seq, "/esp_ot_rcp.bin"), TAG,
-                        "Failed to download esp_ot_rcp.bin");
+    ESP_RETURN_ON_ERROR(download_to_spiffs(http_config, firmware_dir, update_seq, "/rcp_image"), TAG,
+                        "Failed to download rcp_image");
     return esp_rcp_submit_new_image();
 }
