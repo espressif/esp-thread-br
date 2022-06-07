@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "border_router_board.h"
 #include "esp_check.h"
 #include "esp_log.h"
 #include "esp_netif.h"
@@ -40,6 +41,8 @@
 #define RCP_VERSION_MAX_SIZE 100
 
 static esp_openthread_platform_config_t s_openthread_platform_config;
+
+#if CONFIG_OPENTHREAD_BR_AUTO_START
 
 static int hex_digit_to_int(char hex)
 {
@@ -137,8 +140,10 @@ static void launch_openthread_network(otInstance *instance)
         ESP_LOGE(TAG, "Failed to register border router.");
         abort();
     }
-    // otBackboneRouterSetEnabled(instance, true);
+    otBackboneRouterSetEnabled(instance, true);
 }
+
+#endif // CONFIG_OPENTHREAD_BR_AUTO_START
 
 static void update_rcp(void)
 {
@@ -150,6 +155,7 @@ static void update_rcp(void)
     esp_restart();
 }
 
+#if CONFIG_OPENTHREAD_BR_AUTO_UPDATE_RCP
 static void try_update_ot_rcp(const esp_openthread_platform_config_t *config)
 {
     char version_str[RCP_VERSION_MAX_SIZE];
@@ -166,10 +172,10 @@ static void try_update_ot_rcp(const esp_openthread_platform_config_t *config)
     } else {
         ESP_LOGI(TAG, "RCP firmware not found in storage, will reboot to try next image");
         esp_rcp_mark_image_verified(false);
-        printf("Mark image verified done\n");
         esp_restart();
     }
 }
+#endif // CONFIG_OPENTHREAD_BR_AUTO_UPDATE_RCP
 
 static void ot_task_worker(void *ctx)
 {
@@ -177,21 +183,27 @@ static void ot_task_worker(void *ctx)
     esp_netif_t *openthread_netif = esp_netif_new(&cfg);
 
     assert(openthread_netif != NULL);
+
     // Initialize the OpenThread stack
+    border_router_board_init();
     esp_openthread_register_rcp_failure_handler(update_rcp);
     ESP_ERROR_CHECK(esp_openthread_init(&s_openthread_platform_config));
 
     // Initialize border routing features
     esp_openthread_lock_acquire(portMAX_DELAY);
+#if CONFIG_OPENTHREAD_BR_AUTO_UPDATE_RCP
     try_update_ot_rcp(&s_openthread_platform_config);
+#endif
     ESP_ERROR_CHECK(esp_netif_attach(openthread_netif, esp_openthread_netif_glue_init(&s_openthread_platform_config)));
 
     (void)otLoggingSetLevel(CONFIG_LOG_DEFAULT_LEVEL);
     esp_openthread_cli_init();
     esp_cli_custom_command_init();
+#if CONFIG_OPENTHREAD_BR_AUTO_START
     ESP_ERROR_CHECK(esp_openthread_border_router_init());
     create_config_network(esp_openthread_get_instance());
     launch_openthread_network(esp_openthread_get_instance());
+#endif // CONFIG_OPENTHREAD_BR_AUTO_START
     esp_openthread_lock_release();
 
     // Run the main loop

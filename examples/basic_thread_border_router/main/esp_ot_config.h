@@ -16,6 +16,20 @@
 
 #include "esp_openthread_types.h"
 
+#if CONFIG_BR_BOARD_DEV_KIT
+#define HOST_PIN_TO_RCP_RESET 7
+#define HOST_PIN_TO_RCP_BOOT 8
+#define HOST_PIN_TO_RCP_TX 17
+#define HOST_PIN_TO_RCP_RX 18
+#else
+// #define HOST_PIN_TO_RCP_RESET 4
+// #define HOST_PIN_TO_RCP_BOOT 5
+#define HOST_PIN_TO_RCP_RESET CONFIG_PIN_TO_RCP_RESET
+#define HOST_PIN_TO_RCP_BOOT CONFIG_PIN_TO_RCP_BOOT
+#define HOST_PIN_TO_RCP_TX CONFIG_PIN_TO_RCP_TX
+#define HOST_PIN_TO_RCP_RX CONFIG_PIN_TO_RCP_RX
+#endif
+
 #define RCP_FIRMWARE_DIR "/spiffs/ot_rcp"
 
 #define ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG()              \
@@ -33,16 +47,16 @@
                     .rx_flow_ctrl_thresh = 0,              \
                     .source_clk = UART_SCLK_APB,           \
                 },                                         \
-            .rx_pin = 6,                                   \
-            .tx_pin = 7,                                   \
+            .rx_pin = HOST_PIN_TO_RCP_TX,                  \
+            .tx_pin = HOST_PIN_TO_RCP_RX,                  \
         },                                                 \
     }
 
-#define ESP_OPENTHREAD_RCP_UPDATE_CONFIG()                                                     \
-    {                                                                                          \
-        .rcp_type = RCP_TYPE_ESP32H2_UART, .uart_rx_pin = 6, .uart_tx_pin = 7, .uart_port = 1, \
-        .uart_baudrate = 115200, .reset_pin = 19, .boot_pin = 18, .update_baudrate = 230400,   \
-        .firmware_dir = "/spiffs/ot_rcp", .target_chip = ESP32H2_CHIP,                         \
+#define ESP_OPENTHREAD_RCP_UPDATE_CONFIG()                                                                             \
+    {                                                                                                                  \
+        .rcp_type = RCP_TYPE_ESP32H2_UART, .uart_rx_pin = HOST_PIN_TO_RCP_TX, .uart_tx_pin = HOST_PIN_TO_RCP_RX,       \
+        .uart_port = 1, .uart_baudrate = 115200, .reset_pin = HOST_PIN_TO_RCP_RESET, .boot_pin = HOST_PIN_TO_RCP_BOOT, \
+        .update_baudrate = 230400, .firmware_dir = "/spiffs/ot_rcp", .target_chip = ESP32H2_CHIP,                      \
     }
 
 #define ESP_OPENTHREAD_DEFAULT_HOST_CONFIG()                   \

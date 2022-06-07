@@ -115,7 +115,7 @@ esp_err_t esp_rcp_load_version_in_storage(char *version_str, size_t size)
     rcp_subfile_info_t version_info;
     ESP_RETURN_ON_ERROR(seek_to_subfile(fp, RCP_FILETAG_VERSION, &version_info), TAG, "Failed to find version subfile");
     memset(version_str, 0, size);
-    int read_size = MIN(size, version_info.size);
+    int read_size = size < version_info.size ? size : version_info.size;
     fread(version_str, 1, read_size, fp);
     fclose(fp);
     return ESP_OK;

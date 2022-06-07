@@ -8,7 +8,17 @@ This example demonstrates an [OpenThread border router](https://openthread.io/gu
 
 ### Hardware Required
 
+#### Run with ESP border router dev kit
+
+To run with ESP border router dev kit, the following menuconfig options need to be enabled:
+
+* `CONFIG_IDF_TARGET_ESP32S3`
+* `CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG`
+
+#### Run with separate SoCs
+
 The following SoCs are required to run this example:
+
 * An ESP32 series Wi-Fi SoC (ESP32, ESP32-C, ESP32-S, etc) loaded with this ot_br example.
 * An ESP32-H2 802.15.4 SoC loaded with [ot_rcp](../ot_rcp) example.
 * Another ESP32-H2 SoC loaded with [ot_cli](../ot_cli) example. Enable `OPENTHREAD_JOINER` option in menuconfig before compiling the example.
@@ -17,11 +27,11 @@ Connect the two SoCs via UART, below is an example setup with ESP32 DevKitC and 
 
 ESP32 pin | ESP32-H2 pin
 ----------|-------------
-   GND    |      G 
-   GPIO6  |      TX      
-   GPIO7  |      RX
-   GPIO18 |      GPIO9 
-   GPIO19 |      RST
+  GND     |      G
+  GPIO17  |      TX
+  GPIO18  |      RX
+  GPIO4   |      RST
+  GPIO5   |      GPIO9
 
 ### Configure the project
 
@@ -133,16 +143,16 @@ sudo sysctl -w net/ipv6/conf/wlan0/accept_ra_rt_info_max_plen=128
 For mobile devices, the route table rules will be automatically configured after iOS 14 and Android 8.1.
 
 
-### Testing IPv6 connectivity 
+### Testing IPv6 connectivity
 
 Now in the joining device, check the IP addresses:
 
 ```
-> ipaddr                                                              
+> ipaddr
 fde6:75ff:def4:3bc3:9e9e:3ef:4245:28b5
-fdde:ad00:beef:0:0:ff:fe00:c402                                       
+fdde:ad00:beef:0:0:ff:fe00:c402
 fdde:ad00:beef:0:ad4a:9a9a:3cd6:e423
-fe80:0:0:0:f011:2951:569e:9c4a                                        
+fe80:0:0:0:f011:2951:569e:9c4a
 ```
 
 You'll notice an IPv6 global prefix with only on address assigned under it. This is the routable address of this Thread node.

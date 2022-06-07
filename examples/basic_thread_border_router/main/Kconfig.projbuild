@@ -1,0 +1,23 @@
+menu "OpenThread Border Router Example"
+
+    config PIN_TO_RCP_RESET
+        depends on !BR_BOARD_DEV_KIT
+        string "Pin to RCP reset"
+        default "4"
+
+    config PIN_TO_RCP_BOOT
+        depends on !BR_BOARD_DEV_KIT
+        string "Pin to RCP boot"
+        default "5"
+
+    config PIN_TO_RCP_TX
+        depends on !BR_BOARD_DEV_KIT
+        string "Pin to RCP TX"
+        default "17"
+
+    config PIN_TO_RCP_RX
+        depends on !BR_BOARD_DEV_KIT
+        string "Pin to RCP RX"
+        default "18"
+
+endmenu

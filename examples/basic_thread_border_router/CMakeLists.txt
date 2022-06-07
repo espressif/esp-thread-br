@@ -7,7 +7,6 @@ cmake_minimum_required(VERSION 3.5)
 set(EXTRA_COMPONENT_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components
     ${CMAKE_CURRENT_SOURCE_DIR}/../common
-    $ENV{HOME}/src/esp-serial-flasher
     $ENV{IDF_PATH}/examples/common_components/iperf
     $ENV{IDF_PATH}/examples/common_components/protocol_examples_common)
 
