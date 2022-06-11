@@ -10,10 +10,7 @@ This example demonstrates an [OpenThread border router](https://openthread.io/gu
 
 #### Run with ESP border router dev kit
 
-To run with ESP border router dev kit, the following menuconfig options need to be enabled:
-
-* `CONFIG_IDF_TARGET_ESP32S3`
-* `CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG`
+Please refer to the [dev kit introdution](../../README.md##ESP-Thread-Border-Router-Dev-kit) in the SDK README.
 
 #### Run with separate SoCs
 
