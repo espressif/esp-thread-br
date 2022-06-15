@@ -1,9 +1,6 @@
 # Openthread Extension Commands
 
 The ESP OpenThread examples provide a series of extension commands in addition to the standard [OpenThread CLI](https://github.com/openthread/openthread/blob/main/src/cli/README.md).
-The extension commands are available in the following examples:
-* [ot_cli](../ot_cli)
-* [ot_br](../ot_br)
 
 ## Enabling the extension commands
 
@@ -37,7 +34,7 @@ iperf
 -i <interval>       :     seconds between periodic bandwidth reports
 -t <time>           :     time in seconds to transmit for (default 10 secs)
 -p <port>           :     server port to listen on/connect to
--l <len_send_buf>   :     the lenth of send buffer
+-l <len_send_buf>   :     the length of send buffer
 ---example---
 create a tcp server :     iperf -s -i 3 -p 5001 -t 60
 create a udp client :     iperf -c <addr> -u -i 3 -t 60 -p 5001 -l 512

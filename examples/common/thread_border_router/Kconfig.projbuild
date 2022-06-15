@@ -1,4 +1,40 @@
-menu "OpenThread Border Router Example"
+menu "ESP Thread Border Router Example"
+
+    choice BR_BOARD_TYPE
+        prompt "Border router board type"
+        default BR_BOARD_STANDALONE
+        help
+            The board running the border router.
+
+        config BR_BOARD_STANDALONE
+            bool "Standalone dev kits"
+            help
+                Standalone ESP Wi-Fi dev kit manually connected to the RCP
+
+        config BR_BOARD_DEV_KIT
+            bool "Border router dev kit"
+            help
+                Integrated border router dev kit
+    endchoice
+
+    menu "Standalone Board Configuration"
+        depends on BR_BOARD_STANDALONE
+        config PIN_TO_RCP_RESET
+            int "Pin to RCP reset"
+            default "4"
+
+        config PIN_TO_RCP_BOOT
+            int "Pin to RCP boot"
+            default "5"
+
+        config PIN_TO_RCP_TX
+            int "Pin to RCP TX"
+            default "17"
+
+        config PIN_TO_RCP_RX
+            int "Pin to RCP RX"
+            default "18"
+    endmenu
 
     config OPENTHREAD_NETWORK_NAME
         string "OpenThread network name"
