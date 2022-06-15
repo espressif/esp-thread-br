@@ -2,22 +2,15 @@ stages:
   - build
 
 variables:
-    ESP_IDF_PATH: "$CI_PROJECT_DIR/esp-idf"
+    CI_DOCKER_REGISTRY: "ciregistry.espressif.cn:8443"
     ESP_THREAD_BR_PATH: "$CI_PROJECT_DIR"
 
 .submodule_update: &submodule_update
   - cd $ESP_THREAD_BR_PATH
   - git submodule update --init --recursive
 
-.setup_idf: &setup_idf
-  - cd $CI_PROJECT_DIR
-  - git clone --recursive --single-branch -b master https://github.com/espressif/esp-idf.git
-  - cd $ESP_IDF_PATH
-  - ./install.sh
-  - . ./export.sh
-
 .build_basic_thread_border_router: &build_basic_thread_border_router
-  - cd $ESP_IDF_PATH/examples/openthread/ot_rcp
+  - cd $IDF_PATH/examples/openthread/ot_rcp
   - idf.py --preview set-target esp32h2
   - idf.py build
   - cd $ESP_THREAD_BR_PATH/examples/basic_thread_border_router
@@ -30,9 +23,8 @@ variables:
 
 build_examples:
     stage: build
-    image: $CI_DOCKER_REGISTRY/esp-env-v5.0:2
+    image: espressif/idf:latest
     script:
-        - *setup_idf
         - *submodule_update
         - *build_basic_thread_border_router
 

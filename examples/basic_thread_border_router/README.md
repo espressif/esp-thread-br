@@ -8,41 +8,38 @@ This example demonstrates an [OpenThread border router](https://openthread.io/gu
 
 ### Hardware Required
 
-#### Run with ESP border router dev kit
+Please refer to [ESP Thread Border Router Hardware](../../README.md##Hardware-Platforms), the ESP Thread Border Router Board is recommended for this example.
 
-Please refer to the [dev kit introdution](../../README.md##ESP-Thread-Border-Router-Dev-kit) in the SDK README.
+### Setup ESP IDF
 
-#### Run with separate SoCs
+Refer to [ESP-IDF Get Started](https://docs.espressif.com/projects/esp-idf/en/v4.4.1/esp32s3/get-started/index.html).
 
-The following SoCs are required to run this example:
-
-* An ESP32 series Wi-Fi SoC (ESP32, ESP32-C, ESP32-S, etc) loaded with this ot_br example.
-* An ESP32-H2 802.15.4 SoC loaded with [ot_rcp](../ot_rcp) example.
-* Another ESP32-H2 SoC loaded with [ot_cli](../ot_cli) example. Enable `OPENTHREAD_JOINER` option in menuconfig before compiling the example.
-
-Connect the two SoCs via UART, below is an example setup with ESP32 DevKitC and ESP32-H2 DevKitC:
-
-ESP32 pin | ESP32-H2 pin
-----------|-------------
-  GND     |      G
-  GPIO17  |      TX
-  GPIO18  |      RX
-  GPIO4   |      RST
-  GPIO5   |      GPIO9
+note: IDF commit `daa950d` is the tested version.
 
 ### Configure the project
 
+ESP32-S3 is the host SoC on ESP Thread Border Router Board, so set target to esp32s3:
+
 ```
-idf.py menuconfig
+idf.py set-target esp32s3
 ```
+
+The following menuconfig options must be enabled:
+
+* `CONFIG_BR_BOARD_DEV_KIT`
+* `CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG`
+
+If the `OPENTHREAD_BR_AUTO_START` option is enabled, the device will connect to the configured Wi-Fi and form Thread network automatically then act as the border router.
+
 The Wi-Fi network's ssid and psk needs to be pre-configured with `CONFIG_EXAMPLE_WIFI_SSID` and `CONFIG_EXAMPLE_WIFI_PASSWORD`.
-The device will connect to Wi-Fi and form a Thread network automatically after bootup.
+
+The Thread network parameters could be pre-configured with `CONFIG_OPENTHREAD_NETWORK_xx` options.
 
 ### Create the RCP firmware image
 
 The border router supports updating the RCP upon boot.
 
-First build the `ot_rcp` example in IDF. In the building process, the built RCP image will be automatically packed into the border router firmware.
+First build the [ot_rcp](https://github.com/espressif/esp-idf/tree/master/examples/openthread/ot_rcp) example in IDF. In the building process, the built RCP image will be automatically packed into the border router firmware.
 
 ### Build, Flash, and Run
 
@@ -51,9 +48,8 @@ Build the project and flash it to the board, then run monitor tool to view seria
 ```
 idf.py -p PORT build flash monitor
 ```
-If the `OPENTHREAD_BR_AUTO_START` option is enabled, The device will be connected to the configured Wi-Fi and Thread network automatically then act as the border router.
 
-Otherwise, you need to manually configure the networks with CLI commands.
+If the `OPENTHREAD_BR_AUTO_START` option is not enabled, you need to manually configure the networks with CLI commands.
 
 `wifi` command can be used to configure the Wi-Fi network.
 
@@ -102,7 +98,7 @@ connected
 Done
 ```
 
-For forming the Thread network, please refer to the [ot_cli_README](../ot_cli/README.md).
+For forming the Thread network, please refer to the [ot_cli_README](https://github.com/espressif/esp-idf/tree/master/examples/openthread/ot_cli).
 
 ## Example Output
 
