@@ -7,7 +7,7 @@
 #include "border_router_board.h"
 #include "sdkconfig.h"
 
-#if CONFIG_BR_BOARD_DEV_KIT
+#if CONFIG_BR_BOARD_DEV_KIT && CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
 
 #include "esp_vfs_dev.h"
 #include "esp_vfs_usb_serial_jtag.h"
@@ -26,8 +26,8 @@ void border_router_board_init(void)
     esp_vfs_dev_usb_serial_jtag_set_tx_line_endings(ESP_LINE_ENDINGS_CRLF);
 
     /* Enable non-blocking mode on stdin and stdout */
-    fcntl(fileno(stdout), F_SETFL, 0);
-    fcntl(fileno(stdin), F_SETFL, 0);
+    fcntl(fileno(stdout), F_SETFL, O_NONBLOCK);
+    fcntl(fileno(stdin), F_SETFL, O_NONBLOCK);
 
     usb_serial_jtag_driver_config_t usb_serial_jtag_config = USB_SERIAL_JTAG_DRIVER_CONFIG_DEFAULT();
     usb_serial_jtag_driver_install(&usb_serial_jtag_config);
@@ -35,10 +35,10 @@ void border_router_board_init(void)
     esp_vfs_dev_uart_register();
 }
 
-#else // CONFIG_BR_BOARD_DEV_KIT
+#else // CONFIG_BR_BOARD_DEV_KIT && CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
 
 void border_router_board_init(void)
 {
 }
 
-#endif // CONFIG_BR_BOARD_DEV_KIT
+#endif // CONFIG_BR_BOARD_DEV_KIT && CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
