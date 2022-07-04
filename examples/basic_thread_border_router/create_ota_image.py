@@ -7,14 +7,16 @@ import pathlib
 import shutil
 import struct
 
-RCP_FILETAG_VERSION = 0
-RCP_FILETAG_FLASH_ARGS = 1
-RCP_FILETAG_BOOTLOADER = 2
-RCP_FILETAG_PARTITION_TABLE = 3
-RCP_FILETAG_FIRMWARE = 4
-RCP_FILETAG_IMAGE_HEADER = 0xff
+FILETAG_RCP_VERSION = 0
+FILETAG_RCP_FLASH_ARGS = 1
+FILETAG_RCP_BOOTLOADER = 2
+FILETAG_RCP_PARTITION_TABLE = 3
+FILETAG_RCP_FIRMWARE = 4
+FILETAG_BR_OTA_IMAGE = 5
+FILETAG_IMAGE_HEADER = 0xff
 
-RCP_IMAGE_HEADER_SIZE = 3 * 4 * 6
+HEADER_ENTRY_SIZE = 3 * 4
+RCP_IMAGE_HEADER_SIZE = HEADER_ENTRY_SIZE * 6
 RCP_FLASH_ARGS_SIZE = 2 * 4 * 3
 
 
@@ -40,45 +42,52 @@ def append_flash_args(fout, flash_args_path):
     for offset, partition_file in partition_info_list:
         offset = int(offset, 0)
         if partition_file.find('bootloader') >= 0:
-            fout.write(struct.pack('<LL', RCP_FILETAG_BOOTLOADER, offset))
+            fout.write(struct.pack('<LL', FILETAG_RCP_BOOTLOADER, offset))
         elif partition_file.find('partition_table') >= 0:
-            fout.write(struct.pack('<LL', RCP_FILETAG_PARTITION_TABLE, offset))
+            fout.write(struct.pack('<LL', FILETAG_RCP_PARTITION_TABLE, offset))
         else:
-            fout.write(struct.pack('<LL', RCP_FILETAG_FIRMWARE, offset))
+            fout.write(struct.pack('<LL', FILETAG_RCP_FIRMWARE, offset))
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-b', '--base-dir', type=str)
-    parser.add_argument('-t', '--target_dir', type=str)
+    parser.add_argument('--rcp-build-dir', type=str, required=True)
+    parser.add_argument('--br-firmware', type=str, required=False)
+    parser.add_argument('--target-file', type=str, required=True)
     args = parser.parse_args()
-    base_dir = args.base_dir
-    target_dir = args.target_dir
-    pathlib.Path(target_dir).mkdir(parents=True, exist_ok=True)
+    base_dir = args.rcp_build_dir
+    pathlib.Path(os.path.dirname(args.target_file)).mkdir(parents=True, exist_ok=True)
     rcp_version_path = os.path.join(base_dir, 'rcp_version')
     flash_args_path = os.path.join(base_dir, 'flash_args')
     bootloader_path = os.path.join(base_dir, 'bootloader', 'bootloader.bin')
     partition_table_path = os.path.join(
-        base_dir, 'partition_table', 'partition-table.bin')
+            base_dir, 'partition_table', 'partition-table.bin')
     rcp_firmware_path = os.path.join(base_dir, 'esp_ot_rcp.bin')
-    with open(os.path.join(target_dir, 'rcp_image'), 'wb') as fout:
+    with open(args.target_file, 'wb') as fout:
+        image_header_size = RCP_IMAGE_HEADER_SIZE
+        if args.br_firmware:
+            image_header_size += HEADER_ENTRY_SIZE
         offset = append_subfile_header(
-            fout, RCP_FILETAG_IMAGE_HEADER, RCP_IMAGE_HEADER_SIZE, 0)
+                fout, FILETAG_IMAGE_HEADER, image_header_size, 0)
         offset = append_subfile_header(
-            fout, RCP_FILETAG_VERSION, os.path.getsize(rcp_version_path), offset)
+                fout, FILETAG_RCP_VERSION, os.path.getsize(rcp_version_path), offset)
         offset = append_subfile_header(
-            fout, RCP_FILETAG_FLASH_ARGS, RCP_FLASH_ARGS_SIZE, offset)
+                fout, FILETAG_RCP_FLASH_ARGS, RCP_FLASH_ARGS_SIZE, offset)
         offset = append_subfile_header(
-            fout, RCP_FILETAG_BOOTLOADER, os.path.getsize(bootloader_path), offset)
+                fout, FILETAG_RCP_BOOTLOADER, os.path.getsize(bootloader_path), offset)
         offset = append_subfile_header(
-            fout, RCP_FILETAG_PARTITION_TABLE, os.path.getsize(partition_table_path), offset)
+                fout, FILETAG_RCP_PARTITION_TABLE, os.path.getsize(partition_table_path), offset)
         offset = append_subfile_header(
-            fout, RCP_FILETAG_FIRMWARE, os.path.getsize(rcp_firmware_path), offset)
+                fout, FILETAG_RCP_FIRMWARE, os.path.getsize(rcp_firmware_path), offset)
+        if args.br_firmware:
+            offset = append_subfile_header(fout, FILETAG_BR_OTA_IMAGE, os.path.getsize(args.br_firmware), offset)
         append_subfile(fout, rcp_version_path)
         append_flash_args(fout, flash_args_path)
         append_subfile(fout, bootloader_path)
         append_subfile(fout, partition_table_path)
         append_subfile(fout, rcp_firmware_path)
+        if args.br_firmware:
+            append_subfile(fout, args.br_firmware)
 
 
 if __name__ == '__main__':

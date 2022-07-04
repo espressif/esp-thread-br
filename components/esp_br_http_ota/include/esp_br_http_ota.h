@@ -13,7 +13,7 @@ extern "C" {
 #endif
 
 /**
- * @brief This function downloads the RCP image from an HTTPS server
+ * @brief This function performs Border Router OTA by downloading from a HTTPS server.
  *
  * @param[in] http_config       The HTTP server download config
  *
@@ -24,7 +24,7 @@ extern "C" {
  *  - ESP_ERR_INVALID_ARG       If the http config is NULL or does not contain an url.
  *
  */
-esp_err_t esp_rcp_download_image(esp_http_client_config_t *http_config, const char *firmware_dir);
+esp_err_t esp_br_http_ota(esp_http_client_config_t *http_config);
 
 #ifdef __cplusplus
 } /* extern "C" */

@@ -12,9 +12,9 @@
 extern "C" {
 #endif
 
-void esp_openthread_process_rcp_command(void *aContext, uint8_t aArgsLength, char *aArgs[]);
+void esp_openthread_process_ota_command(void *aContext, uint8_t aArgsLength, char *aArgs[]);
 
-void esp_set_rcp_server_cert(const char *cert);
+void esp_set_ota_server_cert(const char *cert);
 
 #ifdef __cplusplus
 } /* extern "C" */

@@ -25,8 +25,8 @@
 #include "esp_openthread_border_router.h"
 #include "esp_openthread_types.h"
 #include "esp_ot_config.h"
+#include "esp_ot_ota_commands.h"
 #include "esp_ot_wifi_cmd.h"
-#include "esp_rcp_update_commands.h"
 #include "esp_spiffs.h"
 #include "esp_vfs_eventfd.h"
 #include "esp_wifi.h"
@@ -80,6 +80,6 @@ void app_main(void)
 #endif
     ESP_ERROR_CHECK(mdns_init());
     ESP_ERROR_CHECK(mdns_hostname_set("esp-ot-br"));
-    esp_set_rcp_server_cert((char *)server_cert_pem_start);
+    esp_set_ota_server_cert((char *)server_cert_pem_start);
     launch_openthread_border_router(&platform_config, &rcp_update_config);
 }

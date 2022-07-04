@@ -87,7 +87,7 @@ static void create_config_network(otInstance *instance)
         return;
     }
 
-    uint16_t network_name_len = strnlen(CONFIG_OPENTHREAD_NETWORK_NAME, OT_NETWORK_NAME_MAX_SIZE + 1);
+    uint16_t network_name_len = strlen(CONFIG_OPENTHREAD_NETWORK_NAME);
 
     assert(network_name_len <= OT_NETWORK_NAME_MAX_SIZE);
 
@@ -196,7 +196,7 @@ static void ot_task_worker(void *ctx)
 #endif
     ESP_ERROR_CHECK(esp_netif_attach(openthread_netif, esp_openthread_netif_glue_init(&s_openthread_platform_config)));
 
-    (void)otLoggingSetLevel(CONFIG_LOG_DEFAULT_LEVEL);
+    (void)otLoggingSetLevel(OT_LOG_LEVEL_INFO);
     esp_openthread_cli_init();
     esp_cli_custom_command_init();
 #if CONFIG_OPENTHREAD_BR_AUTO_START

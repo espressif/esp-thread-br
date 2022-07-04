@@ -41,8 +41,8 @@ menu "OpenThread Extension CLI"
         depends on OPENTHREAD_CLI_ESP_EXTENSION && OPENTHREAD_BORDER_ROUTER
         default y
 
-    config OPENTHREAD_CLI_RCP_UPDATE
-        bool "Enable RCP update command"
+    config OPENTHREAD_CLI_OTA
+        bool "Enable OTA command"
         depends on OPENTHREAD_CLI_ESP_EXTENSION && OPENTHREAD_BORDER_ROUTER
         default y
 
