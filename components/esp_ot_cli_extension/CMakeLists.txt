@@ -16,11 +16,11 @@ if(CONFIG_OPENTHREAD_CLI_WIFI)
     list(APPEND srcs   "src/esp_ot_wifi_cmd.c")
 endif()
 
-if(CONFIG_OPENTHREAD_CLI_RCP_UPDATE)
-    list(APPEND srcs   "src/esp_rcp_update_commands.c")
+if(CONFIG_OPENTHREAD_CLI_OTA)
+    list(APPEND srcs   "src/esp_ot_ota_commands.c")
 endif()
 
 set(include "include")
 idf_component_register(SRCS "${srcs}"
                     INCLUDE_DIRS "${include}"
-                    REQUIRES lwip openthread iperf esp_rcp_http_download)
+                    REQUIRES lwip openthread iperf esp_br_http_ota esp_netif esp_wifi)

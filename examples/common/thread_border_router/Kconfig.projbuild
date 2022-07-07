@@ -82,6 +82,12 @@ menu "ESP Thread Border Router Example"
             compare the stored image version with the running RCP image upon boot. The RCP
             will be automatically updated upon version mismatch.
 
+    config OPENTHREAD_BR_CREATE_OTA_IMAGE
+        bool 'Create the OTA image for border router'
+        default True
+        help
+            If enabled, an ota image will be generated during building.
+
     config OPENTHREAD_BR_AUTO_START
         bool 'Enable the automatic start mode in Thread Border Router.'
         default False

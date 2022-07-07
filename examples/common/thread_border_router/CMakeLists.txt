@@ -3,7 +3,7 @@ idf_component_register(SRC_DIRS "src"
                        REQUIRES
                         border_router_board
                         esp_http_client
-                        esp_rcp_http_download
+                        esp_br_http_ota
                         esp_rcp_update
                         esp-serial-flasher
                         esp_ot_cli_extension

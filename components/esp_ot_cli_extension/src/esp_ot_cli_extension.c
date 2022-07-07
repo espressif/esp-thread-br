@@ -15,10 +15,10 @@
 #include "esp_ot_cli_extension.h"
 #include "esp_openthread.h"
 #include "esp_ot_iperf.h"
+#include "esp_ot_ota_commands.h"
 #include "esp_ot_tcp_socket.h"
 #include "esp_ot_udp_socket.h"
 #include "esp_ot_wifi_cmd.h"
-#include "esp_rcp_update_commands.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/portmacro.h"
 #include "freertos/task.h"
@@ -40,8 +40,8 @@ static const otCliCommand kCommands[] = {
 #if CONFIG_OPENTHREAD_CLI_WIFI
     {"wifi", esp_ot_process_wifi_cmd},
 #endif // CONFIG_OPENTHREAD_CLI_WIFI
-#if CONFIG_OPENTHREAD_CLI_RCP_UPDATE
-    {"rcpupdate", esp_openthread_process_rcp_command},
+#if CONFIG_OPENTHREAD_CLI_OTA
+    {"ota", esp_openthread_process_ota_command},
 #endif // CONFIG_OPENTHREAD_CLI_RCP_UPDATE
 };
 
