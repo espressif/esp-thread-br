@@ -4,12 +4,9 @@ if(CONFIG_OPENTHREAD_CLI_IPERF)
     list(APPEND srcs   "src/esp_ot_iperf.c")
 endif()
 
-if(CONFIG_OPENTHREAD_CLI_TCP_SOCKET)
-    list(APPEND srcs   "src/esp_ot_tcp_socket.c")
-endif()
-
-if(CONFIG_OPENTHREAD_CLI_UDP_SOCKET)
-    list(APPEND srcs   "src/esp_ot_udp_socket.c")
+if(CONFIG_OPENTHREAD_CLI_SOCKET)
+    list(APPEND srcs    "src/esp_ot_tcp_socket.c"
+                        "src/esp_ot_udp_socket.c")
 endif()
 
 if(CONFIG_OPENTHREAD_CLI_WIFI)
@@ -23,4 +20,9 @@ endif()
 set(include "include")
 idf_component_register(SRCS "${srcs}"
                     INCLUDE_DIRS "${include}"
-                    REQUIRES lwip openthread iperf esp_br_http_ota esp_netif esp_wifi)
+                    REQUIRES lwip openthread iperf esp_netif esp_wifi)
+
+if (CONFIG_OPENTHREAD_CLI_OTA)
+    idf_component_optional_requires(PUBLIC esp_br_http_ota)
+endif()
+

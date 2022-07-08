@@ -25,15 +25,13 @@
 #include "openthread/cli.h"
 
 static const otCliCommand kCommands[] = {
-#if CONFIG_OPENTHREAD_CLI_TCP_SOCKET
+#if CONFIG_OPENTHREAD_CLI_SOCKET
     {"tcpsockserver", esp_ot_process_tcp_server},
     {"tcpsockclient", esp_ot_process_tcp_client},
-#endif // CONFIG_OPENTHREAD_CLI_TCP_SOCKET
-#if CONFIG_OPENTHREAD_CLI_UDP_SOCKET
     {"udpsockserver", esp_ot_process_udp_server},
     {"udpsockclient", esp_ot_process_udp_client},
     {"mcast", esp_ot_process_mcast_group},
-#endif // CONFIG_OPENTHREAD_CLI_UDP_SOCKET
+#endif // CONFIG_OPENTHREAD_CLI_SOCKET
 #if CONFIG_OPENTHREAD_CLI_IPERF
     {"iperf", esp_ot_process_iperf},
 #endif // CONFIG_OPENTHREAD_CLI_IPERF
