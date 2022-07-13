@@ -12,27 +12,22 @@ menu "OpenThread Extension CLI"
         depends on OPENTHREAD_CLI_ESP_EXTENSION
         default y
 
-    config OPENTHREAD_CLI_TCP_SOCKET
-        bool "Enable TCP socket command"
+    config OPENTHREAD_CLI_SOCKET
+        bool "Enable socket command"
         depends on OPENTHREAD_CLI_ESP_EXTENSION
         default y
 
     config OPENTHREAD_CLI_TCP_SERVER_PORT
-        int "the port of TCP server"
+        int "the port of TCP socket server"
         default 12345
-        depends on OPENTHREAD_CLI_TCP_SOCKET
+        depends on OPENTHREAD_CLI_SOCKET
         help
             Set the connect port of socket
 
-    config OPENTHREAD_CLI_UDP_SOCKET
-        bool "Enable UDP socket command"
-        depends on OPENTHREAD_CLI_ESP_EXTENSION
-        default y
-
     config OPENTHREAD_CLI_UDP_SERVER_PORT
         int "the port of UDP server"
-        default 54321
-        depends on OPENTHREAD_CLI_UDP_SOCKET
+        default 12346
+        depends on OPENTHREAD_CLI_SOCKET
         help
             Set the connect port of socket
 
@@ -44,6 +39,6 @@ menu "OpenThread Extension CLI"
     config OPENTHREAD_CLI_OTA
         bool "Enable OTA command"
         depends on OPENTHREAD_CLI_ESP_EXTENSION && OPENTHREAD_BORDER_ROUTER
-        default y
+        default n
 
 endmenu

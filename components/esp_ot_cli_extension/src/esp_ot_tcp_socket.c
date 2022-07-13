@@ -10,12 +10,15 @@
  * Unless required by applicable law or agreed to in writing, this
  * software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
  * CONDITIONS OF ANY KIND, either express or implied.
-*/
+ */
+
+#include "esp_ot_tcp_socket.h"
 
 #include "esp_check.h"
 #include "esp_err.h"
 #include "esp_log.h"
-#include "esp_ot_tcp_socket.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "lwip/err.h"
 #include "lwip/sockets.h"
 
@@ -32,9 +35,9 @@ static void tcp_socket_server_task(void *pvParameters)
     int opt = 1;
     int port = CONFIG_OPENTHREAD_CLI_TCP_SERVER_PORT;
     int client_sock = 0;
-    struct timeval timeout = { 0 };
+    struct timeval timeout = {0};
     struct sockaddr_storage source_addr; // Large enough for both IPv6
-    struct sockaddr_in6 listen_addr = { 0 };
+    struct sockaddr_in6 listen_addr = {0};
     // The TCP server listen at the address "::", which means all addresses can be listened to.
     inet6_aton("::", &listen_addr.sin6_addr);
     listen_addr.sin6_family = AF_INET6;
@@ -50,14 +53,14 @@ static void tcp_socket_server_task(void *pvParameters)
 
     ESP_LOGI(TAG, "Socket created");
 
-    err = bind(listen_sock, (struct sockaddr *)&listen_addr, sizeof(struct sockaddr_in6) );
+    err = bind(listen_sock, (struct sockaddr *)&listen_addr, sizeof(struct sockaddr_in6));
     ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "Socket unable to bind: errno %d, IPPROTO: %d", errno, AF_INET6);
     ESP_LOGI(TAG, "Socket bound, port %d", port);
 
     err = listen(listen_sock, 1);
     ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "Error occurred during listen: errno %d", errno);
 
-    //blocking-mode accept, set timeout 30 seconds
+    // blocking-mode accept, set timeout 30 seconds
     timeout.tv_sec = 30;
     setsockopt(listen_sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
@@ -69,7 +72,7 @@ static void tcp_socket_server_task(void *pvParameters)
 
     ESP_GOTO_ON_FALSE((err >= 0), ESP_FAIL, exit, TAG, "Error occurred during sending: errno %d", errno);
 
-    //blocking-mode receive, set timeout 30 seconds
+    // blocking-mode receive, set timeout 30 seconds
     timeout.tv_sec = 30;
     setsockopt(client_sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
@@ -107,7 +110,7 @@ static void tcp_socket_client_task(void *pvParameters)
     int err = 0;
     int len = 0;
     int port = CONFIG_OPENTHREAD_CLI_TCP_SERVER_PORT;
-    struct sockaddr_in6 dest_addr = { 0 };
+    struct sockaddr_in6 dest_addr = {0};
 
     inet6_aton(host_ip, &dest_addr.sin6_addr);
     dest_addr.sin6_family = AF_INET6;
@@ -147,16 +150,20 @@ void esp_ot_process_tcp_server(void *aContext, uint8_t aArgsLength, char *aArgs[
     (void)(aContext);
     (void)(aArgsLength);
     (void)(*aArgs);
+
     xTaskCreate(tcp_socket_server_task, "ot_tcp_scoket_server", 4096, xTaskGetCurrentTaskHandle(), 4, NULL);
 }
 
 void esp_ot_process_tcp_client(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
     (void)(aContext);
-    (void)(aArgsLength);
+
+    static char s_target_addr_string[128];
+
     if (aArgsLength == 0) {
         ESP_LOGE(TAG, "Invalid arguments.");
     } else {
-        xTaskCreate(tcp_socket_client_task, "ot_tcp_socket_client", 4096, aArgs[0], 4, NULL);
+        strncpy(s_target_addr_string, aArgs[0], sizeof(s_target_addr_string));
+        xTaskCreate(tcp_socket_client_task, "ot_tcp_socket_client", 4096, s_target_addr_string, 4, NULL);
     }
 }

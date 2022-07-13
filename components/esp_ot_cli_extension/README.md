@@ -15,6 +15,7 @@ To enable OpenThread extension commands, the following Kconfig option needs to b
 * [udpsockclient](#udpsockclient)
 * [udpsockserver](#udpsockserver)
 * [wifi](#wifi)
+* [ota](#ota)
 
 ### iperf
 
@@ -126,3 +127,53 @@ ot_socket: Socket created, connecting to fdde:ad00:beef:0:a7c6:6311:9c8c:271b:12
 ot_socket: Successfully connected
 ...
 ```
+
+### wifi
+
+Used for connecting the border router to the Wi-Fi network.
+
+```bash
+> wifi
+--wifi parameter---
+connect
+-s                   :     wifi ssid
+-p                   :     wifi psk
+---example---
+join a wifi:
+ssid: threadcertAP
+psk: threadcertAP    :     wifi connect -s threadcertAP -p threadcertAP
+state                :     get wifi state, disconnect or connect
+---example---
+get wifi state       :     wifi state
+Done
+```
+
+To join a Wi-Fi network, please use the `wifi connect` command:
+
+```bash
+> wifi connect -s threadcertAP -p threadcertAP
+```
+
+To get the state of the Wi-Fi network:
+
+```bash
+> wifi state
+connected
+Done
+```
+
+### ota
+
+Used for downloading border router firmware and updating the border router or the RCP alone.
+
+```
+> ota download https://192.168.1.2:8070/br_ota_image
+```
+
+After downloading the device will restart and update itself with the new firmware. The RCP will also be updated if the firmware version changes.
+
+```
+> ota rcpudate
+```
+
+This command will enforce a RCP update regardless of the RCP version.

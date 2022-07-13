@@ -10,14 +10,17 @@
  * Unless required by applicable law or agreed to in writing, this
  * software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
  * CONDITIONS OF ANY KIND, either express or implied.
-*/
+ */
+
+#include "esp_ot_udp_socket.h"
 
 #include "esp_check.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_openthread_lock.h"
-#include "esp_ot_udp_socket.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "lwip/err.h"
 #include "lwip/mld6.h"
 #include "lwip/sockets.h"
@@ -35,7 +38,7 @@ static void udp_socket_server_task(void *pvParameters)
     int listen_sock;
 
     int port = CONFIG_OPENTHREAD_CLI_UDP_SERVER_PORT;
-    struct timeval timeout = { 0 };
+    struct timeval timeout = {0};
     struct sockaddr_storage source_addr; // Large enough for both IPv4 or IPv6
     struct sockaddr_in6 listen_addr;
 
@@ -96,7 +99,7 @@ static void udp_socket_client_task(void *pvParameters)
     int len;
     esp_err_t ret = ESP_OK;
     struct sockaddr_storage source_addr; // Large enough for both IPv4 or IPv6
-    struct sockaddr_in6 dest_addr = { 0 };
+    struct sockaddr_in6 dest_addr = {0};
     uint8_t netif_index = esp_netif_get_netif_impl_index(esp_netif_get_handle_from_ifkey("OT_DEF"));
 
     inet6_aton(host_ip, &dest_addr.sin6_addr);
@@ -135,22 +138,27 @@ void esp_ot_process_udp_server(void *aContext, uint8_t aArgsLength, char *aArgs[
 {
     (void)(aContext);
     (void)(aArgsLength);
+
     xTaskCreate(udp_socket_server_task, "ot_udp_scoket_server", 4096, xTaskGetCurrentTaskHandle(), 4, NULL);
 }
 
 void esp_ot_process_udp_client(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
     (void)(aContext);
+
+    static char s_target_addr_string[128];
+
     if (aArgsLength == 0) {
         ESP_LOGE(TAG, "Invalid arguments.");
     } else {
-        xTaskCreate(udp_socket_client_task, "ot_udp_socket_client", 4096, aArgs[0], 4, NULL);
+        strncpy(s_target_addr_string, aArgs[0], sizeof(s_target_addr_string));
+        xTaskCreate(udp_socket_client_task, "ot_udp_socket_client", 4096, s_target_addr_string, 4, NULL);
     }
 }
 
 void esp_ot_process_mcast_group(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
-    if (aArgsLength != 2 || (strncmp(aArgs[0], "join", 4) != 0 && strncmp(aArgs[0], "leave", 5) != 0) ) {
+    if (aArgsLength != 2 || (strncmp(aArgs[0], "join", 4) != 0 && strncmp(aArgs[0], "leave", 5) != 0)) {
         ESP_LOGE(TAG, "Invalid arguments: mcast [join|leave] group_address");
         return;
     }
