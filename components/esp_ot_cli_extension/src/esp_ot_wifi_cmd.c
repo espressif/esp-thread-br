@@ -10,22 +10,22 @@
  * Unless required by applicable law or agreed to in writing, this
  * software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
  * CONDITIONS OF ANY KIND, either express or implied.
-*/
+ */
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include "esp_netif_types.h"
-#include "esp_openthread_border_router.h"
 #include "esp_check.h"
 #include "esp_event.h"
-#include "esp_openthread_lock.h"
 #include "esp_netif.h"
 #include "esp_netif_ip_addr.h"
 #include "esp_netif_net_stack.h"
+#include "esp_netif_types.h"
+#include "esp_openthread_border_router.h"
+#include "esp_openthread_lock.h"
 #include "esp_wifi.h"
-#include "freertos/event_groups.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
 #include "freertos/portmacro.h"
 #include "freertos/task.h"
 #include "openthread/cli.h"
@@ -41,7 +41,7 @@ void esp_ot_wifi_netif_init(void)
     assert(esp_netif);
 }
 
-static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         xEventGroupClearBits(wifi_event_group, CONNECTED_IP4_BIT);
@@ -63,27 +63,28 @@ static void wifi_join(const char *ssid, const char *psk)
         wifi_event_group = xEventGroupCreate();
         wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
         esp_wifi_init(&cfg);
-        ESP_ERROR_CHECK( esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &event_handler, NULL) );
-        ESP_ERROR_CHECK( esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL) );
-        ESP_ERROR_CHECK( esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_CONNECTED, &event_handler, NULL) );
-        ESP_ERROR_CHECK( esp_event_handler_register(IP_EVENT, IP_EVENT_GOT_IP6, &event_handler, NULL) );
+        ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &event_handler, NULL));
+        ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
+        ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_CONNECTED, &event_handler, NULL));
+        ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_GOT_IP6, &event_handler, NULL));
         esp_wifi_set_storage(WIFI_STORAGE_RAM);
         esp_wifi_set_mode(WIFI_MODE_NULL);
         s_initialized = true;
     }
     esp_wifi_start();
-    wifi_config_t wifi_config = { 0 };
-    strncpy((char *) wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
+    wifi_config_t wifi_config = {0};
+    strncpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
     if (psk) {
-        strncpy((char *) wifi_config.sta.password, psk, sizeof(wifi_config.sta.password));
+        strncpy((char *)wifi_config.sta.password, psk, sizeof(wifi_config.sta.password));
     }
 
-    ESP_ERROR_CHECK( esp_wifi_set_ps(WIFI_PS_NONE) );
-    ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
-    ESP_ERROR_CHECK( esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     esp_wifi_connect();
 
-    int bits = xEventGroupWaitBits(wifi_event_group, CONNECTED_IP4_BIT | CONNECTED_IP6_BIT, pdFALSE, pdTRUE, 10000 / portTICK_PERIOD_MS);
+    int bits = xEventGroupWaitBits(wifi_event_group, CONNECTED_IP4_BIT | CONNECTED_IP6_BIT, pdFALSE, pdTRUE,
+                                   10000 / portTICK_PERIOD_MS);
 
     if (((bits & CONNECTED_IP4_BIT) != 0) && ((bits & CONNECTED_IP6_BIT) != 0)) {
         s_wifi_connected = true;
@@ -102,7 +103,7 @@ static void wifi_join(const char *ssid, const char *psk)
     } else {
         esp_wifi_disconnect();
         esp_wifi_stop();
-        ESP_LOGW("","Connection time out, please check your ssid & password, then retry.");
+        ESP_LOGW("", "Connection time out, please check your ssid & password, then retry.");
         otCliOutputFormat("wifi sta connection is failed\n");
     }
 }
@@ -118,7 +119,8 @@ void esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs[])
         otCliOutputFormat("-s                   :     wifi ssid\n");
         otCliOutputFormat("-p                   :     wifi psk\n");
         otCliOutputFormat("---example---\n");
-        otCliOutputFormat("join a wifi:\nssid: threadcertAP \npsk: threadcertAP    :     wifi connect -s threadcertAP -p threadcertAP\n");
+        otCliOutputFormat("join a wifi:\nssid: threadcertAP \npsk: threadcertAP    :     wifi connect -s threadcertAP "
+                          "-p threadcertAP\n");
         otCliOutputFormat("state                :     get wifi state, disconnect or connect\n");
         otCliOutputFormat("---example---\n");
         otCliOutputFormat("get wifi state       :     wifi state\n");

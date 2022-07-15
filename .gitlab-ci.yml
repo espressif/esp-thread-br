@@ -5,6 +5,15 @@ variables:
     CI_DOCKER_REGISTRY: "ciregistry.espressif.cn:8443"
     ESP_THREAD_BR_PATH: "$CI_PROJECT_DIR"
 
+pre_commit:
+  stage: .pre
+  image: "$CI_DOCKER_REGISTRY/esp-idf-pre-commit:1"
+  script:
+    - cd ${ESP_THREAD_BR_PATH}
+    - apt-get update && apt-get install -y clang-format-11
+    - git fetch origin main
+    - git diff-tree --no-commit-id --name-only -r HEAD origin/main | xargs pre-commit run --files
+
 .submodule_update: &submodule_update
   - cd $ESP_THREAD_BR_PATH
   - git submodule update --init --recursive

@@ -10,16 +10,16 @@
  * Unless required by applicable law or agreed to in writing, this
  * software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
  * CONDITIONS OF ANY KIND, either express or implied.
-*/
+ */
 
+#include "esp_ot_iperf.h"
 #include "esp_check.h"
 #include "esp_log.h"
-#include "esp_ot_iperf.h"
 #include "iperf.h"
-#include "openthread/cli.h"
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include "openthread/cli.h"
 
 #define TAG "ot-iperf"
 static char s_dest_ip6_addr[50];
