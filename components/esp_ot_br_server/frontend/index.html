@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en-US">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>ESP32-OpenThread-AIOT</title>
+  <link href="/static/style.css" type="text/css" rel="stylesheet">
+  <script src="/static/restful.js" defer="true"></script>
+  <link href="/favicon.ico" rel="icon">
+
+  <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
+
+  <style>
+    .container {
+      width: 1500px;
+    }
+  </style>
+</head>
+
+<body>
+  <header id="header" class="header fixed-top sticked" data-scrollto-offset="0">
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-md-4">
+          <a href="https://www.espressif.com/en" class="logo">
+            <h1>ESPRESSIF-<span style="color: #0ea2bd">OpenThread.</span></h1>
+          </a>
+        </div>
+        <div class="col-md-6 menu">
+          <nav id="navbar" class="navbar">
+            <ul>
+              <li class="nav-link"><a href="index.html#Main-Section"><span>Home</span></a>
+              </li>
+              <li><a class="nav-link" href="index.html#Scan">Scan</a></li>
+              <li><a class="nav-link" href="index.html#Form">Form</a></li>
+              <li><a class="nav-link" href="index.html#Status">Status</a></li>
+              <li><a class="nav-link" href="index.html#Contact">Contact</a></li>
+            </ul>
+          </nav>
+        </div>
+        <div class="col-md-2"></div>
+      </div>
+    </div>
+  </header>
+  <section class="main-section" id="Main-Section">
+    <div class="container text-center position-relative default-margin">
+      <h2>Espressif Thread Border Router <span>WEB-GUI</span></h2>
+      <div class="text-left" style="margin-top: 50px;">
+        <p>
+          &nbsp &nbsp &nbsp &nbsp Espressif Systems (688018.SH) is a public multinational, fabless semiconductor company
+          established in 2008,
+          with offices in China, the Czech Republic, India, Singapore and Brazil.
+          We have a passionate team of engineers and scientists from all over the world, focused on developing
+          cutting-edge wireless communication, low-power, AIoT solutions.
+          We have created the popular ESP8266, ESP32, ESP32-S, ESP32-C and ESP32-H series of chips, modules and
+          development boards.
+          By leveraging wireless computing, we provide green, versatile and cost-effective chipsets.
+          We are committed to offering solutions that are secure, robust and power-efficient.
+          At the same time, by open-sourcing our technology and solutions, we aim to enable developers to use
+          Espressif's solutions globally and build their own smart-connected devices.
+        </p>
+      </div>
+    </div>
+  </section>
+  <main id="main">
+    <section id="notice-section" class="notice-section">
+      <div class="container">
+        <div class="row">
+          <div class="col-md-5">
+            <div class="service-item">
+              <h4 class="text-center"><a href="https://github.com/espressif/esp-idf">Espressif IoT Development
+                  Framework.</a></h4>
+              <p> &nbsp &nbsp &nbsp &nbsp ESP-IDF is the development framework for Espressif SoCs supported on Windows,
+                Linux and macOS.
+                Espressif provides basic hardware and software resources to help application developers realize their
+                ideas using the ESP32 series hardware.
+              </p>
+            </div>
+          </div>
+          <div class="col-md-5 col-md-offset-2">
+            <div class="service-item">
+              <h4 class="text-center"><a href="https://github.com/espressif/esp-thread-br">ESP Thread Border Router
+                  SDK.</a></h4>
+              <p> &nbsp &nbsp &nbsp &nbsp ESP-Thread-BR is the official ESP Thread Border Router SDK.
+                It supports all fundamental network features to build a Thread Border Router and integrates rich product
+                level features for quick productization.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section id="Scan" class="sub-section">
+      <div class="container">
+        <div class="section-header default-margin">
+          <h2><span style="color: #0ea2bd">Discover</span> Thread Network</h2>
+          <p>the available thread network would be scan here, one of the networks can be opt-in.</p>
+        </div>
+        <div class="row">
+          <table class="pure-table pure-table-horizontal">
+            <caption>Available thread networks</caption>
+            <thead>
+              <tr>
+                <th style="width: 100px;">No.</th>
+                <th>Network Name</th>
+                <th>Extended PAN ID</th>
+                <th>PAN ID</th>
+                <th>Mac Address</th>
+                <th style="width: 120px;">Channel</th>
+                <th style="width: 120px;">dBm</th>
+                <th style="width: 120px;">LQI</th>
+                <th style="width: 150px;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="table_available_networks">
+              <tr>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td><button class="btn-submit" onclick="click_copy_network_info_to_form(this)">FILL</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="row">
+          <button class="btn-submit" style="margin-top: 1%; margin-left: 1275px;"
+            onclick="get_threadScan_httpServer()">SCAN</button>
+        </div>
+      </div>
+    </section>
+    <section id="Form" class="sub-section">
+      <div class="container">
+        <div class="section-header default-margin">
+          <h2><span style="color: #0ea2bd">Form</span> Thread Network</h2>
+          <p>In this section, you can input some parameters to structure the thread network</p>
+        </div>
+        <div class="part">
+          <div class="submit-form">
+            <div class="row">
+              <div class="col-md-4">
+                <h4>Inputing Relating Value in Form.</h4>
+              </div>
+              <div class="col-md-4 col-md-offset-4">
+                <h4 id="form_tip"
+                  style="color: green; font-weight: 200; font-family: 'Times New Roman', Times, serif; display: none;">
+                  upload...</h4>
+              </div>
+            </div>
+            <p>note: the table which marks * must be filled.</p>
+            <form action="" enctype='application/json' method="post" id="network_form">
+              <div class="row">
+                <div class="col-md-6 form-group">
+                  <span>
+                    <p style="font-size: 16px; font-weight:700;">Network Name <span style="color: red;">*</span></p>
+                  </span>
+                  <input name="network_name" type="text" class="form-control" value="OpenThread-0x99">
+                </div>
+                <div class="col-md-6 form-group">
+                  <span>
+                    <p style="font-size: 16px; font-weight:700;">Network Key <span style="color: red;">*</span></p>
+                  </span>
+                  <input name="key" type="text" class="form-control" value="00112233445566778899aabbccddeeff">
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-6 form-group">
+                  <span>
+                    <p style="font-size: 16px; font-weight:700;">PANID <span style="color: red;">*</span></p>
+                  </span>
+                  <input name="panid" type="text" class="form-control" value="0x1234">
+                </div>
+                <div class="col-md-6 form-group">
+                  <span>
+                    <p style="font-size: 16px; font-weight:700;">Network Channel <span style="color: red;">*</span></p>
+                  </span>
+                  <input name="channel" type="number" class="form-control" value="15">
+                </div>
+              </div>
+
+              <div id="form-more-param" style="display:none">
+                <div class="row">
+                  <div class="col-md-6 form-group">
+                    <span>
+                      <p style="font-size: 16px; font-weight:700;">Network Extended PANID </p>
+                    </span>
+                    <input name="extended_panid" type="text" class="form-control" value="1111111122222222">
+                  </div>
+                  <div class="col-md-6 form-group">
+                    <span>
+                      <p style="font-size: 16px; font-weight:700;">Passphrase/Commissioner Credential</p>
+                    </span>
+                    <input name="passphrase" type="text" class="form-control" value="j01Nme">
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="col-md-12 form-group">
+                    <p style="font-size: 16px; font-weight:700;">On-mesh Prefix</p>
+                    <input name="on_mesh_prefix" type="text" class="form-control" value="fd11:22::">
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="col-md-3 form-checkbox">
+                    <input type="checkbox" checked="check" name="default_route" />
+                    <span style="font-size: 16px;">Default Route</span>
+                  </div>
+                </div>
+              </div>
+              <div class="row" style="float: right;">
+                <a id="form-more-tip" style="font-size:16px" onclick="click_for_more_form_param()">for more &#x21B5;</a>
+              </div>
+              <button type="button" class="btn btn-primary" onclick="upload_form_network_param_package()">Form or
+                Join</button>
+            </form>
+          </div><!-- End blog comments -->
+        </div>
+      </div>
+    </section>
+    <section id="Status" class="sub-section">
+      <div class="container">
+        <div class="section-header default-margin">
+          <h2>Thread Network <span style="color: #0ea2bd" onclick="get_threadStatus_httpServer()">Status</span> </h2>
+          <p>The ESP-OpenThread status can be check here, include ipv6, network, openthread, rcp and WPAN and so on.</p>
+        </div>
+        <div class="row g-4 g-lg-5">
+          <ul class="nav nav-pills mb-3">
+            <li><a class="nav-link active" data-bs-toggle="pill" id="link_0"
+                onclick="get_threadStatus_httpServer()">OverView</a></li>
+            <li><a class="nav-link" data-bs-toggle="pill" id="link_1">IPv6</a></li>
+            <li><a class="nav-link" data-bs-toggle="pill" id="link_2">Network</a></li>
+            <li><a class="nav-link" data-bs-toggle="pill" id="link_3">OpenThread</a></li>
+            <li><a class="nav-link" data-bs-toggle="pill" id="link_4">RCP</a></li>
+            <li><a class="nav-link" data-bs-toggle="pill" id="link_5">WPAN</a></li>
+          </ul>
+          <div class="tab-content" id="status-content">
+            <div class="tab-pane active" id="tab0">
+              <div class="row">
+                <div class="col-lg-3">
+                  <h4 class="tab-pane-elem" style="font-weight: bold; font-style:normal;"> IPv6 </h4>
+                  <div class="d-flex align-items-center mt-4">
+                    <h4>linkLocalAddress</h4>
+                  </div>
+                  <p id="ipv6-link_local_address" class="tab-elem-value">none</p>
+                  <div class="d-flex align-items-center mt-4">
+                    <h4>localAddress</h4>
+                  </div>
+                  <p id="ipv6-local_address" class="tab-elem-value">none</p>
+                  <div class="d-flex align-items-center mt-4">
+                    <h4>meshLocalAddress</h4>
+                  </div>
+                  <p id="ipv6-mesh_local_address" class="tab-elem-value">none</p>
+                  <div class="d-flex align-items-center mt-4">
+                    <h4>meshLocalPrefix</h4>
+                  </div>
+                  <p id="ipv6-mesh_local_prefix" class="tab-elem-value">none</p>
+                </div>
+                <div class="col-lg-2">
+                  <h4 class="tab-pane-elem" style="font-weight: bold; font-style:normal;"> Network </h4>
+                  <div class="d-flex align-items-center mt-4">
+                    <h4>Name</h4>
+                  </div>
+                  <p id="network-name" class="tab-elem-value">none</p>
+                  <div class="d-flex align-items-center mt-4">
+                    <h4>PANID</h4>
+                  </div>
+                  <p id="network-panid" class="tab-elem-value">none</p>
+                  <div class="d-flex align-items-center mt-4">
+                    <h4>PartitionID</h4>
+                  </div>
+                  <p id="network-partition_id" class="tab-elem-value">none</p>
+                  <div class="d-flex align-items-center mt-4">
+                    <h4>XPANID</h4>
+                  </div>
+                  <p id="network-xpanid" class="tab-elem-value">none</p>
+                </div>
+                <div class="col-lg-3">
+                  <h4 class="tab-pane-elem" style="font-weight: bold; font-style:normal;"> OpenThread </h4>
+                  <div class="d-flex align-items-center mt-4">
+                    <h4>Version</h4>
+                  </div>
+                  <p id="openThread-version" class="tab-elem-value">none</p>
+                  <div class="d-flex align-items-center mt-4">
+                    <h4>Version_api</h4>
+                  </div>
+                  <p id="openThread-version_api" class="tab-elem-value">none</p>
+                  <div class="d-flex align-items-center mt-4">
+                    <h4>PSKc</h4>
+                  </div>
+                  <p id="openThread-PSKc" class="tab-elem-value">none</p>
+                </div>
+                <div class="col-lg-2">
+                  <h4 class="tab-pane-elem" style="font-weight: bold; font-style:normal;"> RCP </h4>
+                  <div class="d-flex align-items-center mt-4">
+                    <h4>Channel</h4>
+                  </div>
+                  <p id="rcp-channel" class="tab-elem-value">none</p>
+                  <div class="d-flex align-items-center mt-4">
+                    <h4>State</h4>
+                  </div>
+                  <p id="rcp-state" class="tab-elem-value">none</p>
+                  <div class="d-flex align-items-center mt-4">
+                    <h4>EUI64</h4>
+                  </div>
+                  <p id="rcp-EUI64" class="tab-elem-value">none</p>
+                  <div class="d-flex align-items-center mt-4">
+                    <h4>txPower</h4>
+                  </div>
+                  <p id="rcp-txpower" class="tab-elem-value">none</p>
+                  <div class="d-flex align-items-center mt-4">
+                    <h4>Version</h4>
+                  </div>
+                  <p id="rcp-version" class="tab-elem-value">none</p>
+                </div>
+                <div class="col-lg-2">
+                  <h4 class="tab-pane-elem" style="font-weight: bold; font-style:normal;"> WPAN </h4>
+                  <div class="d-flex align-items-center mt-4">
+                    <h4>Service</h4>
+                  </div>
+                  <p id="WPAN-service" class="tab-elem-value">none</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="tab-pane" id="tab1">
+              <div class="row">
+                <div class="d-flex align-items-center mt-4">
+                  <h4>linkLocalAddress</h4>
+                </div>
+                <p id="t-ipv6-link_local_address" class="tab-elem-value">none</p>
+                <div class="d-flex align-items-center mt-4">
+                  <h4>localAddress</h4>
+                </div>
+                <p id="t-ipv6-local_address" class="tab-elem-value">none</p>
+                <div class="d-flex align-items-center mt-4">
+                  <h4>meshLocalAddress</h4>
+                </div>
+                <p id="t-ipv6-mesh_local_address" class="tab-elem-value">none</p>
+                <div class="d-flex align-items-center mt-4">
+                  <h4>meshLocalPrefix</h4>
+                </div>
+                <p id="t-ipv6-mesh_local_prefix" class="tab-elem-value">none</p>
+              </div>
+            </div>
+            <div class="tab-pane" id="tab2">
+              <div class="row">
+                <div class="d-flex align-items-center mt-4">
+                  <h4>Name</h4>
+                </div>
+                <p id="t-network-name" class="tab-elem-value">none</p>
+                <div class="d-flex align-items-center mt-4">
+                  <h4>PANID</h4>
+                </div>
+                <p id="t-network-panid" class="tab-elem-value">none</p>
+                <div class="d-flex align-items-center mt-4">
+                  <h4>PartitionID</h4>
+                </div>
+                <p id="t-network-partition_id" class="tab-elem-value">none</p>
+                <div class="d-flex align-items-center mt-4">
+                  <h4>XPANID</h4>
+                </div>
+                <p id="t-network-xpanid" class="tab-elem-value">none</p>
+              </div>
+            </div>
+            <div class="tab-pane" id="tab3">
+              <div class="row">
+                <div class="d-flex align-items-center mt-4">
+                  <h4>Version</h4>
+                </div>
+                <p id="t-openThread-version" class="tab-elem-value">none</p>
+                <div class="d-flex align-items-center mt-4">
+                  <h4>Version_api</h4>
+                </div>
+                <p id="t-openThread-version_api" class="tab-elem-value">none</p>
+                <div class="d-flex align-items-center mt-4">
+                  <h4>PSKc</h4>
+                </div>
+                <p id="t-openThread-PSKc" class="tab-elem-value">none</p>
+              </div>
+            </div>
+            <div class="tab-pane" id="tab4">
+              <div class="row">
+                <div class="d-flex align-items-center mt-4">
+                  <h4>Channel</h4>
+                </div>
+                <p id="t-rcp-channel" class="tab-elem-value">none</p>
+                <div class="d-flex align-items-center mt-4">
+                  <h4>State</h4>
+                </div>
+                <p id="t-rcp-state" class="tab-elem-value">none</p>
+                <div class="d-flex align-items-center mt-4">
+                  <h4>EUI64</h4>
+                </div>
+                <p id="t-rcp-EUI64" class="tab-elem-value">none</p>
+                <div class="d-flex align-items-center mt-4">
+                  <h4>txPower</h4>
+                </div>
+                <p id="t-rcp-txpower" class="tab-elem-value">none</p>
+                <div class="d-flex align-items-center mt-4">
+                  <h4>Version</h4>
+                </div>
+                <p id="t-rcp-version" class="tab-elem-value">none</p>
+              </div>
+            </div>
+            <div class="tab-pane" id="tab5">
+              <div class="row">
+                <div class="d-flex align-items-center mt-4">
+                  <h4>Service</h4>
+                </div>
+                <p id="t-WPAN-service" class="tab-elem-value">none</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section id="Contact" class="contact">
+      <div class="container">
+        <div class="section-header default-margin">
+          <h2>Contact <span style="color: #0ea2bd">Us</span></h2>
+          <p>If you meet some questions or have a few advises for us, there is a way to contact us.</p>
+        </div>
+        <div class="row">
+          <div class="col-md-11">
+            <div class="info">
+              <h3>Get in Touch</h3>
+              <p>There are some contact information maybe help to you, include Sales Questions, Technical Inquiries,
+                Get-Samples and Comments & Suggestions.</p>
+              <div class="info-item">
+                <div>
+                  <h4>Technical Inquiries:</h4>
+                  <a href="https://www.espressif.com/en/contact-us/technical-inquiries">
+                    Do you have any technical questions about our products?</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer id="footer" class="footer">
+    <div class="footer-content">
+      <div class="container">
+        <div class="row">
+
+          <div class="col-lg-3 col-md-6">
+            <div class="footer-info">
+              <h3>Espressif</h3>
+              <p>
+                Bibo Road, Pudong New Area, Shanghai <br>
+                NY 201203, China<br><br>
+                <strong>SHARE::CONNECT::INNOVATE</strong><br>
+              </p>
+            </div>
+          </div>
+
+          <div class="col-lg-2 col-md-6 footer-links">
+            <h4>Products</h4>
+            <ul>
+              <li><i></i> <a href="https://www.espressif.com/en/products/socs">SoCs</a></li>
+              <li><i></i> <a href="https://www.espressif.com/en/products/modules">Modules</a></li>
+              <li><i></i> <a href="https://www.espressif.com/en/products/devKits">DeKits</a></li>
+            </ul>
+          </div>
+
+          <div class="col-lg-3 col-md-6 footer-links">
+            <h4>Documents</h4>
+            <ul>
+              <li> <a href="https://www.espressif.com/en/support/documents/technical-documents">Technical Documents</a>
+              </li>
+              <li> <a href="https://www.espressif.com/en/support/documents/certificates">Certificates</a></li>
+              <li> <a href="https://www.espressif.com/en/support/documents/pcns">PCNs</a></li>
+              <li> <a href="https://www.espressif.com/en/support/documents/advisories">Advisories</a></li>
+            </ul>
+          </div>
+
+          <div class="col-lg-4 col-md-6 footer-newsletter">
+            <h4>Some Advice</h4>
+            <p>Join us to create an interconnection of all things world</p>
+            <form action="" method="post">
+              <a href="https://www.espressif.com/en/subscribe"><input type="email" name="email"><input type="button"
+                  value="Subscribe"></a>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-legal text-center">
+      <div class="container flex-lg-row justify-content-center justify-content-lg-between align-items-center">
+        <div class="align-items-center align-items-lg-start">
+          <div class="copyright">
+            &copy; Copyright <strong><span>@2022 ESPRESSIF SYSTEMS (SHANGHAI) CO., LTD.</span></strong>. All Rights
+            Reserved
+          </div>
+          <div class="credits">
+            Designed by ESPRESSIF's 15.4 Group
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+</body>
+
+</html>
+

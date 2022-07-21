@@ -35,6 +35,8 @@ The Wi-Fi network's ssid and psk needs to be pre-configured with `CONFIG_EXAMPLE
 
 The Thread network parameters could be pre-configured with `CONFIG_OPENTHREAD_NETWORK_xx` options.
 
+If the `CONFIG_OPENTHREAD_BR_START_WEB` option is enabled, [ESP Thread Border Router Web Server](../../components/esp_ot_br_server/README.md) will be provided to configure and query Thread network via a Web GUI.
+
 ### Create the RCP firmware image
 
 The border router supports updating the RCP upon boot.
