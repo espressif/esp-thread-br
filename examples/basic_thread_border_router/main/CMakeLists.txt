@@ -12,6 +12,7 @@ if(CONFIG_OPENTHREAD_BR_AUTO_UPDATE_RCP)
 
     spiffs_create_partition_image(rcp_fw ${CMAKE_CURRENT_BINARY_DIR}/spiffs_image FLASH_IN_PROJECT
                                   DEPENDS rcp_image_generation)
+
 endif()
 
 if(CONFIG_OPENTHREAD_BR_CREATE_OTA_IMAGE)

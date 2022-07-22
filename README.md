@@ -53,10 +53,10 @@ These features are currently provided by the SDK:
 * **Service Registration Server**: The nodes on the Thread network can register services to the border router for devices on the backbone link to discover.
 * **Multicast Forwarding**: The devices joining the same multicast group on the backbone link and the Thread network can be reached with one single multicast.
 * **RCP Update**: The built border router image will contain an updatable RCP image and can automatically update the RCP on version mismatch or RCP failure.
+* **Web GUI**: The border router will enable a web server and provide some practical functions including Thread network discovery, network formation and status query. 
 
 In the future releases, the following features will be added:
 
-* Web GUI
 * SPI Communication
 * RF Coexistence
 * NAT64

@@ -96,4 +96,10 @@ menu "ESP Thread Border Router Example"
             SSID and PSK, and then form a Thread network automatically. Otherwise, user need
             to configure Wi-Fi and Thread manually.
 
+    config OPENTHREAD_BR_START_WEB
+        bool 'Enable the web server in Thread Border Router.'
+        default False
+        help
+            If enabled, a web server will be provided to configure and query Thread network via a Web GUI. 
+
 endmenu

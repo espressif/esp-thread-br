@@ -1,21 +1,11 @@
 /*
  * SPDX-FileCopyrightText: 2022 Espressif Systems (Shanghai) CO LTD
  *
- * SPDX-License-Identifier: CC0-1.0
- *
- * OpenThread Border Router Example
- *
- * This example code is in the Public Domain (or CC0 licensed, at your option.)
- *
- * Unless required by applicable law or agreed to in writing, this
- * software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
- * CONDITIONS OF ANY KIND, either express or implied.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 #include <stdio.h>
 #include <string.h>
 
-#include "border_router_launch.h"
 #include "esp_check.h"
 #include "esp_err.h"
 #include "esp_event.h"
@@ -35,6 +25,9 @@
 #include "protocol_examples_common.h"
 #include "driver/uart.h"
 #include "freertos/FreeRTOS.h"
+
+#include "border_router_launch.h"
+#include "esp_br_web.h"
 
 #define TAG "esp_ot_br"
 
@@ -70,6 +63,7 @@ void app_main(void)
     ESP_ERROR_CHECK(init_spiffs());
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
+
 #if CONFIG_OPENTHREAD_BR_AUTO_START
     ESP_ERROR_CHECK(example_connect());
     ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
@@ -78,8 +72,13 @@ void app_main(void)
     esp_ot_wifi_netif_init();
     esp_openthread_set_backbone_netif(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"));
 #endif
+
     ESP_ERROR_CHECK(mdns_init());
     ESP_ERROR_CHECK(mdns_hostname_set("esp-ot-br"));
     esp_set_ota_server_cert((char *)server_cert_pem_start);
     launch_openthread_border_router(&platform_config, &rcp_update_config);
+
+#if CONFIG_OPENTHREAD_BR_START_WEB
+    esp_br_web_start();
+#endif
 }
