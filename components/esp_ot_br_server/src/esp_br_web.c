@@ -279,27 +279,26 @@ static esp_err_t httpd_resp_send_spiffs_file(httpd_req_t *req, char *path)
  */
 static esp_err_t index_html_get_handler(httpd_req_t *req, char *path)
 {
-    esp_err_t ret = httpd_resp_send_spiffs_file(req, path);
+    ESP_RETURN_ON_ERROR(httpd_resp_send_spiffs_file(req, path), WEB_TAG, "Fail to get html file.");
     httpd_resp_sendstr_chunk(req, NULL); // end
-
-    return ret;
+    return ESP_OK;
 }
 
 static esp_err_t style_css_get_handler(httpd_req_t *req, char *path)
 {
     httpd_resp_set_type(req, "text/css"); // send content-type："text/css" in http-header
-    esp_err_t ret = httpd_resp_send_spiffs_file(req, path);
+    ESP_RETURN_ON_ERROR(httpd_resp_send_spiffs_file(req, path), WEB_TAG, "Fail to get style file.");
     httpd_resp_sendstr_chunk(req, NULL);
-    return ret;
+    return ESP_OK;
 }
 
 static esp_err_t script_js_get_handler(httpd_req_t *req, char *path)
 {
     httpd_resp_set_type(req,
                         "application/javascript"); // send content-type："application/javascript" in http-header
-    esp_err_t ret = httpd_resp_send_spiffs_file(req, path);
+    ESP_RETURN_ON_ERROR(httpd_resp_send_spiffs_file(req, path), WEB_TAG, "Fail to get script file.");
     httpd_resp_sendstr_chunk(req, NULL);
-    return ret;
+    return ESP_OK;
 }
 
 /**
@@ -307,7 +306,7 @@ static esp_err_t script_js_get_handler(httpd_req_t *req, char *path)
  *
  * @param[in] uri       A string points the request uri from client
  * @param[in] parse_url A pointer point to the result structure for @function "http_parser_parse_url()".
- * @param[in] base_path A string pointer point the base "spiffs" path.
+ * @param[in] base_path A string pointer point the base files path.
  * @return the vaild information from @param parse_url
  */
 static reqeust_url_t parse_request_url_information(const char *uri, const struct http_parser_url *parse_url,
@@ -379,20 +378,17 @@ static esp_err_t default_urls_get_handler(httpd_req_t *req)
 /**
  * @brief The function is to create an HTTP server and register an accessible URI
  *
+ * @param[in] base_path A string represents the basic path of http_server files.
  * @param[in] host_ip A IPvr4 address provided by the connected wifi, recorded by g_server.ip
  * @return ESP_OK: on success, ESP_FAIL: on failure
  */
-static esp_err_t start_esp_br_http_server(const char *host_ip)
+static esp_err_t start_esp_br_http_server(const char *base_path, const char *host_ip)
 {
-    const char base_path[] = "/spiffs";
+    ESP_RETURN_ON_ERROR(base_path == NULL, WEB_TAG, "The base path is empty.");
 
     strcpy(g_server.ip, host_ip);
     static http_server_data_t *server_data = NULL;
-    // check the dir of spiffs
-    if (strcmp(base_path, "/spiffs") != 0) {
-        ESP_LOGE(WEB_TAG, "File server presently supports only '/spiffs' as base path");
-        return ESP_ERR_INVALID_ARG;
-    }
+
     // avoid to create server twice
     if (server_data) {
         ESP_LOGE(WEB_TAG, "Http server already started!");
@@ -405,8 +401,9 @@ static esp_err_t start_esp_br_http_server(const char *host_ip)
         ESP_LOGE(WEB_TAG, "Failed to allocate memory for server data");
         return ESP_ERR_NO_MEM;
     }
-    strlcpy(server_data->base_path, base_path,
-            sizeof(server_data->base_path)); /* take the path of spiffs in flash as the root directory of the server */
+    strlcpy(
+        server_data->base_path, base_path,
+        sizeof(server_data->base_path)); /* take the path of web_server in flash as the root directory of the server */
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
@@ -453,12 +450,12 @@ static esp_err_t start_esp_br_http_server(const char *host_ip)
     return ESP_OK;
 }
 
-void connect_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+void connect_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data, const char *base_path)
 {
     httpd_handle_t *server = (httpd_handle_t *)arg;
     if (*server == NULL) {
         ESP_LOGI(WEB_TAG, "Starting webserver");
-        *server = (httpd_handle_t *)start_esp_br_http_server(g_server.ip);
+        *server = (httpd_handle_t *)start_esp_br_http_server(base_path, g_server.ip);
     }
 }
 
@@ -495,11 +492,11 @@ static void ot_task_br_web(void *arg)
     char ipv4_address[SERVER_IPV4_LEN];
     esp_netif_get_ip_info(netif, &ip_info);
     sprintf((char *)ipv4_address, IPSTR, IP2STR(&ip_info.ip));
-    start_esp_br_http_server((char *)ipv4_address);
+    start_esp_br_http_server((const char *)arg, (char *)ipv4_address);
     vTaskDelete(NULL);
 }
 
-void esp_br_web_start(void)
+void esp_br_web_start(char *base_path)
 {
-    xTaskCreate(ot_task_br_web, "ot_task_br_web", 20480, NULL, 4, NULL);
+    xTaskCreate(ot_task_br_web, "ot_task_br_web", 20480, base_path, 4, NULL);
 }

@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-void esp_br_web_start(void);
+void esp_br_web_start(char *base_path);
 
 #ifdef __cplusplus
 }

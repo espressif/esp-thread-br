@@ -79,6 +79,6 @@ void app_main(void)
     launch_openthread_border_router(&platform_config, &rcp_update_config);
 
 #if CONFIG_OPENTHREAD_BR_START_WEB
-    esp_br_web_start();
+    esp_br_web_start("/spiffs");
 #endif
 }

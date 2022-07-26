@@ -23,7 +23,7 @@ if(CONFIG_OPENTHREAD_BR_CREATE_OTA_IMAGE)
         --br-firmware "${build_dir}/${elf_name}.bin"
         DEPENDS "${build_dir}/.bin_timestamp"
         )
-
+        
     add_custom_target(gen_ota_image ALL DEPENDS ${build_dir}/br_ota_image)
     add_dependencies(gen_ota_image gen_project_binary)
 endif()
