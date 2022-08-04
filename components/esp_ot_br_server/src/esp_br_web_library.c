@@ -155,7 +155,7 @@ cJSON *ot_status_struct_convert2_json(openthread_status_t *status)
     cJSON_AddStringToObject(json_network, "name", format);
     sprintf(format, "0x%x", status->network.panid);
     cJSON_AddStringToObject(json_network, "panid", format);
-    sprintf(format, "%d", status->network.partition_id);
+    sprintf(format, "%lu", status->network.partition_id);
     cJSON_AddStringToObject(json_network, "partition_id", format);
     otIp6PrefixToString((const otIp6Prefix *)&status->network.xpanid, prefix, OT_IP6_PREFIX_STRING_SIZE);
     cJSON_AddStringToObject(json_network, "xpanid", prefix);

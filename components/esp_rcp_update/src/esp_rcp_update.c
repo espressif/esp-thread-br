@@ -246,7 +246,7 @@ esp_err_t esp_rcp_update(void)
         int num_retry = 0;
         long current = ftell(fp);
         if (seek_to_subfile(fp, flash_args.tag, &subfile) != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to seek to subfile with tag %d", flash_args.tag);
+            ESP_LOGE(TAG, "Failed to seek to subfile with tag %lu", flash_args.tag);
             abort();
         }
         while (flash_binary(fp, subfile.size, flash_args.offset) != ESP_LOADER_SUCCESS) {

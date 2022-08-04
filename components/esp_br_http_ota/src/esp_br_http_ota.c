@@ -160,7 +160,7 @@ static esp_err_t download_br_ota_firmware(esp_http_client_handle_t http_client, 
         ESP_GOTO_ON_FALSE(len >= 0, ESP_FAIL, exit, TAG, "Failed to download");
         read_size += len;
         ESP_GOTO_ON_ERROR(esp_ota_write(ota_handle, s_download_data_buf, len), exit, TAG, "Failed to write ota");
-        ESP_LOGI(TAG, "%u/%u bytes", read_size, br_firmware_size);
+        ESP_LOGI(TAG, "%lu/%lu bytes", read_size, br_firmware_size);
     }
     ESP_GOTO_ON_FALSE(read_size == br_firmware_size, ESP_FAIL, exit, TAG, "Incomplete firmware");
 
@@ -225,7 +225,7 @@ static esp_err_t download_ota_image(esp_http_client_config_t *config, const char
     while (!download_done) {
         esp_br_subfile_info_t subfile_info;
         int len = http_read_for(http_client, (char *)&subfile_info, sizeof(subfile_info));
-        ESP_LOGI(TAG, "subfile_info: tag 0x%x size %d offset %d\n", subfile_info.tag, subfile_info.size,
+        ESP_LOGI(TAG, "subfile_info: tag 0x%lx size %lu offset %lu\n", subfile_info.tag, subfile_info.size,
                  subfile_info.offset);
         download_done = esp_http_client_is_complete_data_received(http_client);
         ESP_GOTO_ON_FALSE(len == sizeof(subfile_info), ESP_FAIL, exit, TAG, "Incomplete header");
@@ -259,7 +259,7 @@ static esp_err_t download_ota_image(esp_http_client_config_t *config, const char
             }
         }
         read_size += len;
-        ESP_LOGI(TAG, "Downloaded %d bytes", read_size);
+        ESP_LOGI(TAG, "Downloaded %lu bytes", read_size);
     }
 
     ESP_GOTO_ON_FALSE(read_size == br_firmware_offset, ESP_FAIL, exit, TAG, "Incomplete RCP image");
