@@ -260,7 +260,7 @@ static void build_availableNetworks_list(otActiveScanResult *aResult)
 
     ESP_LOGI(PACKAGE_TAG, "<==================== Thread Discover ======================>");
     ESP_LOGD(PACKAGE_TAG, "id:%d", network.id);
-    ESP_LOGD(PACKAGE_TAG, "network:%s", network.network_name);
+    ESP_LOGD(PACKAGE_TAG, "network:%s", network.network_name.m8);
     ESP_LOGI(PACKAGE_TAG, "Discover available network.");
     ESP_LOGI(PACKAGE_TAG, "<==========================================================>");
     return;
