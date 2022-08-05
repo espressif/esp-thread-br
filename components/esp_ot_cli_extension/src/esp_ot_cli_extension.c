@@ -6,6 +6,8 @@
 
 #include "esp_ot_cli_extension.h"
 #include "esp_openthread.h"
+#include "esp_ot_curl.h"
+#include "esp_ot_dns64.h"
 #include "esp_ot_iperf.h"
 #include "esp_ot_ota_commands.h"
 #include "esp_ot_tcp_socket.h"
@@ -33,6 +35,12 @@ static const otCliCommand kCommands[] = {
 #if CONFIG_OPENTHREAD_CLI_OTA
     {"ota", esp_openthread_process_ota_command},
 #endif // CONFIG_OPENTHREAD_CLI_RCP_UPDATE
+#if CONFIG_OPENTHREAD_CLI_CURL
+    {"curl", esp_openthread_process_curl},
+#endif //
+#if CONFIG_OPENTHREAD_DNS64_CLIENT
+    {"dns64server", esp_openthread_process_dns64_server},
+#endif // CONFIG_OPENTHREAD_DNS64_CLIENT
 };
 
 void esp_cli_custom_command_init()
