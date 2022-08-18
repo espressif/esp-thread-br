@@ -42,7 +42,7 @@ static esp_err_t init_spiffs(void)
 #if CONFIG_OPENTHREAD_BR_START_WEB
     esp_vfs_spiffs_conf_t web_server_conf = {
         .base_path = "/spiffs", .partition_label = "web_storage", .max_files = 10, .format_if_mount_failed = false};
-    ESP_RETURN_ON_ERROR(esp_vfs_spiffs_register(&rcp_fw_conf), TAG, "Failed to mount web storage");
+    ESP_RETURN_ON_ERROR(esp_vfs_spiffs_register(&web_server_conf), TAG, "Failed to mount web storage");
 #endif
     return ESP_OK;
 }
