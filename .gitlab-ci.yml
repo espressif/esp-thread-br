@@ -41,6 +41,8 @@ build_examples:
 build_docs:
     stage: docs
     image: $CI_DOCKER_REGISTRY/esp-idf-doc-env-v5.0:2-3
+    variables:
+        ESP_DOCS_LATEST_BRANCH_NAME: "main"
     artifacts:
         when: always
         paths:
@@ -50,7 +52,7 @@ build_docs:
     script:
         - cd docs
         - pip install -r requirements.txt
-        - build-docs -t esp32s3 -l en
+        - build-docs -t esp32 esp32s2 esp32s3 esp32c3 -l en
 
 .deploy_docs_template:
     stage: docs
