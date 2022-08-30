@@ -10,7 +10,7 @@ This example demonstrates an [OpenThread border router](https://openthread.io/gu
 
 Please refer to [ESP Thread Border Router Hardware](../../README.md##Hardware-Platforms), the ESP Thread Border Router Board is recommended for this example.
 
-### Setup ESP IDF
+### Set up ESP IDF
 
 Refer to [ESP-IDF Get Started](https://docs.espressif.com/projects/esp-idf/en/v4.4.1/esp32s3/get-started/index.html).
 
@@ -127,7 +127,7 @@ The border router will automatically publish the prefix and the route table rule
 
 ### Host configuration
 
-The automatically configure your host's route table rules you need to set these sysctl options:
+To automatically configure your host's route table rules you need to set these sysctl options:
 
 Please replace `wlan0` with the real name of your Wi-Fi network interface.
 ```

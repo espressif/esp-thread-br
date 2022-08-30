@@ -38,7 +38,7 @@ ESP32 pin | ESP32-H2 pin
   GPIO4   |      RST
   GPIO5   |  GPIO9 (BOOT)
 
-The following image shows an example connection between ES32-H2 and ESP32:
+The following image shows an example connection betwe    Add a package diagram. ES32-H2 and ESP32:
 
 ![br_standalone](docs/images/thread-border-router-esp32-esp32h2.jpg)
 
