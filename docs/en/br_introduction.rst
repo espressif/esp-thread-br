@@ -7,12 +7,12 @@
 
 The ESP Thread Border Router is composed of two main components:
 
-   - The host Wi-Fi SoC, which can be ESP32, ESP32-Sx and ESP32-Cx series SoC.
-   - The radio co-processor (RCP), which is an ESP32-Hx series SoC. The RCP enables the Border Router to access the 802.15.4 physical and MAC layer.
+   - The host Wi-Fi SoC, which can be ESP32, ESP32-S and ESP32-C series SoC.
+   - The radio co-processor (RCP), which is an ESP32-H series SoC. The RCP enables the Border Router to access the 802.15.4 physical and MAC layer.
 
 Espressif also provides a Border Router devkit which integrates the host SoC and the RCP into one module.
 
-.. figure:: ../images/ESP-Thread-Border-Router.png
+.. figure:: ../images/esp-thread-border-router-devkit.png
    :align: center
    :alt: ESP-Thread-Border-Router DevKit
    :figclass: align-center

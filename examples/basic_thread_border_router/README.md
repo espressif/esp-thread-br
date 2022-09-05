@@ -14,8 +14,6 @@ Please refer to [ESP Thread Border Router Hardware](../../README.md##Hardware-Pl
 
 Refer to [ESP-IDF Get Started](https://docs.espressif.com/projects/esp-idf/en/v4.4.1/esp32s3/get-started/index.html).
 
-note: IDF commit `daa950d` is the tested version.
-
 ### Configure the project
 
 ESP32-S3 is the host SoC on ESP Thread Border Router Board, so set target to esp32s3:
@@ -23,11 +21,6 @@ ESP32-S3 is the host SoC on ESP Thread Border Router Board, so set target to esp
 ```
 idf.py set-target esp32s3
 ```
-
-The following menuconfig options must be enabled:
-
-* `CONFIG_BR_BOARD_DEV_KIT`
-* `CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG`
 
 If the `OPENTHREAD_BR_AUTO_START` option is enabled, the device will connect to the configured Wi-Fi and form Thread network automatically then act as the border router.
 

@@ -1,6 +1,0 @@
-# specific configuration for ESP Thread Border Router Board
-
-CONFIG_BR_BOARD_DEV_KIT=y
-
-CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
-
