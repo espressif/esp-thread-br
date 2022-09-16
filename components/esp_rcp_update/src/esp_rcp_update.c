@@ -169,8 +169,8 @@ static void load_rcp_update_seq(esp_rcp_update_handle *handle)
         seq = 0;
         verified = 1;
     } else {
-        seq = (seq & ~RCP_VERIFIED_FLAG);
         verified = (seq & RCP_VERIFIED_FLAG);
+        seq = (seq & ~RCP_VERIFIED_FLAG);
     }
     handle->update_seq = seq;
     handle->verified = verified;
