@@ -7,6 +7,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <openthread/error.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,7 +17,7 @@ extern "C" {
  * @brief User command "dns64server" process.
  *
  */
-void esp_openthread_process_dns64_server(void *aContext, uint8_t aArgsLength, char *aArgs[]);
+otError esp_openthread_process_dns64_server(void *aContext, uint8_t aArgsLength, char *aArgs[]);
 
 #ifdef __cplusplus
 }

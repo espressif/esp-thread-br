@@ -107,12 +107,16 @@ static void curl_task(void *pvParameters)
     return;
 }
 
-void esp_openthread_process_curl(void *aContext, uint8_t aArgsLength, char *aArgs[])
+otError esp_openthread_process_curl(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
     if (aArgsLength == 0) {
         otCliOutputFormat("%s", "curl HTTP_URL\n");
+        return OT_ERROR_INVALID_ARGS;
     } else {
         strcpy(s_arg_buf, aArgs[0]);
-        xTaskCreate(curl_task, "curl", 8192, s_arg_buf, 4, NULL);
+        if (pdPASS != xTaskCreate(curl_task, "curl", 8192, s_arg_buf, 4, NULL)) {
+            return OT_ERROR_FAILED;
+        }
+        return OT_ERROR_NONE;
     }
 }

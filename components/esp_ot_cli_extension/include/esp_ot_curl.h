@@ -7,6 +7,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <openthread/error.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,7 +17,7 @@ extern "C" {
  * @brief User command "curl" process.
  *
  */
-void esp_openthread_process_curl(void *aContext, uint8_t aArgsLength, char *aArgs[]);
+otError esp_openthread_process_curl(void *aContext, uint8_t aArgsLength, char *aArgs[]);
 
 #ifdef __cplusplus
 }
