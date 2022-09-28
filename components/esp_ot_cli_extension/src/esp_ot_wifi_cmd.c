@@ -100,7 +100,7 @@ static void wifi_join(const char *ssid, const char *psk)
     }
 }
 
-void esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs[])
+otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
     char ssid[100] = "";
     char psk[100] = "";
@@ -142,4 +142,5 @@ void esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs[])
     } else {
         otCliOutputFormat("invalid commands\n");
     }
+    return OT_ERROR_NONE;
 }

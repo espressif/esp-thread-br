@@ -137,16 +137,20 @@ exit:
     vTaskDelete(NULL);
 }
 
-void esp_ot_process_tcp_server(void *aContext, uint8_t aArgsLength, char *aArgs[])
+otError esp_ot_process_tcp_server(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
     (void)(aContext);
     (void)(aArgsLength);
     (void)(*aArgs);
 
-    xTaskCreate(tcp_socket_server_task, "ot_tcp_scoket_server", 4096, xTaskGetCurrentTaskHandle(), 4, NULL);
+    if (pdPASS !=
+        xTaskCreate(tcp_socket_server_task, "ot_tcp_scoket_server", 4096, xTaskGetCurrentTaskHandle(), 4, NULL)) {
+        return OT_ERROR_FAILED;
+    }
+    return OT_ERROR_NONE;
 }
 
-void esp_ot_process_tcp_client(void *aContext, uint8_t aArgsLength, char *aArgs[])
+otError esp_ot_process_tcp_client(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
     (void)(aContext);
 
@@ -154,8 +158,13 @@ void esp_ot_process_tcp_client(void *aContext, uint8_t aArgsLength, char *aArgs[
 
     if (aArgsLength == 0) {
         ESP_LOGE(TAG, "Invalid arguments.");
+        return OT_ERROR_INVALID_ARGS;
     } else {
         strncpy(s_target_addr_string, aArgs[0], sizeof(s_target_addr_string));
-        xTaskCreate(tcp_socket_client_task, "ot_tcp_socket_client", 4096, s_target_addr_string, 4, NULL);
+        if (pdPASS !=
+            xTaskCreate(tcp_socket_client_task, "ot_tcp_socket_client", 4096, s_target_addr_string, 4, NULL)) {
+            return OT_ERROR_FAILED;
+        }
+        return OT_ERROR_NONE;
     }
 }

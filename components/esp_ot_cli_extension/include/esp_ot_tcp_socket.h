@@ -7,6 +7,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <openthread/error.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,13 +17,13 @@ extern "C" {
  * @brief User command "tcpsockserver" process.
  *
  */
-void esp_ot_process_tcp_server(void *aContext, uint8_t aArgsLength, char *aArgs[]);
+otError esp_ot_process_tcp_server(void *aContext, uint8_t aArgsLength, char *aArgs[]);
 
 /**
  * @brief User command "tcpsockclient" process.
  *
  */
-void esp_ot_process_tcp_client(void *aContext, uint8_t aArgsLength, char *aArgs[]);
+otError esp_ot_process_tcp_client(void *aContext, uint8_t aArgsLength, char *aArgs[]);
 
 #ifdef __cplusplus
 }

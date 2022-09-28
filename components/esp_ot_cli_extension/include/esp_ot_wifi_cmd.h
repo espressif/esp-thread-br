@@ -7,6 +7,9 @@
 #pragma once
 
 #include "esp_netif.h"
+
+#include <openthread/error.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -15,7 +18,7 @@ extern "C" {
  * @brief User command "wifi" process.
  *
  */
-void esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs[]);
+otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs[]);
 
 /**
  * @brief Wifi netif init.

@@ -20,7 +20,7 @@ static void print_help(void)
     otCliOutputFormat("rcp download ${server_url}");
 }
 
-void esp_openthread_process_ota_command(void *aContext, uint8_t aArgsLength, char *aArgs[])
+otError esp_openthread_process_ota_command(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
     if (aArgsLength == 0) {
         print_help();
@@ -47,6 +47,7 @@ void esp_openthread_process_ota_command(void *aContext, uint8_t aArgsLength, cha
     } else {
         print_help();
     }
+    return OT_ERROR_NONE;
 }
 
 void esp_set_ota_server_cert(const char *cert)
