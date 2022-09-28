@@ -9,6 +9,7 @@ To enable OpenThread extension commands, the following Kconfig option needs to b
 
 ## Commands
 
+* [ip](#ip)
 * [iperf](#iperf)
 * [tcpsockclient](#tcpsockclient)
 * [tcpsockserver](#tcpsockserver)
@@ -19,6 +20,48 @@ To enable OpenThread extension commands, the following Kconfig option needs to b
 * [dns64server](#dns64server)
 * [curl](#curl)
 
+### ip
+
+The ip command is used to add an address onto an interface or delete an address from an interface.
+
+* General Options
+
+```bash
+> ip
+----ip parameter---
+-p                         :     print all ip on each interface of lwip
+-a <ifaddr> dev <ifname>   :     add an address onto an interface of lwip
+-d <ifaddr> dev <ifname>   :     delete an address from an interface of lwip
+Done
+```
+
+* Typical usage
+
+Print all ip addresses on each interface of lwip:
+```bash
+> ip -p
+netif: ot
+ot inet6: FE80::EC7C:3806:85C6:71C2 48
+ot inet6: FDDE:AD00:BEEF:0:23AA:A8:5E2C:E03A 16
+netif: lo
+lo inet6: ::1 16
+Done
+```
+
+Add an address onto the openthread interface of lwip:
+```bash
+> ip -a fd00::2 dev ot
+Done
+```
+
+Delete an address from the openthread interface of lwip:
+```bash
+> ip -d fd00::2 dev ot
+Done
+```
+
+**Note: Currently the ip commands only supports adding or deleting the openthread interface addresses.**
+
 ### iperf
 
 Iperf is a tool for performing TCP or UDP throughput on the Thread network.
@@ -28,7 +71,7 @@ For running iperf, you need to have two Thread devices on the same network.
 * General Options
 
 ```bash
-iperf
+> iperf
 ---iperf parameter---
 -s                  :     server mode, only receive
 -u                  :     upd mode
