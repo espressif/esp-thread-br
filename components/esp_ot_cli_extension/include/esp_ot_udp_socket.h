@@ -7,6 +7,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <openthread/error.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,19 +17,19 @@ extern "C" {
  * @brief User command "mcast" process.
  *
  */
-void esp_ot_process_mcast_group(void *aContext, uint8_t aArgsLength, char *aArgs[]);
+otError esp_ot_process_mcast_group(void *aContext, uint8_t aArgsLength, char *aArgs[]);
 
 /**
  * @brief User command "udpsockserver" process.
  *
  */
-void esp_ot_process_udp_server(void *aContext, uint8_t aArgsLength, char *aArgs[]);
+otError esp_ot_process_udp_server(void *aContext, uint8_t aArgsLength, char *aArgs[]);
 
 /**
  * @brief User command "udpsockclient" process.
  *
  */
-void esp_ot_process_udp_client(void *aContext, uint8_t aArgsLength, char *aArgs[]);
+otError esp_ot_process_udp_client(void *aContext, uint8_t aArgsLength, char *aArgs[]);
 
 #ifdef __cplusplus
 }

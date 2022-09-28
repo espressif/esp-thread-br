@@ -126,15 +126,19 @@ exit:
     vTaskDelete(NULL);
 }
 
-void esp_ot_process_udp_server(void *aContext, uint8_t aArgsLength, char *aArgs[])
+otError esp_ot_process_udp_server(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
     (void)(aContext);
     (void)(aArgsLength);
 
-    xTaskCreate(udp_socket_server_task, "ot_udp_scoket_server", 4096, xTaskGetCurrentTaskHandle(), 4, NULL);
+    if (pdPASS !=
+        xTaskCreate(udp_socket_server_task, "ot_udp_scoket_server", 4096, xTaskGetCurrentTaskHandle(), 4, NULL)) {
+        return OT_ERROR_FAILED;
+    }
+    return OT_ERROR_NONE;
 }
 
-void esp_ot_process_udp_client(void *aContext, uint8_t aArgsLength, char *aArgs[])
+otError esp_ot_process_udp_client(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
     (void)(aContext);
 
@@ -142,17 +146,22 @@ void esp_ot_process_udp_client(void *aContext, uint8_t aArgsLength, char *aArgs[
 
     if (aArgsLength == 0) {
         ESP_LOGE(TAG, "Invalid arguments.");
+        return OT_ERROR_INVALID_ARGS;
     } else {
         strncpy(s_target_addr_string, aArgs[0], sizeof(s_target_addr_string));
-        xTaskCreate(udp_socket_client_task, "ot_udp_socket_client", 4096, s_target_addr_string, 4, NULL);
+        if (pdPASS !=
+            xTaskCreate(udp_socket_client_task, "ot_udp_socket_client", 4096, s_target_addr_string, 4, NULL)) {
+            return OT_ERROR_FAILED;
+        }
+        return OT_ERROR_NONE;
     }
 }
 
-void esp_ot_process_mcast_group(void *aContext, uint8_t aArgsLength, char *aArgs[])
+otError esp_ot_process_mcast_group(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
     if (aArgsLength != 2 || (strncmp(aArgs[0], "join", 4) != 0 && strncmp(aArgs[0], "leave", 5) != 0)) {
         ESP_LOGE(TAG, "Invalid arguments: mcast [join|leave] group_address");
-        return;
+        return OT_ERROR_INVALID_ARGS;
     }
 
     ip6_addr_t group;
@@ -161,10 +170,13 @@ void esp_ot_process_mcast_group(void *aContext, uint8_t aArgsLength, char *aArgs
     if (strncmp(aArgs[0], "join", 4) == 0) {
         if (mld6_joingroup_netif(netif, &group) != ERR_OK) {
             ESP_LOGE(TAG, "Failed to join group");
+            return OT_ERROR_FAILED;
         }
     } else {
         if (mld6_leavegroup_netif(netif, &group) != ERR_OK) {
             ESP_LOGE(TAG, "Failed to leave group");
+            return OT_ERROR_FAILED;
         }
     }
+    return OT_ERROR_NONE;
 }

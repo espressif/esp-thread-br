@@ -16,7 +16,7 @@
 #define TAG "ot-iperf"
 static char s_dest_ip6_addr[50];
 
-void esp_ot_process_iperf(void *aContext, uint8_t aArgsLength, char *aArgs[])
+otError esp_ot_process_iperf(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
     (void)(aContext);
     (void)(aArgsLength);
@@ -92,9 +92,10 @@ void esp_ot_process_iperf(void *aContext, uint8_t aArgsLength, char *aArgs[])
                 }
             } else if (strcmp(aArgs[i], "-a") == 0) {
                 iperf_stop();
-                return;
+                return OT_ERROR_NONE;
             }
         }
         iperf_start(&cfg);
     }
+    return OT_ERROR_NONE;
 }

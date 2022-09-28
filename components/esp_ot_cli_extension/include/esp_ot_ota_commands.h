@@ -7,12 +7,13 @@
 #pragma once
 
 #include <stdint.h>
+#include <openthread/error.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void esp_openthread_process_ota_command(void *aContext, uint8_t aArgsLength, char *aArgs[]);
+otError esp_openthread_process_ota_command(void *aContext, uint8_t aArgsLength, char *aArgs[]);
 
 void esp_set_ota_server_cert(const char *cert);
 
