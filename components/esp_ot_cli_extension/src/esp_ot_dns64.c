@@ -27,21 +27,22 @@ static esp_err_t set_dns64(const ip4_addr_t *dns_server)
     return ESP_OK;
 }
 
-void esp_openthread_process_dns64_server(void *aContext, uint8_t aArgsLength, char *aArgs[])
+otError esp_openthread_process_dns64_server(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
     if (aArgsLength == 0) {
         otCliOutputFormat("%s", "dns64server DNS_SERVER_URL\n");
-        return;
+        return OT_ERROR_INVALID_ARGS;
     }
     ip4_addr_t server_addr;
 
     if (ip4addr_aton(aArgs[0], &server_addr) != 1) {
         otCliOutputFormat("Invalid DNS server\n");
-        return;
+        return OT_ERROR_INVALID_ARGS;
     }
 
     if (set_dns64(&server_addr) != ESP_OK) {
         otCliOutputFormat("Failed to set DNS server\n");
-        return;
+        return OT_ERROR_INVALID_ARGS;
     }
+    return OT_ERROR_NONE;
 }
