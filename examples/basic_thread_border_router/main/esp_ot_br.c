@@ -85,7 +85,7 @@ void app_main(void)
     ESP_ERROR_CHECK(example_connect());
     esp_openthread_set_backbone_netif(get_example_netif());
 #else
-    ESP_LOGE(TAG, "ESP-Openthread has not set backbone netif");
+#error No backbone netif!
 #endif // CONFIG_EXAMPLE_CONNECT_WIFI
 
     ESP_ERROR_CHECK(mdns_init());

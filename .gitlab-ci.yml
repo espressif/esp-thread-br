@@ -59,6 +59,8 @@ build_docs:
     image: $CI_DOCKER_REGISTRY/esp-idf-doc-env-v5.0:2-3
     needs:
         - build_docs
+    variables:
+        ESP_DOCS_LATEST_BRANCH_NAME: "main"
     script:
         - source ${CI_PROJECT_DIR}/docs/utils.sh
         - add_doc_server_ssh_keys $DOCS_DEPLOY_PRIVATEKEY $DOCS_DEPLOY_SERVER $DOCS_DEPLOY_SERVER_USER
@@ -69,7 +71,6 @@ build_docs:
 deploy_docs_preview:
     extends:
         - .deploy_docs_template
-    when: manual
     variables:
         TYPE: "preview"
         DOCS_BUILD_DIR: "${CI_PROJECT_DIR}/docs/_build/"
@@ -82,7 +83,6 @@ deploy_docs_preview:
 deploy_docs_production:
     extends:
         - .deploy_docs_template
-    when: manual
     variables:
         TYPE: "preview"
         DOCS_BUILD_DIR: "${CI_PROJECT_DIR}/docs/_build/"

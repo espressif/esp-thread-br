@@ -1,6 +1,6 @@
-************
+**********
 3.4. NAT64
-************
+**********
 
 The ESP Thread Border Router supports NAT64 which allows Thread devices to visit the IPv4 Internet.
 

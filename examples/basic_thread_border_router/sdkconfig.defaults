@@ -1,4 +1,4 @@
-# ESP32-S3 is the host SoC on ESP-Thread-Border-Router devkit
+# ESP32-S3 is the host SoC on ESP-Thread-Border-Router board
 CONFIG_IDF_TARGET="esp32s3"
 
 #

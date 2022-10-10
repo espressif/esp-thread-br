@@ -1,6 +1,6 @@
-****************************************
+************************************
 2.2. Setting up the Local OTA Server
-****************************************
+************************************
 
 This document contains instructions on setting up a self-signed HTTPS OTA server on the local host and configuring the Border Router to trust the server.
 

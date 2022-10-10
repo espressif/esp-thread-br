@@ -1,6 +1,6 @@
-*********************************
+*************************
 3.2. Multicast Forwarding
-*********************************
+*************************
 
 Multicast Forwarding allows reaching devices on the Thread and Wi-Fi network in the same multicast group from both sides.
 

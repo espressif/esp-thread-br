@@ -1,6 +1,6 @@
-*********************************
+**********************
 3.3. Service Discovery
-*********************************
+**********************
 
 The ESP Thread Border Router allows devices on the Thread and Wi-Fi network to discover services published on both the networks.
 
