@@ -20,7 +20,7 @@ The ESP Thread Border Router SDK is built on top of `ESP-IDF <https://github.com
 The ESP Thread Border Router supports both Wi-Fi and Ethernet interfaces.
 
 1.2.1. Wi-Fi based Thread Border Router
----------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Wi-Fi based ESP Thread Border Router consists of two SoCs:
 
@@ -46,7 +46,7 @@ The SDK also supports manually connecting an ESP32-H2 RCP to an ESP32 series Wi-
    ESP-Thread-Border-Router Standalone Modules
 
 1.2.2. Ethernet based Thread Border Router
-------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Similar to the previous Wi-Fi based Thread Border Route setup, but a device with Ethernet interface is required, such as `ESP32-Ethernet-Kit <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/hw-reference/esp32/get-started-ethernet-kit.html>`_.
 

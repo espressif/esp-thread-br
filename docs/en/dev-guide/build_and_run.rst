@@ -60,14 +60,14 @@ Set ``PIN_TO_RESET``, ``PIN_TO_BOOT``, ``PIN_TO_RX``, ``PIN_TO_TX`` to correspon
 The Thread network parameters could be pre-configured with ``OPENTHREAD_NETWORK_xx`` options.
 
 2.1.3.1. Wi-Fi based Thread Border Router
------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 By default, it is configured as Wi-Fi based Thread Border Router.
 
 If the ``OPENTHREAD_BR_AUTO_START`` option is enabled, the device will connect to the configured Wi-Fi and form Thread network automatically then act as the border router. The Wi-Fi SSID and password must be set in menuconfig. The corresponding options are ``Example Connection Configuration -> WiFi SSID`` and ``Example Connection Configuration -> WiFi Password``.
 
 2.1.3.2. Ethernet based Thread Border Router
---------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The border router can also be configured to connect to Ethernet network. In this case, a host device with Ethernet interface is required, such as `ESP32-Ethernet-Kit <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/hw-reference/esp32/get-started-ethernet-kit.html>`_.
 
