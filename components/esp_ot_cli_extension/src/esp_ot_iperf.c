@@ -30,6 +30,7 @@ otError esp_ot_process_iperf(void *aContext, uint8_t aArgsLength, char *aArgs[])
     cfg.time = IPERF_DEFAULT_TIME;
     cfg.type = IPERF_IP_TYPE_IPV4;
     cfg.len_send_buf = OT_IPERF_DEFAULT_LEN;
+    cfg.format = KBITS_PER_SEC;
     if (aArgsLength == 0) {
         otCliOutputFormat("---iperf parameter---\n");
         otCliOutputFormat("-V                  :     use IPV6 address\n");
@@ -40,9 +41,11 @@ otError esp_ot_process_iperf(void *aContext, uint8_t aArgsLength, char *aArgs[])
         otCliOutputFormat("-t <time>           :     time in seconds to transmit for (default 30 secs)\n");
         otCliOutputFormat("-p <port>           :     server port to listen on/connect to\n");
         otCliOutputFormat("-l <len_send_buf>   :     the lenth of send buffer\n");
+        otCliOutputFormat("-f <output_format>  :     the output format of the report (Mbit/sec, Kbit/sec, bit/sec; "
+                          "default Mbit/sec)\n");
         otCliOutputFormat("---example---\n");
-        otCliOutputFormat("create a tcp server :     iperf -s -i 3 -p 5001 -t 60\n");
-        otCliOutputFormat("create a udp client :     iperf -c <addr> -u -i 3 -t 60 -p 5001 -l 512\n");
+        otCliOutputFormat("create a tcp server :     iperf -s -i 3 -p 5001 -t 60 -f M\n");
+        otCliOutputFormat("create a udp client :     iperf -c <addr> -u -i 3 -t 60 -p 5001 -l 512 -f B\n");
     } else {
         for (int i = 0; i < aArgsLength; i++) {
             if (strcmp(aArgs[i], "-c") == 0) {
@@ -95,6 +98,23 @@ otError esp_ot_process_iperf(void *aContext, uint8_t aArgsLength, char *aArgs[])
             } else if (strcmp(aArgs[i], "-a") == 0) {
                 iperf_stop();
                 return OT_ERROR_NONE;
+            } else if (strcmp(aArgs[i], "-f") == 0) {
+                i++;
+                const char *unit[3] = {"M", "K", "B"};
+                if (i >= aArgsLength) {
+                    return OT_ERROR_INVALID_ARGS;
+                } else {
+                    for (uint8_t idx = 0; idx <= 3; idx++) {
+                        if (idx == 3) {
+                            return OT_ERROR_INVALID_ARGS;
+                        }
+                        if (strcmp(aArgs[i], unit[idx]) == 0) {
+                            cfg.format = idx;
+                            break;
+                        }
+                    }
+                }
+                otCliOutputFormat("f:%sbit/s\n", strcmp(unit[cfg.format], "B") == 0 ? "\0" : unit[cfg.format]);
             }
         }
         if (client_flag) {

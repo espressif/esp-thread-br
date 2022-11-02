@@ -6,6 +6,14 @@ variables:
     CI_DOCKER_REGISTRY: "ciregistry.espressif.cn:8443"
     ESP_THREAD_BR_PATH: "$CI_PROJECT_DIR"
 
+before_script:
+  - mkdir -p ~/.ssh
+  - chmod 700 ~/.ssh
+  - echo -n "${GITLAB_KEY}" >~/.ssh/id_rsa_base64
+  - base64 --decode --ignore-garbage ~/.ssh/id_rsa_base64 >~/.ssh/id_rsa
+  - chmod 600 ~/.ssh/id_rsa
+  - echo -e "Host gitlab.espressif.cn\n\tStrictHostKeyChecking no\n" >>~/.ssh/config
+
 pre_commit:
   stage: .pre
   image: "$CI_DOCKER_REGISTRY/esp-idf-pre-commit:1"
@@ -19,12 +27,23 @@ pre_commit:
   - cd $ESP_THREAD_BR_PATH
   - git submodule update --init --recursive
 
+.setup_idf: &setup_idf
+  - cd $CI_PROJECT_DIR
+  - git clone --recursive -b master ${IDF_GIT_REPO_URL}
+  - cd esp-idf
+  - git checkout --track origin/$CI_COMMIT_REF_NAME || git branch
+  - git submodule sync --recursive
+  - git submodule update --recursive --init
+  - ./install.sh
+  - . ./export.sh
+
 .build_basic_thread_border_router: &build_basic_thread_border_router
   - cd $IDF_PATH/examples/openthread/ot_rcp
 
   # Change 'esp32h2' to 'esp32h4' (becasue esp-idf change it)
   # To do: Change 'esp32h4' to 'esp32h2' after target 'esp32h2' is added in esp-idf
   - idf.py --preview set-target esp32h4
+  - git rev-parse HEAD
 
   - idf.py build
   - cd $ESP_THREAD_BR_PATH/examples/basic_thread_border_router
@@ -39,6 +58,7 @@ build_examples:
     stage: build
     image: espressif/idf:latest
     script:
+        - *setup_idf
         - *submodule_update
         - *build_basic_thread_border_router
 
