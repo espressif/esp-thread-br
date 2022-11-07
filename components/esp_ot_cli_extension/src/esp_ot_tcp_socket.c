@@ -86,7 +86,7 @@ static void tcp_client_add(TCP_CLIENT *tcp_client_member)
     if (pdPASS != xTaskCreate(tcp_client_receive_task, "tcp_client_receive", 4096, tcp_client_member, 4, NULL)) {
         err = -1;
     }
-    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "The tcp client is unable to receive: errno %d", errno);
+    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "The TCP client is unable to receive: errno %d", errno);
 
 exit:
     if (ret != ESP_OK) {
@@ -95,7 +95,7 @@ exit:
             close(tcp_client_member->sock);
             tcp_client_member->sock = -1;
         }
-        ESP_LOGI(TAG, "Fail to create socket client");
+        ESP_LOGI(TAG, "Fail to create TCP client");
     } else {
         tcp_client_member->exist = 1;
     }
@@ -148,7 +148,7 @@ static void tcp_socket_client_task(void *pvParameters)
             break;
         }
     }
-    ESP_LOGI(TAG, "Closed tcp client successfully");
+    ESP_LOGI(TAG, "Closed TCP client successfully");
     vEventGroupDelete(tcp_client_event_group);
     vTaskDelete(NULL);
 }
@@ -160,20 +160,20 @@ otError esp_ot_process_tcp_client(void *aContext, uint8_t aArgsLength, char *aAr
 
     if (aArgsLength == 0) {
         otCliOutputFormat("---tcpsockclient parameter---\n");
-        otCliOutputFormat("status                     :     get tcp client status\n");
-        otCliOutputFormat("open                       :     open tcp client function\n");
-        otCliOutputFormat("connect <ipaddr> <port>    :     create a tcp client and connect the server\n");
-        otCliOutputFormat("send <message>             :     send a message to the tcp server\n");
-        otCliOutputFormat("close                      :     close tcp client \n");
+        otCliOutputFormat("status                     :     get TCP client status\n");
+        otCliOutputFormat("open                       :     open TCP client function\n");
+        otCliOutputFormat("connect <ipaddr> <port>    :     create a TCP client and connect the server\n");
+        otCliOutputFormat("send <message>             :     send a message to the TCP server\n");
+        otCliOutputFormat("close                      :     close TCP client \n");
         otCliOutputFormat("---example---\n");
-        otCliOutputFormat("get tcp client status      :     tcpsockclient status\n");
-        otCliOutputFormat("open tcp client function   :     tcpsockclient open\n");
-        otCliOutputFormat("create a tcp client        :     tcpsockclient connect fd81:984a:b59d:2::c0a8:0166 12345\n");
+        otCliOutputFormat("get TCP client status      :     tcpsockclient status\n");
+        otCliOutputFormat("open TCP client function   :     tcpsockclient open\n");
+        otCliOutputFormat("create a TCP client        :     tcpsockclient connect fd81:984a:b59d:2::c0a8:0166 12345\n");
         otCliOutputFormat("send a message             :     tcpsockclient send hello\n");
-        otCliOutputFormat("close tcp client           :     tcpsockclient close\n");
+        otCliOutputFormat("close TCP client           :     tcpsockclient close\n");
     } else if (strcmp(aArgs[0], "status") == 0) {
         if (tcp_client_handle == NULL) {
-            otCliOutputFormat("TCP client is not opened\n");
+            otCliOutputFormat("TCP client is not open\n");
             return OT_ERROR_NONE;
         }
         if (tcp_client_member.exist == 0) {
@@ -194,7 +194,7 @@ otError esp_ot_process_tcp_client(void *aContext, uint8_t aArgsLength, char *aAr
         }
     } else if (strcmp(aArgs[0], "connect") == 0) {
         if (tcp_client_handle == NULL) {
-            otCliOutputFormat("TCP client is not opened\n");
+            otCliOutputFormat("TCP client is not open\n");
             return OT_ERROR_NONE;
         }
         if (tcp_client_member.exist == 1) {
@@ -210,7 +210,7 @@ otError esp_ot_process_tcp_client(void *aContext, uint8_t aArgsLength, char *aAr
         xEventGroupSetBits(tcp_client_event_group, TCP_CLIENT_ADD_BIT);
     } else if (strcmp(aArgs[0], "send") == 0) {
         if (tcp_client_handle == NULL) {
-            otCliOutputFormat("TCP client is not opened\n");
+            otCliOutputFormat("TCP client is not open\n");
             return OT_ERROR_NONE;
         }
         if (tcp_client_member.exist == 0) {
@@ -225,7 +225,7 @@ otError esp_ot_process_tcp_client(void *aContext, uint8_t aArgsLength, char *aAr
         xEventGroupSetBits(tcp_client_event_group, TCP_CLIENT_SEND_BIT);
     } else if (strcmp(aArgs[0], "close") == 0) {
         if (tcp_client_handle == NULL) {
-            otCliOutputFormat("TCP client is not opened\n");
+            otCliOutputFormat("TCP client is not open\n");
             return OT_ERROR_NONE;
         }
         xEventGroupSetBits(tcp_client_event_group, TCP_CLIENT_CLOSE_BIT);
@@ -319,7 +319,7 @@ static void tcp_server_add(TCP_SERVER *tcp_server_member)
     if (pdPASS != xTaskCreate(tcp_server_task, "tcp_server_receive", 4096, tcp_server_member, 4, NULL)) {
         err = -1;
     }
-    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "The tcp server is unable to accept: errno %d", errno);
+    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "The TCP server is unable to accept: errno %d", errno);
 
 exit:
     if (ret != ESP_OK) {
@@ -328,7 +328,7 @@ exit:
             close(listen_sock);
             tcp_server_member->listen_sock = -1;
         }
-        ESP_LOGI(TAG, "Fail to create a socket server");
+        ESP_LOGI(TAG, "Fail to create a TCP server");
     } else {
         ESP_LOGI(TAG, "Successfully created");
         tcp_server_member->exist = 1;
@@ -357,7 +357,7 @@ static void tcp_server_delete(TCP_SERVER *tcp_server_member)
     if (connect_sock >= 0) {
         shutdown(connect_sock, 0);
         close(connect_sock);
-        ESP_LOGI(TAG, "TCP server is disconnecting %s", tcp_server_member->remote_ipaddr);
+        ESP_LOGI(TAG, "TCP server is disconnecting with %s", tcp_server_member->remote_ipaddr);
     }
 }
 
@@ -390,7 +390,7 @@ static void tcp_socket_server_task(void *pvParameters)
             break;
         }
     }
-    ESP_LOGI(TAG, "Closed tcp server successfully");
+    ESP_LOGI(TAG, "Closed TCP server successfully");
     vEventGroupDelete(tcp_server_event_group);
     vTaskDelete(NULL);
 }
@@ -402,20 +402,20 @@ otError esp_ot_process_tcp_server(void *aContext, uint8_t aArgsLength, char *aAr
 
     if (aArgsLength == 0) {
         otCliOutputFormat("---tcpsockserver parameter---\n");
-        otCliOutputFormat("status                     :     get tcp server status\n");
-        otCliOutputFormat("open                       :     open tcp server function\n");
-        otCliOutputFormat("bind <ipaddr> <port>       :     create a tcp server with binding the ipaddr and port\n");
-        otCliOutputFormat("send <message>             :     send a message to the tcp client\n");
-        otCliOutputFormat("close                      :     close tcp server\n");
+        otCliOutputFormat("status                     :     get TCP server status\n");
+        otCliOutputFormat("open                       :     open TCP server function\n");
+        otCliOutputFormat("bind <ipaddr> <port>       :     create a TCP server with binding the ipaddr and port\n");
+        otCliOutputFormat("send <message>             :     send a message to the TCP client\n");
+        otCliOutputFormat("close                      :     close TCP server\n");
         otCliOutputFormat("---example---\n");
-        otCliOutputFormat("get tcp server status      :     tcpsockserver status\n");
-        otCliOutputFormat("open tcp server function   :     tcpsockserver open\n");
-        otCliOutputFormat("create a tcp server        :     tcpsockserver bind :: 12345\n");
+        otCliOutputFormat("get TCP server status      :     tcpsockserver status\n");
+        otCliOutputFormat("open TCP server function   :     tcpsockserver open\n");
+        otCliOutputFormat("create a TCP server        :     tcpsockserver bind :: 12345\n");
         otCliOutputFormat("send a message             :     tcpsockserver send hello\n");
-        otCliOutputFormat("close tcp server           :     tcpsockserver close\n");
+        otCliOutputFormat("close TCP server           :     tcpsockserver close\n");
     } else if (strcmp(aArgs[0], "status") == 0) {
         if (tcp_server_handle == NULL) {
-            otCliOutputFormat("TCP server is not opened\n");
+            otCliOutputFormat("TCP server is not open.\n");
             return OT_ERROR_NONE;
         }
         if (tcp_server_member.exist == 0) {
@@ -440,7 +440,7 @@ otError esp_ot_process_tcp_server(void *aContext, uint8_t aArgsLength, char *aAr
         }
     } else if (strcmp(aArgs[0], "bind") == 0) {
         if (tcp_server_handle == NULL) {
-            otCliOutputFormat("TCP server is not opened.\n");
+            otCliOutputFormat("TCP server is not open.\n");
             return OT_ERROR_NONE;
         }
         if (tcp_server_member.exist == 1) {
@@ -456,7 +456,7 @@ otError esp_ot_process_tcp_server(void *aContext, uint8_t aArgsLength, char *aAr
         xEventGroupSetBits(tcp_server_event_group, TCP_SERVER_ADD_BIT);
     } else if (strcmp(aArgs[0], "send") == 0) {
         if (tcp_server_handle == NULL) {
-            otCliOutputFormat("TCP server is not opened.\n");
+            otCliOutputFormat("TCP server is not open.\n");
             return OT_ERROR_NONE;
         }
         if (tcp_server_member.exist == 0) {
@@ -471,7 +471,7 @@ otError esp_ot_process_tcp_server(void *aContext, uint8_t aArgsLength, char *aAr
         xEventGroupSetBits(tcp_server_event_group, TCP_SERVER_SEND_BIT);
     } else if (strcmp(aArgs[0], "close") == 0) {
         if (tcp_server_handle == NULL) {
-            otCliOutputFormat("TCP server is not opened.\n");
+            otCliOutputFormat("TCP server is not open.\n");
             return OT_ERROR_NONE;
         }
         xEventGroupSetBits(tcp_server_event_group, TCP_SERVER_CLOSE_BIT);

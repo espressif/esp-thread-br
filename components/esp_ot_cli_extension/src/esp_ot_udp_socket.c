@@ -6,155 +6,454 @@
 
 #include "esp_ot_udp_socket.h"
 
+#include "cc.h"
 #include "esp_check.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_netif.h"
-#include "esp_openthread_lock.h"
+#include <sys/unistd.h>
 #include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
 #include "freertos/task.h"
 #include "lwip/err.h"
 #include "lwip/mld6.h"
 #include "lwip/sockets.h"
+#include "openthread/cli.h"
 
 #define TAG "ot_socket"
 
-static void udp_socket_server_task(void *pvParameters)
+static EventGroupHandle_t udp_server_event_group;
+static EventGroupHandle_t udp_client_event_group;
+
+static void udp_server_receive_task(void *pvParameters)
 {
-    char addr_str[128];
-    char *payload = "This message is from server\n";
     char rx_buffer[128];
-    esp_err_t ret = ESP_OK;
-    int err = 0;
-    int len;
-    int listen_sock;
+    int len = 0;
+    char addr_str[128];
+    int port = 0;
+    struct sockaddr_storage source_addr;
+    UDP_SERVER *udp_server_member = (UDP_SERVER *)pvParameters;
 
-    int port = CONFIG_OPENTHREAD_CLI_UDP_SERVER_PORT;
-    struct timeval timeout = {0};
-    struct sockaddr_storage source_addr; // Large enough for both IPv4 or IPv6
-    struct sockaddr_in6 listen_addr;
-
-    inet6_aton("::", &listen_addr.sin6_addr);
-    listen_addr.sin6_family = AF_INET6;
-    listen_addr.sin6_port = htons(port);
-
-    listen_sock = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
-    ESP_GOTO_ON_FALSE((listen_sock >= 0), ESP_OK, exit, TAG, "Unable to create socket: errno %d", errno);
-    ESP_LOGI(TAG, "Socket created");
-
-    // Note that by default IPV6 binds to both protocols, it is must be disabled
-    // if both protocols used at the same time (used in CI)
-    int opt = 1;
-    setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-    setsockopt(listen_sock, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt));
-
-    err = bind(listen_sock, (struct sockaddr *)&listen_addr, sizeof(listen_addr));
-    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "Socket unable to bind: errno %d", errno);
-    ESP_LOGI(TAG, "Socket bound, port %d", port);
-
-    timeout.tv_sec = 30;
-    setsockopt(listen_sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-
-    ESP_LOGI(TAG, "Waiting for data, timeout is 30 seconds");
-    socklen_t socklen = sizeof(source_addr);
-    len = recvfrom(listen_sock, rx_buffer, sizeof(rx_buffer) - 1, 0, (struct sockaddr *)&source_addr, &socklen);
-
-    // Error occurred during receiving
-    ESP_GOTO_ON_FALSE((len >= 0), ESP_FAIL, exit, TAG, "recvfrom failed: errno %d", errno);
-    // Data received
-    // Get the sender's ip address as string
-    inet6_ntoa_r(((struct sockaddr_in6 *)&source_addr)->sin6_addr, addr_str, sizeof(addr_str) - 1);
-
-    rx_buffer[len] = 0; // Null-terminate whatever we received and treat like a string...
-    ESP_LOGI(TAG, "Received %d bytes from %s:", len, addr_str);
-    ESP_LOGI(TAG, "%s", rx_buffer);
-
-    err = sendto(listen_sock, payload, strlen(payload), 0, (struct sockaddr *)&source_addr, sizeof(source_addr));
-    ESP_GOTO_ON_FALSE((err >= 0), ESP_FAIL, exit, TAG, "Error occurred during sending: errno %d", errno);
-exit:
-    if (ret != ESP_OK || listen_sock != -1) {
-        shutdown(listen_sock, 0);
-        close(listen_sock);
+    while (true) {
+        socklen_t socklen = sizeof(source_addr);
+        len = recvfrom(udp_server_member->sock, rx_buffer, sizeof(rx_buffer) - 1, 0, (struct sockaddr *)&source_addr,
+                       &socklen);
+        if (len < 0) {
+            ESP_LOGW(TAG, "UDP server fail when receiving message");
+        }
+        if (len > 0) {
+            inet6_ntoa_r(((struct sockaddr_in6 *)&source_addr)->sin6_addr, addr_str, sizeof(addr_str) - 1);
+            port = ntohs(((struct sockaddr_in6 *)&source_addr)->sin6_port);
+            ESP_LOGI(TAG, "sock %d Received %d bytes from %s : %d", udp_server_member->sock, len, addr_str, port);
+            rx_buffer[len] = '\0';
+            ESP_LOGI(TAG, "%s", rx_buffer);
+        }
+        if (udp_server_member->exist == 0) {
+            break;
+        }
     }
-    ESP_LOGI(TAG, "Socket server is closed.");
+    ESP_LOGI(TAG, "UDP server receive task exiting");
     vTaskDelete(NULL);
 }
 
-static void udp_socket_client_task(void *pvParameters)
+static void udp_server_bind(UDP_SERVER *udp_server_member)
 {
-    char rx_buffer[128];
-    char *host_ip = (char *)pvParameters;
-    char *payload = "This message is from client\n";
-    int client_sock;
-    int port = CONFIG_OPENTHREAD_CLI_UDP_SERVER_PORT;
-    int err = 0;
-    int len;
     esp_err_t ret = ESP_OK;
-    struct sockaddr_storage source_addr; // Large enough for both IPv4 or IPv6
-    struct sockaddr_in6 dest_addr = {0};
-    uint8_t netif_index = esp_netif_get_netif_impl_index(esp_netif_get_handle_from_ifkey("OT_DEF"));
+    int err = 0;
+    int sock = -1;
+    int err_flag = 0;
 
-    inet6_aton(host_ip, &dest_addr.sin6_addr);
-    dest_addr.sin6_family = AF_INET6;
-    dest_addr.sin6_port = htons(port);
+    struct sockaddr_in6 listen_addr = {0};
 
-    client_sock = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
-    ESP_GOTO_ON_FALSE((client_sock >= 0), ESP_OK, exit, TAG, "Unable to create socket: errno %d", errno);
-    ESP_LOGI(TAG, "Socket created, sending to %s:%d", host_ip, port);
+    inet6_aton(udp_server_member->local_ipaddr, &listen_addr.sin6_addr);
+    inet6_ntoa_r((&listen_addr)->sin6_addr, udp_server_member->local_ipaddr,
+                 sizeof(udp_server_member->local_ipaddr) - 1);
+    listen_addr.sin6_family = AF_INET6;
+    listen_addr.sin6_port = htons(udp_server_member->local_port);
 
-    setsockopt(client_sock, IPPROTO_IPV6, IPV6_MULTICAST_IF, &netif_index, sizeof(netif_index));
+    sock = socket(AF_INET6, SOCK_DGRAM, IPPROTO_IPV6);
+    ESP_GOTO_ON_FALSE((sock >= 0), ESP_FAIL, exit, TAG, "Unable to create socket: errno %d", errno);
+    ESP_LOGI(TAG, "Socket created");
+    udp_server_member->sock = sock;
+    err_flag = 1;
 
-    err = sendto(client_sock, payload, strlen(payload), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
-    ESP_GOTO_ON_FALSE((err >= 0), ESP_FAIL, exit, TAG, "Error occurred during sending: errno %d", errno);
-    ESP_LOGI(TAG, "Message sent");
+    err = bind(sock, (struct sockaddr *)&listen_addr, sizeof(struct sockaddr_in6));
+    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "Socket unable to bind: errno %d, IPPROTO: %d", errno, AF_INET6);
+    ESP_LOGI(TAG, "Socket bound, ipaddr %s, port %d", udp_server_member->local_ipaddr, udp_server_member->local_port);
 
-    socklen_t socklen = sizeof(source_addr);
-    len = recvfrom(client_sock, rx_buffer, sizeof(rx_buffer) - 1, 0, (struct sockaddr *)&source_addr, &socklen);
-
-    // Error occurred during receiving
-    ESP_GOTO_ON_FALSE((len >= 0), ESP_FAIL, exit, TAG, "recvfrom failed: errno %d", errno);
-    // Data received
-    rx_buffer[len] = 0; // Null-terminate whatever we received and treat like a string
-    ESP_LOGI(TAG, "Received %d bytes from %s:", len, host_ip);
-    ESP_LOGI(TAG, "%s", rx_buffer);
-exit:
-    if (ret != ESP_OK || client_sock != -1) {
-        shutdown(client_sock, 0);
-        close(client_sock);
+    if (pdPASS != xTaskCreate(udp_server_receive_task, "udp_server_receive", 4096, udp_server_member, 4, NULL)) {
+        err = -1;
     }
-    ESP_LOGI(TAG, "Socket client is closed");
+    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "The UDP server is unable to receive: errno %d", errno);
+
+exit:
+    if (ret != ESP_OK) {
+        if (err_flag) {
+            shutdown(sock, 0);
+            close(sock);
+            udp_server_member->sock = -1;
+        }
+        ESP_LOGI(TAG, "Fail to create a UDP server");
+    } else {
+        ESP_LOGI(TAG, "Successfully created");
+        udp_server_member->exist = 1;
+    }
+}
+
+static void udp_server_send(UDP_SERVER *udp_server_member)
+{
+    struct sockaddr_in6 dest_addr = {0};
+    int len = 0;
+
+    inet6_aton(udp_server_member->messagesend.ipaddr, &dest_addr.sin6_addr);
+    dest_addr.sin6_family = AF_INET6;
+    dest_addr.sin6_port = htons(udp_server_member->messagesend.port);
+    ESP_LOGI(TAG, "Sending to %s : %d", udp_server_member->messagesend.ipaddr, udp_server_member->messagesend.port);
+
+    len = sendto(udp_server_member->sock, udp_server_member->messagesend.message,
+                 strlen(udp_server_member->messagesend.message), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+    if (len < 0) {
+        ESP_LOGW(TAG, "Fail to send message");
+    }
+}
+
+static void udp_server_delete(UDP_SERVER *udp_server_member)
+{
+    udp_server_member->exist = 0;
+    shutdown(udp_server_member->sock, 0);
+    close(udp_server_member->sock);
+    udp_server_member->sock = -1;
+}
+
+static void udp_socket_server_task(void *pvParameters)
+{
+    UDP_SERVER *udp_server_member = (UDP_SERVER *)pvParameters;
+
+    udp_server_event_group = xEventGroupCreate();
+
+    while (true) {
+        int bits = xEventGroupWaitBits(udp_server_event_group,
+                                       UDP_SERVER_BIND_BIT | UDP_SERVER_SEND_BIT | UDP_SERVER_CLOSE_BIT, pdFALSE,
+                                       pdFALSE, 10000 / portTICK_PERIOD_MS);
+        int udp_event = bits & 0x0f;
+        if (udp_event == UDP_SERVER_BIND_BIT) {
+            xEventGroupClearBits(udp_server_event_group, UDP_SERVER_BIND_BIT);
+            udp_server_bind(udp_server_member);
+        } else if (udp_event == UDP_SERVER_SEND_BIT) {
+            xEventGroupClearBits(udp_server_event_group, UDP_SERVER_SEND_BIT);
+            udp_server_send(udp_server_member);
+        } else if (udp_event == UDP_SERVER_CLOSE_BIT) {
+            xEventGroupClearBits(udp_server_event_group, UDP_SERVER_CLOSE_BIT);
+            udp_server_delete(udp_server_member);
+            break;
+        }
+    }
+    ESP_LOGI(TAG, "Closed UDP server successfully");
+    vEventGroupDelete(udp_server_event_group);
     vTaskDelete(NULL);
 }
 
 otError esp_ot_process_udp_server(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
-    (void)(aContext);
-    (void)(aArgsLength);
+    static TaskHandle_t udp_server_handle = NULL;
+    static UDP_SERVER udp_server_member = {0, -1, -1, "", {-1, "", ""}};
 
-    if (pdPASS !=
-        xTaskCreate(udp_socket_server_task, "ot_udp_scoket_server", 4096, xTaskGetCurrentTaskHandle(), 4, NULL)) {
-        return OT_ERROR_FAILED;
+    if (aArgsLength == 0) {
+        otCliOutputFormat("---udpsockserver parameter---\n");
+        otCliOutputFormat("status                           :     get UDP server status\n");
+        otCliOutputFormat("open                             :     open UDP server function\n");
+        otCliOutputFormat("bind <port>                      :     create a UDP server with binding the port\n");
+        otCliOutputFormat("send <ipaddr> <port> <message>   :     send a message to the UDP client\n");
+        otCliOutputFormat("close                            :     close UDP server\n");
+        otCliOutputFormat("---example---\n");
+        otCliOutputFormat("get UDP server status            :     udpsockserver status\n");
+        otCliOutputFormat("open UDP server function         :     udpsockserver open\n");
+        otCliOutputFormat("create a UDP server              :     udpsockserver bind 12345\n");
+        otCliOutputFormat("send a message                   :     udpsockserver send "
+                          "FDDE:AD00:BEEF:CAFE:FD14:30B6:CDA:8A95 51876 hello\n");
+        otCliOutputFormat("close UDP server                 :     udpsockserver close\n");
+    } else if (strcmp(aArgs[0], "status") == 0) {
+        if (udp_server_handle == NULL) {
+            otCliOutputFormat("UDP server is not open\n");
+            return OT_ERROR_NONE;
+        }
+        if (udp_server_member.exist == 0) {
+            otCliOutputFormat("UDP server is not binded!\n");
+            return OT_ERROR_NONE;
+        }
+        otCliOutputFormat("open\tlocal ipaddr: %s\tlocal port: %d\n", udp_server_member.local_ipaddr,
+                          udp_server_member.local_port);
+    } else if (strcmp(aArgs[0], "open") == 0) {
+        if (udp_server_handle == NULL) {
+            if (pdPASS !=
+                xTaskCreate(udp_socket_server_task, "udp_socket_server", 4096, &udp_server_member, 4,
+                            &udp_server_handle)) {
+                udp_server_handle = NULL;
+                return OT_ERROR_FAILED;
+            }
+        } else {
+            otCliOutputFormat("Already!\n");
+        }
+    } else if (strcmp(aArgs[0], "bind") == 0) {
+        if (udp_server_handle == NULL) {
+            otCliOutputFormat("UDP server is not open.\n");
+            return OT_ERROR_NONE;
+        }
+        if (udp_server_member.exist == 1) {
+            otCliOutputFormat("UDP server exists.\n");
+            return OT_ERROR_NONE;
+        }
+        if (aArgsLength != 2) {
+            ESP_LOGE(TAG, "Invalid arguments.");
+            return OT_ERROR_INVALID_ARGS;
+        }
+        strncpy(udp_server_member.local_ipaddr, "::", sizeof(udp_server_member.local_ipaddr));
+        udp_server_member.local_port = atoi(aArgs[1]);
+        xEventGroupSetBits(udp_server_event_group, UDP_SERVER_BIND_BIT);
+    } else if (strcmp(aArgs[0], "send") == 0) {
+        if (udp_server_handle == NULL) {
+            otCliOutputFormat("UDP server is not open.\n");
+            return OT_ERROR_NONE;
+        }
+        if (udp_server_member.exist == 0) {
+            otCliOutputFormat("UDP server is not binded!\n");
+            return OT_ERROR_NONE;
+        }
+        if (aArgsLength != 4) {
+            ESP_LOGE(TAG, "Invalid arguments.");
+            return OT_ERROR_INVALID_ARGS;
+        }
+        strncpy(udp_server_member.messagesend.ipaddr, aArgs[1], sizeof(udp_server_member.messagesend.ipaddr));
+        udp_server_member.messagesend.port = atoi(aArgs[2]);
+        strncpy(udp_server_member.messagesend.message, aArgs[3], sizeof(udp_server_member.messagesend.message));
+        xEventGroupSetBits(udp_server_event_group, UDP_SERVER_SEND_BIT);
+    } else if (strcmp(aArgs[0], "close") == 0) {
+        if (udp_server_handle == NULL) {
+            otCliOutputFormat("UDP server is not open.\n");
+            return OT_ERROR_NONE;
+        }
+        xEventGroupSetBits(udp_server_event_group, UDP_SERVER_CLOSE_BIT);
+        udp_server_handle = NULL;
+    } else {
+        otCliOutputFormat("invalid commands\n");
     }
     return OT_ERROR_NONE;
 }
 
+static void udp_client_receive_task(void *pvParameters)
+{
+    char rx_buffer[128];
+    int len = 0;
+    char addr_str[128];
+    int port = 0;
+    struct sockaddr_storage source_addr;
+    UDP_CLIENT *udp_client_member = (UDP_CLIENT *)pvParameters;
+
+    while (true) {
+        socklen_t socklen = sizeof(source_addr);
+        len = recvfrom(udp_client_member->sock, rx_buffer, sizeof(rx_buffer) - 1, 0, (struct sockaddr *)&source_addr,
+                       &socklen);
+        if (len < 0) {
+            ESP_LOGW(TAG, "UDP client fail when receiving message");
+        }
+        if (len > 0) {
+            inet6_ntoa_r(((struct sockaddr_in6 *)&source_addr)->sin6_addr, addr_str, sizeof(addr_str) - 1);
+            port = ntohs(((struct sockaddr_in6 *)&source_addr)->sin6_port);
+            ESP_LOGI(TAG, "sock %d Received %d bytes from %s : %d", udp_client_member->sock, len, addr_str, port);
+            rx_buffer[len] = '\0';
+            ESP_LOGI(TAG, "%s", rx_buffer);
+        }
+        if (udp_client_member->exist == 0) {
+            break;
+        }
+    }
+    ESP_LOGI(TAG, "UDP client receive task exiting");
+    vTaskDelete(NULL);
+}
+
+static void udp_client_send(UDP_CLIENT *udp_client_member)
+{
+    struct sockaddr_in6 dest_addr = {0};
+    int len = 0;
+
+    inet6_aton(udp_client_member->messagesend.ipaddr, &dest_addr.sin6_addr);
+    dest_addr.sin6_family = AF_INET6;
+    dest_addr.sin6_port = htons(udp_client_member->messagesend.port);
+    ESP_LOGI(TAG, "Sending to %s : %d", udp_client_member->messagesend.ipaddr, udp_client_member->messagesend.port);
+
+    len = sendto(udp_client_member->sock, udp_client_member->messagesend.message,
+                 strlen(udp_client_member->messagesend.message), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+    if (len < 0) {
+        ESP_LOGW(TAG, "Fail to send message");
+    }
+}
+
+static void udp_client_delete(UDP_CLIENT *udp_client_member)
+{
+    udp_client_member->exist = 0;
+    shutdown(udp_client_member->sock, 0);
+    close(udp_client_member->sock);
+    udp_client_member->sock = -1;
+    udp_client_member->local_port = -1;
+}
+
+static void udp_socket_client_task(void *pvParameters)
+{
+    UDP_CLIENT *udp_client_member = (UDP_CLIENT *)pvParameters;
+    udp_client_event_group = xEventGroupCreate();
+
+    esp_err_t ret = ESP_OK;
+    int err = 0;
+    int sock = -1;
+    int err_flag = 0;
+    struct sockaddr_in6 bind_addr = {0};
+
+    sock = socket(AF_INET6, SOCK_DGRAM, IPPROTO_IPV6);
+    ESP_GOTO_ON_FALSE((sock >= 0), ESP_FAIL, exit, TAG, "Unable to create socket: errno %d", errno);
+    ESP_LOGI(TAG, "Socket created");
+    udp_client_member->sock = sock;
+    err_flag = 1;
+
+    if (udp_client_member->local_port != -1) {
+        inet6_aton(udp_client_member->local_ipaddr, &bind_addr.sin6_addr);
+        inet6_ntoa_r((&bind_addr)->sin6_addr, udp_client_member->local_ipaddr,
+                     sizeof(udp_client_member->local_ipaddr) - 1);
+        bind_addr.sin6_family = AF_INET6;
+        bind_addr.sin6_port = htons(udp_client_member->local_port);
+
+        err = bind(sock, (struct sockaddr *)&bind_addr, sizeof(bind_addr));
+        ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "Socket unable to bind: errno %d", errno);
+        ESP_LOGI(TAG, "Socket bound, port %d", udp_client_member->local_port);
+    }
+
+    if (pdPASS != xTaskCreate(udp_client_receive_task, "udp_client_receive", 4096, udp_client_member, 4, NULL)) {
+        err = -1;
+    }
+    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "The UDP client is unable to receive: errno %d", errno);
+    udp_client_member->exist = 1;
+    ESP_LOGI(TAG, "Successfully created");
+
+    while (true) {
+        int bits = xEventGroupWaitBits(udp_client_event_group, UDP_CLIENT_SEND_BIT | UDP_CLIENT_CLOSE_BIT, pdFALSE,
+                                       pdFALSE, 10000 / portTICK_PERIOD_MS);
+        int udp_event = bits & 0x0f;
+        if (udp_event == UDP_CLIENT_SEND_BIT) {
+            xEventGroupClearBits(udp_client_event_group, UDP_CLIENT_SEND_BIT);
+            udp_client_send(udp_client_member);
+        } else if (udp_event == UDP_CLIENT_CLOSE_BIT) {
+            xEventGroupClearBits(udp_client_event_group, UDP_CLIENT_CLOSE_BIT);
+            udp_client_delete(udp_client_member);
+            break;
+        }
+    }
+    ESP_LOGI(TAG, "Closed UDP client successfully");
+
+exit:
+    if (ret != ESP_OK) {
+        if (err_flag) {
+            udp_client_member->sock = -1;
+            shutdown(sock, 0);
+            close(sock);
+        }
+        udp_client_member->local_port = -1;
+        ESP_LOGI(TAG, "Fail to create a UDP client");
+    }
+    vEventGroupDelete(udp_client_event_group);
+    vTaskDelete(NULL);
+}
+
 otError esp_ot_process_udp_client(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
-    (void)(aContext);
-
-    static char s_target_addr_string[128];
+    static TaskHandle_t udp_client_handle = NULL;
+    static UDP_CLIENT udp_client_member = {0, -1, -1, "::", {-1, "", ""}};
 
     if (aArgsLength == 0) {
-        ESP_LOGE(TAG, "Invalid arguments.");
-        return OT_ERROR_INVALID_ARGS;
-    } else {
-        strncpy(s_target_addr_string, aArgs[0], sizeof(s_target_addr_string));
-        if (pdPASS !=
-            xTaskCreate(udp_socket_client_task, "ot_udp_socket_client", 4096, s_target_addr_string, 4, NULL)) {
-            return OT_ERROR_FAILED;
+        otCliOutputFormat("---udpsockclient parameter---\n");
+        otCliOutputFormat("status                               :     get UDP client status\n");
+        otCliOutputFormat("open <port>                          :     open UDP client function, create a UDP client "
+                          "and bind a local port(optional)\n");
+        otCliOutputFormat("send <ipaddr> <port> <message>       :     send a message to the UDP server\n");
+        otCliOutputFormat("close                                :     close UDP client\n");
+        otCliOutputFormat("---example---\n");
+        otCliOutputFormat("get UDP client status                :     udpsockclient status\n");
+        otCliOutputFormat("create a UDP client without binding  :     udpsockclient open\n");
+        otCliOutputFormat("create a UDP client with binding     :     udpsockclient open 12345\n");
+        otCliOutputFormat("send a message                       :     udpsockclient send "
+                          "FDDE:AD00:BEEF:CAFE:FD14:30B6:CDA:8A95 51876 hello\n");
+        otCliOutputFormat("close UDP client                     :     udpsockclient close\n");
+    } else if (strcmp(aArgs[0], "status") == 0) {
+        if (udp_client_handle == NULL) {
+            otCliOutputFormat("UDP client is not open\n");
+            return OT_ERROR_NONE;
         }
-        return OT_ERROR_NONE;
+        if (udp_client_member.local_port != -1) {
+            otCliOutputFormat("open\tlocal port: %d\n", udp_client_member.local_port);
+        } else {
+            otCliOutputFormat("open\tnot binded manually\n");
+        }
+
+    } else if (strcmp(aArgs[0], "open") == 0) {
+        if (aArgsLength != 1 && aArgsLength != 2) {
+            ESP_LOGE(TAG, "Invalid arguments.");
+            return OT_ERROR_INVALID_ARGS;
+        }
+        if (udp_client_handle == NULL) {
+            if (aArgsLength == 2) {
+                udp_client_member.local_port = atoi(aArgs[1]);
+            }
+            if (pdPASS !=
+                xTaskCreate(udp_socket_client_task, "udp_socket_client", 4096, &udp_client_member, 4,
+                            &udp_client_handle)) {
+                udp_client_handle = NULL;
+                udp_client_member.local_port = -1;
+                return OT_ERROR_FAILED;
+            }
+        } else {
+            otCliOutputFormat("Already!\n");
+        }
+
+    } else if (strcmp(aArgs[0], "bind") == 0) {
+        if (udp_client_handle == NULL) {
+            otCliOutputFormat("UDP client is not open.\n");
+            return OT_ERROR_NONE;
+        }
+        if (udp_client_member.exist == 1) {
+            otCliOutputFormat("UDP client exists.\n");
+            return OT_ERROR_NONE;
+        }
+        if (aArgsLength != 2) {
+            ESP_LOGE(TAG, "Invalid arguments.");
+            return OT_ERROR_INVALID_ARGS;
+        }
+
+    } else if (strcmp(aArgs[0], "send") == 0) {
+        if (udp_client_handle == NULL) {
+            otCliOutputFormat("UDP client is not open.\n");
+            return OT_ERROR_NONE;
+        }
+        if (udp_client_member.exist == 0) {
+            otCliOutputFormat("UDP client is not binded!\n");
+            return OT_ERROR_NONE;
+        }
+        if (aArgsLength != 4) {
+            ESP_LOGE(TAG, "Invalid arguments.");
+            return OT_ERROR_INVALID_ARGS;
+        }
+        strncpy(udp_client_member.messagesend.ipaddr, aArgs[1], sizeof(udp_client_member.messagesend.ipaddr));
+        udp_client_member.messagesend.port = atoi(aArgs[2]);
+        strncpy(udp_client_member.messagesend.message, aArgs[3], sizeof(udp_client_member.messagesend.message));
+        xEventGroupSetBits(udp_client_event_group, UDP_CLIENT_SEND_BIT);
+    } else if (strcmp(aArgs[0], "close") == 0) {
+        if (udp_client_handle == NULL) {
+            otCliOutputFormat("UDP client is not open.\n");
+            return OT_ERROR_NONE;
+        }
+        xEventGroupSetBits(udp_client_event_group, UDP_CLIENT_CLOSE_BIT);
+        udp_client_handle = NULL;
+    } else {
+        otCliOutputFormat("invalid commands\n");
     }
+    return OT_ERROR_NONE;
 }
 
 otError esp_ot_process_mcast_group(void *aContext, uint8_t aArgsLength, char *aArgs[])

@@ -240,24 +240,149 @@ I (307796) ot_socket: Closed tcp client successfully
 
 Used for creating a udp server.
 
+* General Options
+
 ```bash
 > udpsockserver
+---udpsockserver parameter---
+status                           :     get UDP server status
+open                             :     open UDP server function
+bind <port>                      :     create a UDP server with binding the port
+send <ipaddr> <port> <message>   :     send a message to the UDP client
+close                            :     close UDP server
+---example---
+get UDP server status            :     udpsockserver status
+open UDP server function         :     udpsockserver open
+create a UDP server              :     udpsockserver bind 12345
+send a message                   :     udpsockserver send FDDE:AD00:BEEF:CAFE:FD14:30B6:CDA:8A95 12346 hello
+close UDP server                 :     udpsockserver close
 Done
-I (1310225) ot_socket: Socket created
-I (1310225) ot_socket: Socket bound, port 12345
-I (1310225) ot_socket: Socket listening, timeout is 30 seconds
+```
+
+* Typical usage
+
+Open the udp server function.
+
+```bash
+> udpsockserver open
+Done
+```
+
+Create a udp server with binding the port.
+
+```bash
+> udpsockserver bind 12345
+Done
+I (411174) ot_socket: Socket created
+I (411174) ot_socket: Socket bound, ipaddr ::, port 12345
+I (411184) ot_socket: Successfully created
+```
+
+Check the status of udp client
+
+```bash
+> udpsockserver status
+open        local ipaddr: ::        local port: 12345
+Done
+```
+
+Send a message to the udp client.
+
+```bash
+> udpsockserver send fdf9:2548:ce39:efbb:9612:c4a0:477b:349a 12346 hello
+Done
+I (224674) ot_socket: Sending to fdf9:2548:ce39:efbb:9612:c4a0:477b:349a : 12346
+```
+
+Receive a message from the udp client.
+
+```bash
+I (278524) ot_socket: sock 54 Received 5 bytes from FDF9:2548:CE39:EFBB:9612:C4A0:477B:349A : 12346
+I (278524) ot_socket: hello
+```
+
+Close the udp server.
+
+```bash
+> udpsockserver close
+Done
+I (308914) ot_socket: UDP server receive task exiting
+I (308914) ot_socket: Closed UDP server successfully
 ```
 
 ### udpsockclient
 
-Used for creating a udp client. Note that the client shall be connected to the same Thread network as the server.
+Used for creating a udp client.
+
+* General Options
 
 ```bash
-> udpsockclient fdde:ad00:beef:0:a7c6:6311:9c8c:271b
+> udpsockclient
+---udpsockclient parameter---
+status                               :     get UDP client status
+open <port>                          :     open UDP client function, create a UDP client and bind a local port(optional)
+send <ipaddr> <port> <message>       :     send a message to the UDP server
+close                                :     close UDP client
+---example---
+get UDP client status                :     udpsockclient status
+create a UDP client without binding  :     udpsockclient open
+create a UDP client with binding     :     udpsockclient open 12345
+send a message                       :     udpsockclient send FDDE:AD00:BEEF:CAFE:FD14:30B6:CDA:8A95 12346 hello
+close UDP client                     :     udpsockclient close
 Done
-ot_socket: Socket created, connecting to fdde:ad00:beef:0:a7c6:6311:9c8c:271b:12345
-ot_socket: Successfully connected
-...
+```
+
+* Typical usage
+
+Open the udp client function, create a udp client without binding the port.
+
+```bash
+> udpsockclient open
+Done
+I (842586) ot_socket: Socket created
+I (842586) ot_socket: Successfully created
+```
+
+Open the udp client function, create a udp client with binding the port.
+
+```bash
+udpsockclient open 12345
+Done
+I (926816) ot_socket: Socket created
+I (926816) ot_socket: Socket bound, port 12345
+I (926816) ot_socket: Successfully created
+```
+
+Check the status of udp client
+
+```bash
+> udpsockclient status
+open    local port: 12345
+Done
+```
+
+Send a message to the udp client.
+
+```bash
+> udpsockclient send fdf9:2548:ce39:efbb:79b9:4ac4:f686:8fc9 12346 hello
+Done
+I (1180356) ot_socket: Sending to fdf9:2548:ce39:efbb:79b9:4ac4:f686:8fc9 : 12346
+```
+
+Receive a message from the udp client.
+
+```bash
+I (1218636) ot_socket: sock 54 Received 5 bytes from FDF9:2548:CE39:EFBB:79B9:4AC4:F686:8FC9 : 12345
+I (1218636) ot_socket: hello
+```
+
+Close the udp client.
+
+```bash
+> udpsockclient close
+Done
+I (1238686) ot_socket: UDP client receive task exiting
+I (1238686) ot_socket: Closed UDP client successfully
 ```
 
 ### wifi
