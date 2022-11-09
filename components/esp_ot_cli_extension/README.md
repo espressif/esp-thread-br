@@ -86,24 +86,154 @@ Done
 
 Used for creating a tcp server.
 
+* General Options
+
 ```bash
 > tcpsockserver
+---tcpsockserver parameter---
+status                     :     get tcp server status
+open                       :     open tcp server function
+bind <ipaddr> <port>       :     create a tcp server with binding the ipaddr and port
+send <message>             :     send a message to the tcp client
+close                      :     close tcp server
+---example---
+get tcp server status      :     tcpsockserver status
+open tcp server function   :     tcpsockserver open
+create a tcp server        :     tcpsockserver bind :: 12345
+send a message             :     tcpsockserver send hello
+close tcp server           :     tcpsockserver close
 Done
-I (1310225) ot_socket: Socket created
-I (1310225) ot_socket: Socket bound, port 12345
-I (1310225) ot_socket: Socket listening, timeout is 30 seconds
+```
+
+* Typical usage
+
+Open the tcp server function.
+
+```bash
+> tcpsockserver open
+Done
+```
+
+Create a tcp server with binding.
+
+```bash
+> tcpsockserver bind :: 12345
+Done
+I (362245) ot_socket: Socket created
+I (362245) ot_socket: Socket bound, port 12345
+I (362245) ot_socket: Socket listening
+I (362255) ot_socket: Successfully created
+```
+
+Now the tcp client can connect the tcp server.
+
+```bash
+I (448575) ot_socket: Socket accepted ip address: FDDE:AD00:BEEF:CAFE:F612:FAFF:FE40:37A0
+```
+
+Check the status of tcp client
+
+```bash
+> tcpsockserver status
+connected       remote ipaddr: FDDE:AD00:BEEF:CAFE:F612:FAFF:FE40:37A0
+Done
+```
+
+Send a message to the tcp client.
+
+```bash
+> tcpsockserver send hello
+Done
+```
+
+Receive a message from the tcp client.
+
+```bash
+I (635835) ot_socket: sock 55 Received 5 bytes from FDDE:AD00:BEEF:CAFE:F612:FAFF:FE40:37A0
+I (635835) ot_socket: hello
+```
+
+Close the tcp server.
+
+```bash
+> tcpsockserver close
+Done
+I (232650) ot_socket: TCP server is disconnecting with FDDE:AD00:BEEF:CAFE:F612:FAFF:FE40:37A0
+I (232650) ot_socket: TCP server receive task exiting
+I (232660) ot_socket: Closed tcp server successfully
 ```
 
 ### tcpsockclient
 
 Used for creating a tcp client.
 
+* General Options
+
 ```bash
-> tcpsockclient fdde:ad00:beef:0:a7c6:6311:9c8c:271b
+> tcpsockclient
+---tcpsockclient parameter---
+status                     :     get tcp client status
+open                       :     open tcp client function
+connect <ipaddr> <port>    :     create a tcp client and connect the server
+send <message>             :     send a message to the tcp server
+close                      :     close tcp client 
+---example---
+get tcp client status      :     tcpsockclient status
+open tcp client function   :     tcpsockclient open
+create a tcp client        :     tcpsockclient connect fd81:984a:b59d:2::c0a8:0166 12345
+send a message             :     tcpsockclient send hello
+close tcp client           :     tcpsockclient close
 Done
-ot_socket: Socket created, connecting to fdde:ad00:beef:0:a7c6:6311:9c8c:271b:12345
-ot_socket: Successfully connected
-...
+```
+
+* Typical usage
+
+Open the tcp client function.
+
+```bash
+> tcpsockclient open
+Done
+```
+
+Create a tcp client and connect the tcp server
+
+```bash
+> tcpsockclient connect fd0d:e86e:4ac3:1:81f3:d614:e2ec:46ec 12345
+Done
+I (164956) ot_socket: Socket created, connecting to FD0D:E86E:4AC3:1:81F3:D614:E2EC:46EC:12345
+I (165126) ot_socket: Successfully connected
+```
+
+Check the status of tcp client
+
+```bash
+> tcpsockclient status
+connected       remote ipaddr: FD0D:E86E:4AC3:1:81F3:D614:E2EC:46EC
+Done
+```
+
+Send a message to the tcp server.
+
+```bash
+> tcpsockclient send hello
+Done
+```
+
+Receive a message from the tcp server.
+
+```bash
+I (270416) ot_socket: sock 54 Received 5 bytes from FD0D:E86E:4AC3:1:81F3:D614:E2EC:46EC
+I (270426) ot_socket: hello
+```
+
+Close the tcp client.
+
+```bash
+> tcpsockclient close
+Done
+I (307796) ot_socket: TCP client is disconnecting with FD0D:E86E:4AC3:1:81F3:D614:E2EC:46EC
+I (307796) ot_socket: TCP client receive task exiting
+I (307796) ot_socket: Closed tcp client successfully
 ```
 
 ### udpsockserver
