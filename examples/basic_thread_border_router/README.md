@@ -14,6 +14,8 @@ Please refer to [ESP Thread Border Router Hardware](../../README.md##Hardware-Pl
 
 Refer to [ESP-IDF Get Started](https://docs.espressif.com/projects/esp-idf/en/v4.4.1/esp32s3/get-started/index.html).
 
+note: IDF commit `14ef8d5` is the tested version.
+
 ### Configure the project
 
 ESP32-S3 is the host SoC on ESP Thread Border Router Board, so set target to esp32s3:

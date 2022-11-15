@@ -11,8 +11,12 @@ Clone the `esp-idf <https://github.com/espressif/esp-idf>`_ and the `esp-thread-
 
 .. code-block:: bash
 
-   git clone https://github.com/espressif/esp-idf.git
-
+   git clone --recursive https://github.com/espressif/esp-idf.git
+   cd esp-idf
+   git checkout 14ef8d56cab200d61afdc25c50ede88e0fc61c20
+   git submodule update --init --recursive
+   ./install.sh
+   cd ..
 
 .. code-block:: bash
 
