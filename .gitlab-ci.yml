@@ -21,7 +21,11 @@ pre_commit:
 
 .build_basic_thread_border_router: &build_basic_thread_border_router
   - cd $IDF_PATH/examples/openthread/ot_rcp
-  - idf.py --preview set-target esp32h2
+
+  # Change 'esp32h2' to 'esp32h4' (becasue esp-idf change it)
+  # To do: Change 'esp32h4' to 'esp32h2' after target 'esp32h2' is added in esp-idf
+  - idf.py --preview set-target esp32h4
+
   - idf.py build
   - cd $ESP_THREAD_BR_PATH/examples/basic_thread_border_router
   - idf.py set-target esp32
