@@ -11,10 +11,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "lwip/inet.h"
 #include "openthread/cli.h"
 
 #define TAG "ot-iperf"
-static char s_dest_ip6_addr[50];
+static char s_dest_ip_addr[50];
 
 otError esp_ot_process_iperf(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
@@ -22,6 +23,7 @@ otError esp_ot_process_iperf(void *aContext, uint8_t aArgsLength, char *aArgs[])
     (void)(aArgsLength);
     iperf_cfg_t cfg;
     memset(&cfg, 0, sizeof(cfg));
+    int client_flag = 0;
     // set iperf default flag: tcp server
     IPERF_FLAG_SET(cfg.flag, IPERF_FLAG_TCP);
     IPERF_FLAG_SET(cfg.flag, IPERF_FLAG_SERVER);
@@ -46,9 +48,8 @@ otError esp_ot_process_iperf(void *aContext, uint8_t aArgsLength, char *aArgs[])
                 IPERF_FLAG_SET(cfg.flag, IPERF_FLAG_CLIENT);
                 IPERF_FLAG_CLR(cfg.flag, IPERF_FLAG_SERVER);
                 i++;
-                strcpy(s_dest_ip6_addr, aArgs[i]);
-                cfg.destination_ip6 = s_dest_ip6_addr;
-                otCliOutputFormat("ip:%s\n", cfg.destination_ip6);
+                strcpy(s_dest_ip_addr, aArgs[i]);
+                client_flag = 1;
             } else if (strcmp(aArgs[i], "-s") == 0) {
                 IPERF_FLAG_SET(cfg.flag, IPERF_FLAG_SERVER);
                 IPERF_FLAG_CLR(cfg.flag, IPERF_FLAG_CLIENT);
@@ -93,6 +94,17 @@ otError esp_ot_process_iperf(void *aContext, uint8_t aArgsLength, char *aArgs[])
             } else if (strcmp(aArgs[i], "-a") == 0) {
                 iperf_stop();
                 return OT_ERROR_NONE;
+            }
+        }
+        if (client_flag) {
+            if (cfg.type == IPERF_IP_TYPE_IPV4) {
+                cfg.destination_ip4 = inet_addr(s_dest_ip_addr);
+                char ip_addr[50];
+                strncpy(ip_addr, inet_ntoa(cfg.destination_ip4), sizeof(ip_addr));
+                otCliOutputFormat("ip:%s\n", ip_addr);
+            } else {
+                cfg.destination_ip6 = s_dest_ip_addr;
+                otCliOutputFormat("ip:%s\n", cfg.destination_ip6);
             }
         }
         iperf_start(&cfg);
