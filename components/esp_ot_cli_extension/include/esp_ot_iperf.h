@@ -18,6 +18,11 @@ extern "C" {
  */
 otError esp_ot_process_iperf(void *aContext, uint8_t aArgsLength, char *aArgs[]);
 
+/**
+ * default length to fit into a single 15.4 packet
+ */
+#define OT_IPERF_DEFAULT_LEN 81
+
 #ifdef __cplusplus
 }
 #endif

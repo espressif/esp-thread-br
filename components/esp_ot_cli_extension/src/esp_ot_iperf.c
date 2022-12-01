@@ -29,6 +29,7 @@ otError esp_ot_process_iperf(void *aContext, uint8_t aArgsLength, char *aArgs[])
     IPERF_FLAG_SET(cfg.flag, IPERF_FLAG_SERVER);
     cfg.time = IPERF_DEFAULT_TIME;
     cfg.type = IPERF_IP_TYPE_IPV4;
+    cfg.len_send_buf = OT_IPERF_DEFAULT_LEN;
     if (aArgsLength == 0) {
         otCliOutputFormat("---iperf parameter---\n");
         otCliOutputFormat("-V                  :     use IPV6 address\n");
