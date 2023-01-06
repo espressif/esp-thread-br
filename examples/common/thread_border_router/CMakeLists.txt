@@ -7,4 +7,5 @@ idf_component_register(SRC_DIRS "src"
                         esp-serial-flasher
                         esp_ot_cli_extension
                         openthread
+                        vfs
 )

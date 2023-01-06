@@ -38,9 +38,10 @@ iperf
 -t <time>           :     time in seconds to transmit for (default 10 secs)
 -p <port>           :     server port to listen on/connect to
 -l <len_send_buf>   :     the length of send buffer
+-f <output_format>  :     the output format of the report (Mbit/sec, Kbit/sec, bit/sec; default Mbit/sec)
 ---example---
-create a tcp server :     iperf -s -i 3 -p 5001 -t 60
-create a udp client :     iperf -c <addr> -u -i 3 -t 60 -p 5001 -l 512
+create a tcp server :     iperf -s -i 3 -p 5001 -t 60 -f M
+create a udp client :     iperf -c <addr> -u -i 3 -t 60 -p 5001 -l 512 -f B
 Done
 ```
 
