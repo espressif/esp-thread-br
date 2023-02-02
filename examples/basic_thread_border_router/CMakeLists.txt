@@ -6,7 +6,8 @@ cmake_minimum_required(VERSION 3.5)
 # This example uses an extra component for common functions such as Wi-Fi and Ethernet connection.
 set(EXTRA_COMPONENT_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../common
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../components
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/esp_br_http_ota
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/esp_ot_br_server
     $ENV{IDF_PATH}/examples/common_components/iperf
     $ENV{IDF_PATH}/examples/common_components/protocol_examples_common
 )
