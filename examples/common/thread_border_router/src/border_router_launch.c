@@ -221,5 +221,5 @@ void launch_openthread_border_router(const esp_openthread_platform_config_t *pla
 {
     s_openthread_platform_config = *platform_config;
     ESP_ERROR_CHECK(esp_rcp_update_init(update_config));
-    xTaskCreate(ot_task_worker, "ot_br_main", 20480, xTaskGetCurrentTaskHandle(), 5, NULL);
+    xTaskCreate(ot_task_worker, "ot_br_main", 6144, xTaskGetCurrentTaskHandle(), 5, NULL);
 }
