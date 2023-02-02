@@ -498,5 +498,5 @@ static void ot_task_br_web(void *arg)
 
 void esp_br_web_start(char *base_path)
 {
-    xTaskCreate(ot_task_br_web, "ot_task_br_web", 10240, base_path, 4, NULL);
+    xTaskCreate(ot_task_br_web, "ot_task_br_web", 4096, base_path, 4, NULL);
 }
