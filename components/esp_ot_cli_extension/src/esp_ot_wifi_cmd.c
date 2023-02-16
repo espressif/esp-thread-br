@@ -146,6 +146,9 @@ otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs
         otCliOutputFormat("---example---\n");
         otCliOutputFormat("wifi disconnect once :     wifi disconnect\n");
         otCliOutputFormat("reconnect after 2s   :     wifi disconnect 2000\n");
+        otCliOutputFormat("mac                  :     get mac address of wifi netif\n");
+        otCliOutputFormat("---example---\n");
+        otCliOutputFormat("get wifi mac address :     wifi mac\n");
     } else if (strcmp(aArgs[0], "connect") == 0) {
         for (int i = 1; i < aArgsLength; i++) {
             if (strcmp(aArgs[i], "-s") == 0) {
@@ -181,6 +184,13 @@ otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs
         } else {
             otCliOutputFormat("wifi is not ready, please connect wifi first\n");
         }
+    } else if (strcmp(aArgs[0], "mac") == 0) {
+        uint8_t mac[6];
+        esp_netif_get_mac(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), mac);
+        for (int i = 0; i < 6; i++) {
+            otCliOutputFormat("%02x", mac[i]);
+        }
+        otCliOutputFormat("\n");
     } else {
         otCliOutputFormat("invalid commands\n");
     }
