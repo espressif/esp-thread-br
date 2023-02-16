@@ -12,10 +12,21 @@ Clone the `esp-idf <https://github.com/espressif/esp-idf>`_ and the `esp-thread-
 .. code-block:: bash
 
    git clone --recursive https://github.com/espressif/esp-idf.git
+   
+.. code-block:: bash
+
    cd esp-idf
-   git checkout 14ef8d56cab200d61afdc25c50ede88e0fc61c20
-   git submodule update --init --recursive
+
+.. code-block:: bash
+
    ./install.sh
+
+.. code-block:: bash
+
+   . ./export.sh
+
+.. code-block:: bash
+
    cd ..
 
 .. code-block:: bash
@@ -28,14 +39,25 @@ Follow the `ESP-IDF getting started guide <https://idf.espressif.com/>`_ to set 
 2.1.2. Build the RCP Image
 --------------------------
 
-The default communication interface is port 0 of ESP32-H2 UART running at 115200 baud, change the configuration in `esp_ot_config.h <https://github.com/espressif/esp-idf/blob/master/examples/openthread/ot_rcp/main/esp_ot_config.h>`_ if you want to use another interface or need different communication parameters.
-
 Build the ``esp-idf/examples/openthread/ot-rcp`` example. The firmware doesn't need to be explicitly flashed to a device. It will be included in the Border Router firmware and flashed to the ESP32-H2 chip upon first boot.
 
 .. code-block:: bash
 
    cd $IDF_PATH/examples/openthread/ot-rcp
 
+Select the ESP32-H2 as the RCP.
+
+.. code-block:: bash
+
+   idf.py --preview set-target esp32h2
+
+The default communication interface of ESP32H2 is UART0 with 460800 baudrate, which can be configured in `esp_ot_config.h <https://github.com/espressif/esp-idf/blob/master/examples/openthread/ot_rcp/main/esp_ot_config.h>`_.
+
+In order to use the SPI interface instead, the ``OPENTHREAD_RCP_SPI`` and ``OPENTHREAD_RADIO_SPINEL_SPI`` options should be enabled in ``ot_rcp`` and ``basic_thread_border_router`` example configurations, respectively.
+
+.. code-block:: bash
+
+   idf.py menuconfig
 
 .. code-block:: bash
 

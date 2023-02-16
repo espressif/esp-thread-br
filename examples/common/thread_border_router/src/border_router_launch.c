@@ -157,13 +157,13 @@ static void update_rcp(void)
 #if CONFIG_OPENTHREAD_BR_AUTO_UPDATE_RCP
 static void try_update_ot_rcp(const esp_openthread_platform_config_t *config)
 {
-    char version_str[RCP_VERSION_MAX_SIZE];
+    char internal_rcp_version[RCP_VERSION_MAX_SIZE];
     const char *running_rcp_version = otPlatRadioGetVersionString(esp_openthread_get_instance());
 
-    if (esp_rcp_load_version_in_storage(version_str, sizeof(version_str)) == ESP_OK) {
-        ESP_LOGI(TAG, "RCP Version in storage: %s", version_str);
-        ESP_LOGI(TAG, "Running RCP Version: %s", running_rcp_version);
-        if (strcmp(version_str, running_rcp_version)) {
+    if (esp_rcp_load_version_in_storage(internal_rcp_version, sizeof(internal_rcp_version)) == ESP_OK) {
+        ESP_LOGI(TAG, "Internal RCP Version: %s", internal_rcp_version);
+        ESP_LOGI(TAG, "Running  RCP Version: %s", running_rcp_version);
+        if (strcmp(internal_rcp_version, running_rcp_version)) {
             update_rcp();
         } else {
             esp_rcp_mark_image_verified(true);
@@ -176,6 +176,14 @@ static void try_update_ot_rcp(const esp_openthread_platform_config_t *config)
 }
 #endif // CONFIG_OPENTHREAD_BR_AUTO_UPDATE_RCP
 
+static void rcp_failure_handler(void)
+{
+#if CONFIG_OPENTHREAD_BR_AUTO_UPDATE_RCP
+    try_update_ot_rcp(&s_openthread_platform_config);
+#endif // CONFIG_OPENTHREAD_BR_AUTO_UPDATE_RCP
+    esp_rcp_reset();
+}
+
 static void ot_task_worker(void *ctx)
 {
     esp_netif_config_t cfg = ESP_NETIF_DEFAULT_OPENTHREAD();
@@ -184,7 +192,7 @@ static void ot_task_worker(void *ctx)
     assert(openthread_netif != NULL);
 
     // Initialize the OpenThread stack
-    esp_openthread_register_rcp_failure_handler(update_rcp);
+    esp_openthread_register_rcp_failure_handler(rcp_failure_handler);
     ESP_ERROR_CHECK(esp_openthread_init(&s_openthread_platform_config));
 
     // Initialize border routing features

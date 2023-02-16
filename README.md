@@ -32,13 +32,19 @@ The two SoCs are connected with following interfaces:
 
 The SDK also supports manually connecting an ESP32-H2 RCP to an ESP32 series Wi-Fi SoC.
 
-ESP32 pin | ESP32-H2 pin
-----------|-------------
-  GND     |      G
-  GPIO17  |      TX
-  GPIO18  |      RX
-  GPIO4   |      RST
-  GPIO5   |  GPIO9 (BOOT)
+ESP32 pin           | ESP32-H2 pin
+--------------------|-------------
+  GND               |     G
+  GPIO17 (UART RX)  |     TX
+  GPIO18 (UART TX)  |     RX
+  GPIO4             |     RST
+  GPIO5  (SPI INTR) |     GPIO9 (BOOT)
+  GPIO10 (SPI CS)   |     GPIO2
+  GPIO11 (SPI MOSI) |     GPIO3
+  GPIO12 (SPI CLK)  |     GPIO0
+  GPIO13 (SPI MISO) |     GPIO1
+
+Note that the SPI GPIOs are optional, if the UART is selected for communication.
 
 The following image shows an example connection between ESP32 DevKitC and ESP32-H2 DevKitC:
 
@@ -64,7 +70,6 @@ These features are currently provided by the SDK:
 
 In the future releases, the following features will be added:
 
-* SPI Communication
 * RF Coexistence
 
 # Resources
