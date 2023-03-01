@@ -5,6 +5,7 @@
  */
 
 #include "esp_check.h"
+#include "esp_coexist.h"
 #include "esp_err.h"
 #include "esp_event.h"
 #include "esp_netif.h"
@@ -76,6 +77,12 @@ static void wifi_join(const char *ssid, const char *psk)
         esp_wifi_init(&cfg);
         handle_wifi_addr_init();
 
+#if CONFIG_ESP_COEX_SW_COEXIST_ENABLE && CONFIG_OPENTHREAD_RADIO_NATIVE
+        ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_MIN_MODEM));
+        ESP_ERROR_CHECK(esp_coex_wifi_i154_enable());
+#else
+        ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+#endif
         ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &event_handler, NULL));
         ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
         ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_CONNECTED, &event_handler, NULL));
@@ -91,7 +98,6 @@ static void wifi_join(const char *ssid, const char *psk)
         strncpy((char *)wifi_config.sta.password, psk, sizeof(wifi_config.sta.password));
     }
 
-    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     esp_wifi_connect();

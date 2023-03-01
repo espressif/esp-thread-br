@@ -30,7 +30,7 @@ list(APPEND srcs   "src/esp_ot_ip.c")
 set(include "include")
 idf_component_register(SRCS "${srcs}"
                     INCLUDE_DIRS "${include}"
-                    REQUIRES lwip openthread iperf esp_netif esp_wifi http_parser esp_http_client)
+                    PRIV_REQUIRES lwip openthread iperf esp_netif esp_wifi http_parser esp_http_client esp_coex)
 
 if (CONFIG_OPENTHREAD_CLI_OTA)
     idf_component_optional_requires(PUBLIC esp_br_http_ota)
