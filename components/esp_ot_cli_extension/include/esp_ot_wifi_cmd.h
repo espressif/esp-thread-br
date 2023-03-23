@@ -20,6 +20,8 @@ extern "C" {
  */
 otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs[]);
 
+void handle_wifi_addr_init(void);
+
 /**
  * @brief Wifi netif init.
  *

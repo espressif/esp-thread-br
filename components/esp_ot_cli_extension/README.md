@@ -29,9 +29,9 @@ The ip command is used to add an address onto an interface or delete an address 
 ```bash
 > ip
 ----ip parameter---
--p                         :     print all ip on each interface of lwip
--a <ifaddr> dev <ifname>   :     add an address onto an interface of lwip
--d <ifaddr> dev <ifname>   :     delete an address from an interface of lwip
+print                    :     print all ip on each interface of lwip
+add <ifname> <ifaddr>    :     add an address onto an interface of lwip
+del <ifname> <ifaddr>    :     delete an address from an interface of lwip
 Done
 ```
 
@@ -39,7 +39,7 @@ Done
 
 Print all ip addresses on each interface of lwip:
 ```bash
-> ip -p
+> ip print
 netif: ot
 ot inet6: FE80::EC7C:3806:85C6:71C2 48
 ot inet6: FDDE:AD00:BEEF:0:23AA:A8:5E2C:E03A 16
@@ -50,17 +50,17 @@ Done
 
 Add an address onto the openthread interface of lwip:
 ```bash
-> ip -a fd00::2 dev ot
+> ip add ot fd00::2
 Done
 ```
 
 Delete an address from the openthread interface of lwip:
 ```bash
-> ip -d fd00::2 dev ot
+> ip del ot fd00::2
 Done
 ```
 
-**Note: Currently the ip commands only supports adding or deleting the openthread interface addresses.**
+**Note: Currently the ip commands only support adding or deleting the addresses of openthread interface and Wi-Fi interface.**
 
 ### iperf
 
