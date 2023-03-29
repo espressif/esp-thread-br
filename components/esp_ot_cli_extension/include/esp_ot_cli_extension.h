@@ -10,6 +10,17 @@ extern "C" {
 #endif
 
 /**
+ * @brief Wi-Fi IPv6 address event declarations
+ *
+ */
+typedef enum {
+    WIFI_ADDRESS_EVENT_ADD_IP6,               /*!< Wi-Fi stack added IPv6 address */
+    WIFI_ADDRESS_EVENT_REMOVE_IP6,            /*!< Wi-Fi stack removed IPv6 address */
+    WIFI_ADDRESS_EVENT_MULTICAST_GROUP_JOIN,  /*!< Wi-Fi stack joined IPv6 multicast group */
+    WIFI_ADDRESS_EVENT_MULTICAST_GROUP_LEAVE, /*!< Wi-Fi stack left IPv6 multicast group */
+} esp_wifi_address_event_t;
+
+/**
  * @brief Init the custom command.
  *
  */

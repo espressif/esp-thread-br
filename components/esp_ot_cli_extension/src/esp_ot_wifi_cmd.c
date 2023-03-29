@@ -5,6 +5,7 @@
  */
 
 #include "esp_check.h"
+#include "esp_err.h"
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "esp_netif_ip_addr.h"
@@ -12,6 +13,7 @@
 #include "esp_netif_types.h"
 #include "esp_openthread_border_router.h"
 #include "esp_openthread_lock.h"
+#include "esp_ot_cli_extension.h"
 #include "esp_wifi.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,6 +28,7 @@ static EventGroupHandle_t wifi_event_group;
 const int CONNECTED_IP4_BIT = BIT0;
 const int CONNECTED_IP6_BIT = BIT1;
 static bool s_wifi_connected = false;
+ESP_EVENT_DEFINE_BASE(WIFI_ADDRESS_EVENT);
 
 void esp_ot_wifi_netif_init(void)
 {
@@ -48,6 +51,22 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
     }
 }
 
+void handle_wifi_addr_init(void)
+{
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_ADDRESS_EVENT, WIFI_ADDRESS_EVENT_ADD_IP6,
+                                               esp_netif_action_add_ip6_address,
+                                               esp_netif_get_handle_from_ifkey("WIFI_STA_DEF")));
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_ADDRESS_EVENT, WIFI_ADDRESS_EVENT_REMOVE_IP6,
+                                               esp_netif_action_remove_ip6_address,
+                                               esp_netif_get_handle_from_ifkey("WIFI_STA_DEF")));
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_ADDRESS_EVENT, WIFI_ADDRESS_EVENT_MULTICAST_GROUP_JOIN,
+                                               esp_netif_action_join_ip6_multicast_group,
+                                               esp_netif_get_handle_from_ifkey("WIFI_STA_DEF")));
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_ADDRESS_EVENT, WIFI_ADDRESS_EVENT_MULTICAST_GROUP_LEAVE,
+                                               esp_netif_action_leave_ip6_multicast_group,
+                                               esp_netif_get_handle_from_ifkey("WIFI_STA_DEF")));
+}
+
 static void wifi_join(const char *ssid, const char *psk)
 {
     static bool s_initialized = false;
@@ -55,6 +74,8 @@ static void wifi_join(const char *ssid, const char *psk)
         wifi_event_group = xEventGroupCreate();
         wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
         esp_wifi_init(&cfg);
+        handle_wifi_addr_init();
+
         ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &event_handler, NULL));
         ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
         ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_CONNECTED, &event_handler, NULL));
