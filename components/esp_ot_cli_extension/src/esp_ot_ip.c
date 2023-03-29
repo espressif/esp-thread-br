@@ -20,7 +20,9 @@
 #include "openthread/cli.h"
 
 #if CONFIG_OPENTHREAD_CLI_WIFI
+#if CONFIG_OPENTHREAD_BR_AUTO_START
 static bool wifi_addr_handle_init = false;
+#endif
 ESP_EVENT_DECLARE_BASE(WIFI_ADDRESS_EVENT);
 #endif
 
