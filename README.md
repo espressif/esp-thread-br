@@ -54,7 +54,7 @@ In this setup, only UART interface is connected, so it doesn't support RCP Updat
 
 ## Ethernet based Thread Border Router
 
-Similar to the previous Wi-Fi based Thread Border Route setup, but a device with Ethernet interface is required, such as [ESP32-Ethernet-Kit](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/hw-reference/esp32/get-started-ethernet-kit.html).
+Similar to the previous Wi-Fi based Thread Border Router setup, but a device with Ethernet interface is required, such as [ESP32-Ethernet-Kit](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/hw-reference/esp32/get-started-ethernet-kit.html).
 
 # Provided Features
 

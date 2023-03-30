@@ -5,6 +5,7 @@ stages:
 variables:
     CI_DOCKER_REGISTRY: "ciregistry.espressif.cn:8443"
     ESP_THREAD_BR_PATH: "$CI_PROJECT_DIR"
+    CI_TOOLS_PATH: "$CI_PROJECT_DIR/tools/ci"
 
 before_script:
   - mkdir -p ~/.ssh
@@ -27,6 +28,16 @@ pre_commit:
   - cd $ESP_THREAD_BR_PATH
   - git submodule update --init --recursive
 
+.setup_idf: &setup_idf
+  - cd $CI_PROJECT_DIR
+  - git clone --recursive -b master ${IDF_GIT_REPO_URL}
+  - cd esp-idf
+  - git checkout --track origin/$CI_COMMIT_REF_NAME || git branch
+  - git submodule update --recursive --init
+  - git rev-parse HEAD
+  - ./install.sh
+  - . ./export.sh
+
 .build_basic_thread_border_router: &build_basic_thread_border_router
   - cd $IDF_PATH/examples/openthread/ot_rcp
   - idf.py --preview set-target esp32h2
@@ -36,12 +47,74 @@ pre_commit:
   - cd $ESP_THREAD_BR_PATH/examples/basic_thread_border_router
   - idf.py build
 
+.build_idf_example_ot_br: &build_idf_example_ot_br
+  - cd $IDF_PATH/examples/openthread/ot_br/main
+  - rm -rf idf_component.yml
+  - cp ${CI_TOOLS_PATH}/idf_component_otbr.yml idf_component.yml
+  - cd ..
+  - rm -rf CMakeLists.txt
+  - cp ${CI_TOOLS_PATH}/ot_br.cmake CMakeLists.txt
+  - idf.py set-target esp32s3
+  - idf.py build
+  - idf.py --preview set-target esp32c6
+  - idf.py build
+
+.build_idf_example_ot_br_autostart: &build_idf_example_ot_br_autostart
+  - cd $IDF_PATH/examples/openthread/ot_br/main
+  - rm -rf idf_component.yml
+  - cp ${CI_TOOLS_PATH}/idf_component_otbr.yml idf_component.yml
+  - cd ..
+  - rm -rf CMakeLists.txt
+  - cp ${CI_TOOLS_PATH}/ot_br.cmake CMakeLists.txt
+  - rm -rf sdkconfig.defaults
+  - cp ${CI_TOOLS_PATH}/sdkconfig.br.autostart sdkconfig.defaults
+  - idf.py set-target esp32s3
+  - idf.py build
+  - idf.py --preview set-target esp32c6
+  - idf.py build
+
+.build_idf_example_ot_cli: &build_idf_example_ot_cli
+  - cd $IDF_PATH/examples/openthread/ot_cli/main
+  - rm -rf idf_component.yml
+  - cp ${CI_TOOLS_PATH}/idf_component_otcli.yml idf_component.yml
+  - cd ..
+  - rm -rf CMakeLists.txt
+  - cp ${CI_TOOLS_PATH}/ot_cli.cmake CMakeLists.txt
+  - idf.py --preview set-target esp32c6
+  - idf.py build
+  - idf.py --preview set-target esp32h2
+  - idf.py build
+
 build_examples:
     stage: build
     image: espressif/idf:latest
     script:
         - *submodule_update
         - *build_basic_thread_border_router
+
+build_idf_otbr_examples:
+    stage: build
+    image: espressif/idf:latest
+    allow_failure: true
+    script:
+        - *setup_idf
+        - *build_idf_example_ot_br
+
+build_idf_otbr_autostart_examples:
+    stage: build
+    image: espressif/idf:latest
+    allow_failure: true
+    script:
+        - *setup_idf
+        - *build_idf_example_ot_br_autostart
+
+build_idf_otcli_examples:
+    stage: build
+    image: espressif/idf:latest
+    allow_failure: true
+    script:
+        - *setup_idf
+        - *build_idf_example_ot_cli
 
 build_docs:
     stage: docs

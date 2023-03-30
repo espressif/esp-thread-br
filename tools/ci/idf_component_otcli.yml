@@ -1,0 +1,6 @@
+## IDF Component Manager Manifest File
+dependencies:
+  espressif/esp_ot_cli_extension:
+    path: "$ESP_THREAD_BR_PATH/components/esp_ot_cli_extension"
+  idf:
+    version: ">=4.1.0"
