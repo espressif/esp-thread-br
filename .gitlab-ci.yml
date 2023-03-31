@@ -27,16 +27,6 @@ pre_commit:
   - cd $ESP_THREAD_BR_PATH
   - git submodule update --init --recursive
 
-.setup_idf: &setup_idf
-  - cd $CI_PROJECT_DIR
-  - git clone --recursive -b master ${IDF_GIT_REPO_URL}
-  - cd esp-idf
-  - git checkout 14ef8d5  # TODO: use a fixed commit in IDF v5.0 (IDF-6201)
-  - git submodule sync --recursive
-  - git submodule update --recursive --init
-  - ./install.sh
-  - . ./export.sh
-
 .build_basic_thread_border_router: &build_basic_thread_border_router
   - cd $IDF_PATH/examples/openthread/ot_rcp
   - idf.py --preview set-target esp32h2
@@ -48,9 +38,8 @@ pre_commit:
 
 build_examples:
     stage: build
-    image: $CI_DOCKER_REGISTRY/esp-env-v5.0:4
+    image: espressif/idf:latest
     script:
-        - *setup_idf
         - *submodule_update
         - *build_basic_thread_border_router
 
