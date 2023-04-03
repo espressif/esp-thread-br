@@ -55,8 +55,10 @@ static esp_loader_error_t connect_to_target(target_chip_t target_chip, uint32_t 
     }
 
     if (higher_baudrate) {
-        ESP_RETURN_ON_ERROR(esp_loader_change_baudrate(higher_baudrate), TAG, "Failed to change bootloader baudrate");
-        ESP_RETURN_ON_ERROR(loader_port_change_baudrate(higher_baudrate), TAG, "Failed to change local port baudrate");
+        ESP_RETURN_ON_ERROR(esp_loader_change_transmission_rate(higher_baudrate), TAG,
+                            "Failed to change bootloader baudrate");
+        ESP_RETURN_ON_ERROR(loader_port_change_transmission_rate(higher_baudrate), TAG,
+                            "Failed to change local port baudrate");
     }
     return ESP_LOADER_SUCCESS;
 }
