@@ -45,6 +45,8 @@ The SDK also supports manually connecting an ESP32-H2 RCP to an ESP32 series Wi-
 
    ESP-Thread-Border-Router Standalone Modules
 
+ESP Thread Border Router SDK could also run on a single SoC which supports both Wi-Fi and Thread (e.g., ESP32-C6), check `OpenThread Border Router Example <https://github.com/espressif/esp-idf/blob/master/examples/openthread/ot_br/README.md>`_ for more information. But since there is only one RF path in ESP32-C6, which means Wi-Fi and Thread can't receivce simultaneously, it has a significant impact on performance. Hence the two SoCs solution is recommended.
+
 1.2.2. Ethernet based Thread Border Router
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
