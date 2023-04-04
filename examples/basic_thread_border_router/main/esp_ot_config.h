@@ -25,7 +25,7 @@
             .port = 1,                                     \
             .uart_config =                                 \
                 {                                          \
-                    .baud_rate = 115200,                   \
+                    .baud_rate = 460800,                   \
                     .data_bits = UART_DATA_8_BITS,         \
                     .parity = UART_PARITY_DISABLE,         \
                     .stop_bits = UART_STOP_BITS_1,         \
@@ -42,7 +42,7 @@
     {                                                                                                                \
         .rcp_type = RCP_TYPE_ESP32H2_UART, .uart_rx_pin = CONFIG_PIN_TO_RCP_TX, .uart_tx_pin = CONFIG_PIN_TO_RCP_RX, \
         .uart_port = 1, .uart_baudrate = 115200, .reset_pin = CONFIG_PIN_TO_RCP_RESET,                               \
-        .boot_pin = CONFIG_PIN_TO_RCP_BOOT, .update_baudrate = 230400, .firmware_dir = "/rcp_fw/ot_rcp",             \
+        .boot_pin = CONFIG_PIN_TO_RCP_BOOT, .update_baudrate = 460800, .firmware_dir = "/rcp_fw/ot_rcp",             \
         .target_chip = ESP32H2_CHIP,                                                                                 \
     }
 
