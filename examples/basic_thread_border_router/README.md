@@ -12,9 +12,9 @@ Please refer to [ESP Thread Border Router Hardware](../../README.md##Hardware-Pl
 
 ### Set up ESP IDF
 
-Refer to [ESP-IDF Get Started](https://docs.espressif.com/projects/esp-idf/en/v4.4.1/esp32s3/get-started/index.html).
+Refer to [ESP-IDF Get Started](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/get-started/index.html).
 
-note: IDF commit `14ef8d5` is the tested version.
+Note that it is recommended to use the latest [esp-idf](https://github.com/espressif/esp-idf).
 
 ### Configure the project
 
