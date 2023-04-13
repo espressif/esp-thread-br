@@ -9,4 +9,6 @@
    multicast_forwarding
    service_discovery
    nat64
+   web-gui
+
 

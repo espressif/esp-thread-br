@@ -76,5 +76,3 @@ To access the Web GUI, simply enter ``the local IPv4 address`` for the ESP Threa
    :align: center
    :alt: ESP-Thread-Border-Router GUI
    :figclass: align-center
-
-More user's guidance for Web GUI can reference to `README <https://github.com/espressif/esp-thread-br/blob/main/components/esp_ot_br_server/README.md>`_

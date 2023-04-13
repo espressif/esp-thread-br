@@ -6,49 +6,64 @@
 
 #include "esp_br_web.h"
 #include "cJSON.h"
-#include "esp_br_web_package.h"
+#include "esp_br_web_api.h"
+#include "esp_br_web_base.h"
 #include "esp_check.h"
 #include "esp_err.h"
 #include "esp_event.h"
+#include "esp_heap_caps.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
+#include "esp_openthread.h"
 #include "esp_openthread_border_router.h"
 #include "esp_spiffs.h"
 #include "esp_vfs.h"
 #include "http_parser.h"
 #include "protocol_examples_common.h"
+#include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include "openthread/dataset.h"
+#include "openthread/error.h"
+#include "openthread/ip6.h"
+#include "openthread/platform/radio.h"
+#include "openthread/thread.h"
+#include "openthread/thread_ftd.h"
 
 #define MAX_FILE_SIZE (200 * 1024) // 200 KB
 #define MAX_FILE_SIZE_STR "200KB"
-#define SCRATCH_BUFSIZE 8192 /* Scratch buffer size */
+#define SCRATCH_BUFSIZE 1024 /* Scratch buffer size */
 #define VFS_PATH_MAXNUM 15
-#define MAX_WS_QUEUE_SIZE 5
 #define SERVER_IPV4_LEN 16
 #define FILE_CHUNK_SIZE 1024
-#define WEB_TAG "OTBR_WEB"
-#define SPIFFS_TAG "SPIFFS"
+#define WEB_TAG "obtr_web"
 
+/*-----------------------------------------------------
+ Note：Http Server
+-----------------------------------------------------*/
 /**
- * @brief some information for http_server
- */
-typedef struct http_server {
-    httpd_handle_t handle;    /* Server handle, unique */
-    char ip[SERVER_IPV4_LEN]; /* ip */
-    uint16_t port;            /* port */
-} http_server_t;
-static http_server_t g_server = {NULL, "", 80}; /* the instance of server */
-/**
- * @brief some configure for http_server
+ * @brief The basic configuration for http_server
  */
 typedef struct http_server_data {
-    char base_path[ESP_VFS_PATH_MAX + 1]; /* Base path of file storage */
-    char scratch[SCRATCH_BUFSIZE];        /* Scratch buffer for temporary storage during file transfer */
+    char base_path[ESP_VFS_PATH_MAX + 1]; /* the storaged file path */
+    char scratch[SCRATCH_BUFSIZE];        /* scratch buffer for temporary storage during file transfer */
 } http_server_data_t;
 
 /**
- * @brief some parameter for parsing url
+ * @brief The basic information for http_server
+ */
+typedef struct http_server {
+    httpd_handle_t handle;    /* server handle, unique */
+    http_server_data_t data;  /* data */
+    char ip[SERVER_IPV4_LEN]; /* ip */
+    uint16_t port;            /* port */
+} http_server_t;
+
+static http_server_t s_server = {NULL, {"", ""}, "", 80}; /* the instance of server */
+
+/**
+ * @brief The basic parameter definition for parsing url
  */
 #define PROTLOCOL_MAX_SIZE 12
 #define FILENAME_MAX_SIZE 64
@@ -61,16 +76,203 @@ typedef struct request_url {
 } reqeust_url_t;
 
 /*-----------------------------------------------------
- Note：REST API Configure
+ Note：Http Server Thread REST API
 -----------------------------------------------------*/
-/**
- * @brief The function is to convert client's http request message to cSJON type.
- *
- * @param[in] req A request from http client.
- * @return the json message
- * @note return result needs to free.
- */
-static cJSON *http_request_convert2_json(httpd_req_t *req)
+static esp_err_t esp_otbr_network_diagnostics_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_rloc_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_rloc16_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_state_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_extaddress_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_network_name_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_leader_data_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_number_of_router_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_extpanid_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_active_dataset_tlv_get_handler(httpd_req_t *req);
+
+static httpd_uri_t s_resource_handlers[] = {
+    {
+        .uri = ESP_OT_REST_API_DIAGNOSTICS_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_network_diagnostics_get_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_network_node_get_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_RLOC_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_network_node_rloc_get_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_RLOC16_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_network_node_rloc16_get_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_STATE_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_network_node_state_get_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_EXTADDRESS_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_network_node_extaddress_get_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_NETWORKNAME_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_network_node_network_name_get_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_LEADERDATA_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_network_node_leader_data_get_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_NUMBEROFROUTER_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_network_node_number_of_router_get_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_EXTPANID_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_network_node_extpanid_get_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_ACTIVE_DATASET_TLVS_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_network_node_active_dataset_tlv_get_handler,
+        .user_ctx = NULL,
+    },
+};
+
+/*-----------------------------------------------------
+ Note：Http Server WEB-GUI API
+-----------------------------------------------------*/
+static esp_err_t esp_otbr_network_properties_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_available_networks_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_join_post_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_form_post_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_add_network_prefix_post_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_delete_network_prefix_post_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_commission_post_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_topology_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_current_node_get_handler(httpd_req_t *req);
+
+static httpd_uri_t s_web_gui_handlers[] = {
+    {
+        .uri = ESP_OT_REST_API_PROPERTIES_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_network_properties_get_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_AVAILABLE_NETWORK_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_available_networks_get_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_JOIN_NETWORK_PATH,
+        .method = HTTP_POST,
+        .handler = esp_otbr_network_join_post_handler,
+        .user_ctx = &s_server.data,
+    },
+    {
+        .uri = ESP_OT_REST_API_FORM_NETWORK_PATH,
+        .method = HTTP_POST,
+        .handler = esp_otbr_network_form_post_handler,
+        .user_ctx = &s_server.data,
+    },
+    {
+        .uri = ESP_OT_REST_API_ADD_NETWORK_PREFIX_PATH,
+        .method = HTTP_POST,
+        .handler = esp_otbr_add_network_prefix_post_handler,
+        .user_ctx = &s_server.data,
+    },
+    {
+        .uri = ESP_OT_REST_API_DELETE_NETWORK_PREFIX_PATH,
+        .method = HTTP_POST,
+        .handler = esp_otbr_delete_network_prefix_post_handler,
+        .user_ctx = &s_server.data,
+    },
+    {
+        .uri = ESP_OT_REST_API_COMMISSION_PATH,
+        .method = HTTP_POST,
+        .handler = esp_otbr_network_commission_post_handler,
+        .user_ctx = &s_server.data,
+    },
+    {
+        .uri = ESP_OT_REST_API_TOPOLOGY_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_network_topology_get_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_INFORMATION_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_current_node_get_handler,
+        .user_ctx = NULL,
+    },
+};
+
+/*-----------------------------------------------------
+ Note：Http Tools
+-----------------------------------------------------*/
+static cJSON *pack_response(cJSON *error, cJSON *result, cJSON *message)
+{
+    if (!error || !result || !message) {
+        if (error) {
+            cJSON_Delete(error);
+        }
+        if (result) {
+            cJSON_Delete(result);
+        }
+        if (message) {
+            cJSON_Delete(message);
+        }
+        ESP_LOGE(WEB_TAG, "Failed to pack response json");
+        return NULL;
+    }
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddItemToObject(root, "error", error);
+    cJSON_AddItemToObject(root, "result", result);
+    cJSON_AddItemToObject(root, "message", message);
+    return root;
+}
+
+static cJSON *resource_status(char *error, char *msg)
+{
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddItemToObject(root, "ErrorCode", cJSON_CreateString(error));
+    cJSON_AddItemToObject(root, "ErrorMessage", cJSON_CreateString(msg));
+    return root;
+}
+
+static esp_err_t httpd_server_register_http_uri(const http_server_t *server, httpd_uri_t *uris, uint8_t size)
+{
+    ESP_RETURN_ON_FALSE((server->handle && uris), ESP_ERR_INVALID_ARG, WEB_TAG, "Invalid arguement");
+    for (int i = 0; i < size; i++) {
+        ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server->handle, &uris[i]), WEB_TAG,
+                            "Failed to register %s for %d", uris[i].uri, i);
+    }
+    return ESP_OK;
+}
+
+static cJSON *httpd_request_convert2_json(httpd_req_t *req)
 {
     int total_len = req->content_len;
     int cur_len = 0;
@@ -78,237 +280,575 @@ static cJSON *http_request_convert2_json(httpd_req_t *req)
     int received = 0;
     if (total_len >= SCRATCH_BUFSIZE) /* Respond with 500 Internal Server Error */
     {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "The content of packet is too long");
         return NULL;
     }
     while (cur_len < total_len) {
         received = httpd_req_recv(req, buf + cur_len, total_len);
         if (received <= 0) /* Respond with 500 Internal Server Error */
         {
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to post control value");
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Internal Server Error[500]");
             return NULL;
         }
         cur_len += received;
     }
     buf[total_len] = '\0';
-    cJSON *root = cJSON_Parse(buf); /* need to free. */
-    if (verify_ot_server_package(root) == ESP_OK)
-        return root;
-    else
-        return NULL;
+
+    return cJSON_Parse(buf);
+}
+
+static esp_err_t httpd_send_packet(httpd_req_t *req, cJSON *root)
+{
+    esp_err_t ret = ESP_OK;
+    ESP_RETURN_ON_FALSE(root, ESP_FAIL, WEB_TAG, "Invalid Arguement");
+    char *packet = cJSON_Print(root);
+    ESP_RETURN_ON_FALSE(packet, ESP_FAIL, WEB_TAG, "Invalid Packet");
+    ESP_LOGD(WEB_TAG, "Properties: %s\r\n", packet);
+    ESP_RETURN_ON_FALSE(packet, ESP_FAIL, WEB_TAG, "Invalid Pesponse");
+    ESP_GOTO_ON_ERROR(httpd_resp_set_type(req, "application/json"), exit, WEB_TAG, "Failed to set http type");
+    ESP_GOTO_ON_ERROR(httpd_resp_sendstr(req, packet), exit, WEB_TAG, "Failed to send http respond");
+exit:
+    cJSON_free(packet);
+    return ret;
 }
 
 /*-----------------------------------------------------
- Note：Openthread Discover
+ Note：Openthread resource API implement
 -----------------------------------------------------*/
 /**
- * @brief The function is to handle a client's request which requires to get the available thread networks by 'HTTP_GET'
- * way.
+ * @brief These APIs would collect corresponding information from Thread network and send to @param req.
  *
- * @param[in] req the request for http_client
- * @return ESP_OK: on success, ESP_FAIL: on failure
+ * @param[in] req The request from http client.
+ * @return
+ *      -   ESP_OK   : On success
+ *      -   ESP_FAIL : Failed to handle @param req
+ *      -   ESP_ERR_INVALID_ARG         : Null request pointer
+ *      -   ESP_ERR_HTTPD_RESP_HDR      : Essential headers are too large for internal buffer
+ *      -   ESP_ERR_HTTPD_RESP_SEND     : Error in raw send
+ *      -   ESP_ERR_HTTPD_INVALID_REQ   : Invalid request
  */
-static esp_err_t thread_scan_networks_get_handler(httpd_req_t *req)
+
+static esp_err_t esp_otbr_network_diagnostics_get_handler(httpd_req_t *req)
 {
-    ESP_LOGI(WEB_TAG, "<==================== Thread Discover ======================>");
-    ESP_LOGI(WEB_TAG, "Start to discover network!");
+    ESP_RETURN_ON_FALSE(req, ESP_FAIL, WEB_TAG, "Failed to parse the diagnostics of http request");
+    esp_err_t ret = ESP_OK;
+    cJSON *response = handle_ot_resource_network_diagnostics_request();
+    ESP_RETURN_ON_FALSE(response, ESP_FAIL, WEB_TAG, "Failed to handle openthread diagnostics request");
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
+    cJSON_Delete(response);
+    return ret;
+}
+
+static esp_err_t esp_otbr_network_node_get_handler(httpd_req_t *req)
+{
+    ESP_RETURN_ON_FALSE(req, ESP_FAIL, WEB_TAG, "Failed to parse the node information of http request");
+    esp_err_t ret = ESP_OK;
+    cJSON *response = handle_ot_resource_node_information_request();
+    ESP_RETURN_ON_FALSE(response, ESP_FAIL, WEB_TAG, "Failed to handle openthread diagnostics request");
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
+    cJSON_Delete(response);
+    return ret;
+}
+
+static esp_err_t esp_otbr_network_node_rloc_get_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *response = handle_ot_resource_node_rloc_request();
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
+    cJSON_Delete(response);
+    return ret;
+}
+
+static esp_err_t esp_otbr_network_node_rloc16_get_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *response = handle_ot_resource_node_rloc16_request();
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
+    cJSON_Delete(response);
+    return ret;
+}
+
+static esp_err_t esp_otbr_network_node_state_get_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *response = handle_ot_resource_node_state_request();
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
+    cJSON_Delete(response);
+    return ret;
+}
+
+static esp_err_t esp_otbr_network_node_extaddress_get_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *response = handle_ot_resource_node_extaddress_request();
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
+    cJSON_Delete(response);
+    return ret;
+}
+
+static esp_err_t esp_otbr_network_node_network_name_get_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *response = handle_ot_resource_node_network_name_request();
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
+    cJSON_Delete(response);
+    return ret;
+}
+
+static esp_err_t esp_otbr_network_node_leader_data_get_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *response = handle_ot_resource_node_leader_data_request();
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
+    cJSON_Delete(response);
+    return ret;
+}
+
+static esp_err_t esp_otbr_network_node_number_of_router_get_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *response = handle_ot_resource_node_numofrouter_request();
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
+    cJSON_Delete(response);
+    return ret;
+}
+
+static esp_err_t esp_otbr_network_node_extpanid_get_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *response = handle_ot_resource_node_extpanid_request();
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
+    cJSON_Delete(response);
+    return ret;
+}
+
+static esp_err_t esp_otbr_network_node_active_dataset_tlv_get_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *response = handle_ot_resource_node_active_dataset_tlv_request();
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
+    cJSON_Delete(response);
+    return ret;
+}
+
+/*-----------------------------------------------------
+ Note：Openthread WEB GUI API implement
+-----------------------------------------------------*/
+/**
+ * @brief The API would collect the properties of Thread network and send to @param req.
+ *
+ * @param[in] req The request from http client.
+ * @return
+ *      -   ESP_OK                      : On success
+ *      -   ESP_ERR_INVALID_ARG         : Null request pointer
+ *      -   ESP_ERR_HTTPD_RESP_HDR      : Essential headers are too large for internal buffer
+ *      -   ESP_ERR_HTTPD_RESP_SEND     : Error in raw send
+ *      -   ESP_ERR_HTTPD_INVALID_REQ   : Invalid request
+ */
+static esp_err_t esp_otbr_network_properties_get_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *result = handle_openthread_network_properties_request(); /* encode json package */
+    cJSON *error = result ? cJSON_CreateNumber((double)OT_ERROR_NONE) : cJSON_CreateNumber((double)OT_ERROR_FAILED);
+    cJSON *message = result ? cJSON_CreateString("Properties: Success") : cJSON_CreateString("Properties: Failure");
+    cJSON *response = pack_response(error, result, message);
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+    ESP_GOTO_ON_FALSE(result, ESP_FAIL, exit, WEB_TAG, "Failed to Get Thread network properties");
+    ESP_LOGI(WEB_TAG, "<================= OpenThread Properties ==================>");
+    ESP_LOGI(WEB_TAG, "Collection Complete !");
     ESP_LOGI(WEB_TAG, "<==========================================================>");
 
-    cJSON *json_ret = encode_available_thread_networks_package(); /* encode the package */
-    const char *send_msg = cJSON_Print(json_ret);
-
-    ESP_LOGD(WEB_TAG, "send: %s\r\n", send_msg);
-
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr(req, send_msg);
-
-    cJSON_free((void *)send_msg);
-    cJSON_Delete(json_ret);
-    return ESP_OK;
-}
-
-/*-----------------------------------------------------
- Note：Openthread Join
------------------------------------------------------*/
-/**
- * @brief The function is to handle a request from client, which requires Thread to join a network.
- *
- * @param[in] req The request for http_client.
- * @return ESP_OK: ESP_OK: on success, ESP_FAIL: on failure.
- */
-static esp_err_t thread_join_network_post_handler(httpd_req_t *req)
-{
-    cJSON *root = http_request_convert2_json(req); /* obtain the json for network which client wants to join */
-    if (!root) {
-        ESP_LOGW(WEB_TAG, "parsing package error.");
-        return ESP_FAIL;
-    }
-    char *output = cJSON_Print(root);
-    ESP_LOGD(WEB_TAG, "%s", output);
-    cJSON_Delete(root);
-    cJSON_free(output);
-    return ESP_OK;
-}
-
-/*-----------------------------------------------------
- Note：Openthread Form
------------------------------------------------------*/
-/**
- * @brief The function is to handle a request from client, which requires Thread to form a Network.
- *
- * @param[in] req The request for http_client.
- * @return ESP_OK: ESP_OK: on success, ESP_FAIL: on failure.
- */
-static esp_err_t thread_form_network_post_handler(httpd_req_t *req)
-{
-    cJSON *root = http_request_convert2_json(req);
-    cJSON *content = cJSON_GetObjectItem(root, "content");
-
-    char *output = cJSON_Print(root);
-    ESP_LOGD(WEB_TAG, "received: %s", output);
-    cJSON_free(output);
-
-    if (!content) {
-        ESP_LOGW(WEB_TAG, "parsing package error.");
-        return ESP_FAIL;
-    }
-
-    cJSON *response = form_openthread_network(content);
-    const char *send_msg = cJSON_Print(response);
-    httpd_resp_sendstr(req, send_msg);
-
-    ESP_LOGD(WEB_TAG, "send: %s", send_msg);
-
-    cJSON_free(root);
-    cJSON_free((void *)send_msg);
+exit:
     cJSON_Delete(response);
-    return ESP_OK;
+    return ret;
 }
 
-/*-----------------------------------------------------
- Note：Openthread Status
------------------------------------------------------*/
 /**
- * @brief The function is to response the requirement from client by "HTTP_GET" which need to get thread status.
+ * @brief The API would discover the available thread network, packs and sends it to @param req.
  *
  * @param[in] req The request for http_client.
- * @return ESP_OK: ESP_OK: on success, ESP_FAIL: on failure.
+ * @return
+ *      -   ESP_OK                      : On success
+ *      -   ESP_ERR_HTTPD_RESP_HDR      : Essential headers are too large for internal buffer
+ *      -   ESP_ERR_HTTPD_RESP_SEND     : Error in raw send
+ *      -   ESP_ERR_HTTPD_INVALID_REQ   : Invalid request
+ *      -   ESP_FAILED                  : Null request pointer.
  */
-static esp_err_t thread_status_get_handler(httpd_req_t *req)
+static esp_err_t esp_otbr_available_networks_get_handler(httpd_req_t *req)
 {
-    httpd_resp_set_type(req, "application/json");
-    cJSON *ret = encode_thread_status_package(); /* encode json package */
-    const char *send_msg = cJSON_Print(ret);
+    esp_err_t ret = ESP_OK;
+    cJSON *result = handle_openthread_available_network_request();
+    cJSON *error = result ? cJSON_CreateNumber((double)OT_ERROR_NONE) : cJSON_CreateNumber((double)OT_ERROR_FAILED);
+    cJSON *message = result ? cJSON_CreateString("Networks: Success") : cJSON_CreateString("Networks: Failure");
+    cJSON *response = pack_response(error, result, message);
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+    ESP_GOTO_ON_FALSE(result, ESP_FAIL, exit, WEB_TAG, "Failed to Discover Thread available networks");
+    ESP_LOGI(WEB_TAG, "<================== Available Network =====================>");
+    ESP_LOGI(WEB_TAG, "Discover Completed !");
+    ESP_LOGI(WEB_TAG, "<==========================================================>");
+exit:
+    cJSON_Delete(response);
+    return ret;
+}
 
-    ESP_LOGD(WEB_TAG, "send: %s\r\n", send_msg);
+/**
+ * @brief The API provides an entry for you to join the Thread network by the @param req.
+ *
+ * @param[in] req The request for http_client.
+ * @return
+ *      -   ESP_OK                      : On success
+ *      -   ESP_ERR_HTTPD_RESP_HDR      : Essential headers are too large for internal buffer
+ *      -   ESP_ERR_HTTPD_RESP_SEND     : Error in raw send
+ *      -   ESP_ERR_HTTPD_INVALID_REQ   : Invalid request
+ *      -   ESP_FAILED                  : Null request pointer.
+ */
+static esp_err_t esp_otbr_network_join_post_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *request = httpd_request_convert2_json(req);
+    ESP_RETURN_ON_FALSE(request, ESP_FAIL, WEB_TAG, "Failed to parse the JOIN package");
 
-    httpd_resp_sendstr(req, send_msg);
+    cJSON *join_log = cJSON_CreateString("Known");
+    otError err = handle_openthread_join_network_request(request, join_log);
+    cJSON *error = cJSON_CreateNumber((double)err);
+    cJSON *result = err ? cJSON_CreateString("failed") : cJSON_CreateString("successful");
+    cJSON *message = join_log;
+    cJSON *response = pack_response(error, result, message);
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+    ESP_GOTO_ON_FALSE(!err, ESP_FAIL, exit, WEB_TAG, "Failed to JOIN openthread network");
+    ESP_LOGI(WEB_TAG, "<================== Join Thread Network ====================>");
+    ESP_LOGI(WEB_TAG, "Join successfully !"); /* successfully */
+    ESP_LOGI(WEB_TAG, "<==========================================================>");
+exit:
+    cJSON_Delete(request);
+    cJSON_Delete(response);
+    return ret;
+}
 
-    free((void *)send_msg);
-    cJSON_Delete(ret);
+/**
+ * @brief The API provides an entry to form a Thread network by the @param req.
+ *
+ * @param[in] req The request from http_client.
+ * @return
+ *      -   ESP_OK                      : On success
+ *      -   ESP_ERR_HTTPD_RESP_HDR      : Essential headers are too large for internal buffer
+ *      -   ESP_ERR_HTTPD_RESP_SEND     : Error in raw send
+ *      -   ESP_ERR_HTTPD_INVALID_REQ   : Invalid request
+ *      -   ESP_FAILED                  : Null request pointer
+ */
+static esp_err_t esp_otbr_network_form_post_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *request = httpd_request_convert2_json(req);
+    ESP_RETURN_ON_FALSE(request, ESP_FAIL, WEB_TAG, "Failed to parse the FORM package");
 
-    return ESP_OK;
+    cJSON *form_log = cJSON_CreateString("Known");
+    otError err = handle_openthread_form_network_request(request, form_log);
+    cJSON *error = cJSON_CreateNumber((double)err);
+    cJSON *result = err ? cJSON_CreateString("failed") : cJSON_CreateString("successful");
+    cJSON *message = form_log;
+    cJSON *response = pack_response(error, result, message);
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+    ESP_GOTO_ON_FALSE(!err, ESP_FAIL, exit, WEB_TAG, "Failed to form Thread network");
+    ESP_LOGI(WEB_TAG, "<================== Form Thread Network ===================>");
+    ESP_LOGI(WEB_TAG, "Form network successfully"); /* form successfully */
+    ESP_LOGI(WEB_TAG, "<==========================================================>");
+exit:
+    cJSON_Delete(request);
+    cJSON_Delete(response);
+    return ret;
+}
+
+/**
+ * @brief The API provides an entry to add network prefix to Thread node by the @param req.
+ *
+ * @param[in] req The request from http_client.
+ * @return
+ *      -   ESP_OK                      : On success
+ *      -   ESP_ERR_HTTPD_RESP_HDR      : Essential headers are too large for internal buffer
+ *      -   ESP_ERR_HTTPD_RESP_SEND     : Error in raw send
+ *      -   ESP_ERR_HTTPD_INVALID_REQ   : Invalid request
+ *      -   ESP_FAILED                  : Null request pointer
+ */
+static esp_err_t esp_otbr_add_network_prefix_post_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *request = httpd_request_convert2_json(req);
+    ESP_RETURN_ON_FALSE(request, ESP_FAIL, WEB_TAG, "Failed to parse the add prefix package");
+    otError err = handle_openthread_add_network_prefix_request(request);
+    cJSON *error = cJSON_CreateNumber((double)err);
+    cJSON *result = err ? cJSON_CreateString("failed") : cJSON_CreateString("successful");
+    cJSON *message = err ? cJSON_CreateString("Add Prefix: Failure") : cJSON_CreateString("Add Prefix: Success");
+    cJSON *response = pack_response(error, result, message);
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+    ESP_GOTO_ON_FALSE(!err, ESP_FAIL, exit, WEB_TAG, "Failed to ADD Thread network prefix");
+    ESP_LOGI(WEB_TAG, "<================== Add Network Prefix ====================>");
+    ESP_LOGI(WEB_TAG, "On mesh prefix: %s", cJSON_GetStringValue(cJSON_GetObjectItem(request, "prefix")));
+    ESP_LOGI(WEB_TAG, "Add mesh prefix successfully"); /* successfully */
+    ESP_LOGI(WEB_TAG, "<==========================================================>");
+exit:
+    cJSON_Delete(request);
+    cJSON_Delete(response);
+    return ret;
+}
+
+/**
+ * @brief The API provides an entry to delete network prefix from Thread node by the @param req.
+ *
+ * @param[in] req The request from http_client.
+ * @return
+ *      -   ESP_OK                      : On success
+ *      -   ESP_ERR_HTTPD_RESP_HDR      : Essential headers are too large for internal buffer
+ *      -   ESP_ERR_HTTPD_RESP_SEND     : Error in raw send
+ *      -   ESP_ERR_HTTPD_INVALID_REQ   : Invalid request
+ *      -   ESP_FAILED                  : Null request pointer
+ */
+static esp_err_t esp_otbr_delete_network_prefix_post_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *request = httpd_request_convert2_json(req);
+    ESP_RETURN_ON_FALSE(request, ESP_FAIL, WEB_TAG, "Failed to parse the delete prefix package");
+
+    otError err = handle_openthread_delete_network_prefix_request(request);
+    cJSON *error = cJSON_CreateNumber((double)err);
+    cJSON *result = err ? cJSON_CreateString("failed") : cJSON_CreateString("successful");
+    cJSON *message = err ? cJSON_CreateString("Delete Prefix: Failure") : cJSON_CreateString("Delete Prefix: Success");
+    cJSON *response = pack_response(error, result, message);
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+    ESP_GOTO_ON_FALSE(!err, ESP_FAIL, exit, WEB_TAG, "Failed to DELETE Thread network prefix");
+    ESP_LOGI(WEB_TAG, "<================= Delete Network Prefix ===================>");
+    ESP_LOGI(WEB_TAG, "On mesh prefix: %s", cJSON_GetStringValue(cJSON_GetObjectItem(request, "prefix")));
+    ESP_LOGI(WEB_TAG, "Delete mesh prefix successfully"); /* successfully */
+    ESP_LOGI(WEB_TAG, "<==========================================================>");
+exit:
+    cJSON_Delete(request);
+    cJSON_Delete(response);
+    return ret;
+}
+
+static esp_err_t esp_otbr_network_commission_post_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *request = httpd_request_convert2_json(req);
+    ESP_RETURN_ON_FALSE(request, ESP_FAIL, WEB_TAG, "Failed to parse the add prefix package");
+
+    otError err = handle_openthread_network_commission_request(request);
+    cJSON *error = err ? cJSON_CreateNumber((double)err) : cJSON_CreateNumber((double)err);
+    cJSON *result = err ? cJSON_CreateString("failed") : cJSON_CreateString("successful");
+    cJSON *message = err ? cJSON_CreateString("Commissioner: Failure") : cJSON_CreateString("Commissioner: Process");
+    cJSON *response = pack_response(error, result, message);
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+    ESP_GOTO_ON_FALSE(!err, ESP_FAIL, exit, WEB_TAG, "Failed to commsission thread network");
+    ESP_LOGI(WEB_TAG, "<================== Thread Commission =====================>");
+    ESP_LOGI(WEB_TAG, "Thread commission successfully"); /* successfully */
+    ESP_LOGI(WEB_TAG, "<==========================================================>");
+exit:
+    cJSON_Delete(request);
+    cJSON_Delete(response);
+    return ret;
+}
+
+/**
+ * @brief The API provides an entry to collect the topology of Thread node, packs and sends it to @param req.
+ *
+ * @param[in] req The request from http_client.
+ * @return
+ *      -   ESP_OK                      : On success
+ *      -   ESP_ERR_HTTPD_RESP_HDR      : Essential headers are too large for internal buffer
+ *      -   ESP_ERR_HTTPD_RESP_SEND     : Error in raw send
+ *      -   ESP_ERR_HTTPD_INVALID_REQ   : Invalid request
+ *      -   ESP_FAILED                  : Null request pointer
+ */
+static esp_err_t esp_otbr_network_topology_get_handler(httpd_req_t *req)
+{
+    ESP_RETURN_ON_FALSE(req, ESP_FAIL, WEB_TAG, "Failed to parse the diagnostics of http request");
+    esp_err_t ret = ESP_OK;
+    cJSON *result = handle_ot_resource_network_diagnostics_request();
+    cJSON *error = result ? cJSON_CreateNumber((double)OT_ERROR_NONE) : cJSON_CreateNumber((double)OT_ERROR_FAILED);
+    cJSON *message = result ? cJSON_CreateString("Topology: Success") : cJSON_CreateString("Topology: Failure");
+    cJSON *response = pack_response(error, result, message);
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+    ESP_GOTO_ON_FALSE(result, ESP_FAIL, exit, WEB_TAG, "Failed to get Thread Network Topology");
+    ESP_LOGI(WEB_TAG, "<==================== Thread Topology =====================>");
+    ESP_LOGI(WEB_TAG, "Thread diagnostic Tlv Complete.");
+    ESP_LOGI(WEB_TAG, "<==========================================================>");
+exit:
+    cJSON_Delete(response);
+    return ret;
+}
+
+/**
+ * @brief The API provides an entry to collect the information of Thread node, packs and sends it to @param req.
+ *
+ * @param[in] req The request from http_client.
+ * @return
+ *      -   ESP_OK                      : On success
+ *      -   ESP_ERR_HTTPD_RESP_HDR      : Essential headers are too large for internal buffer
+ *      -   ESP_ERR_HTTPD_RESP_SEND     : Error in raw send
+ *      -   ESP_ERR_HTTPD_INVALID_REQ   : Invalid request
+ *      -   ESP_FAILED                  : Null request pointer
+ */
+static esp_err_t esp_otbr_current_node_get_handler(httpd_req_t *req)
+{
+    ESP_RETURN_ON_FALSE(req, ESP_FAIL, WEB_TAG, "Failed to parse the node information of http request");
+    esp_err_t ret = ESP_OK;
+    cJSON *result = handle_ot_resource_node_information_request();
+    cJSON *error = result ? cJSON_CreateNumber((double)OT_ERROR_NONE) : cJSON_CreateNumber((double)OT_ERROR_FAILED);
+    cJSON *message = result ? cJSON_CreateString("Get Node: Success") : cJSON_CreateString("Get Node: Failure");
+    cJSON *response = pack_response(error, result, message);
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+    ESP_GOTO_ON_FALSE(result, ESP_FAIL, exit, WEB_TAG, "Failed to get current thread node information");
+    ESP_LOGI(WEB_TAG, "<=================== Node Information =====================>");
+    ESP_LOGI(WEB_TAG, "Extraction Complete");
+    ESP_LOGI(WEB_TAG, "<==========================================================>");
+exit:
+    cJSON_Delete(response);
+    return ret;
 }
 
 /*-----------------------------------------------------
  Note：Handling for Client request
 -----------------------------------------------------*/
 /**
- * @brief The function is to return a blank html to client. when client accesses a error link, the function will be
+ * @brief Provide a blank html to client. when client accesses a error link, the function will be
  * call.
  *
- * @param[in] req the request from client's browser
- * @return ESP_OK: on success, ESP_FAIL: on failure
+ * @param[in] req The request from client's browser
+ * @return
+ *      -   ESP_OK                      : On success
+ *      -   ESP_ERR_INVALID_ARG         : Null request pointer
+ *      -   ESP_ERR_HTTPD_RESP_HDR      : Essential headers are too large for internal buffer
+ *      -   ESP_ERR_HTTPD_RESP_SEND     : Error in raw send
+ *      -   ESP_ERR_HTTPD_INVALID_REQ   : Invalid request
  */
 static esp_err_t blank_html_get_handler(httpd_req_t *req)
 {
-    httpd_resp_set_status(req, "307 Temporary Redirect");
-    httpd_resp_set_hdr(req, "Location", "/");
-    return httpd_resp_send(req, NULL, 0); /* Response body can be empty */
+    esp_err_t ret = ESP_OK;
+    cJSON *response = resource_status("404", "404 Not Found");
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+
+exit:
+    cJSON_Delete(response);
+    return ret;
+}
+static esp_err_t NOT_FOUND_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *response = resource_status("404", "404 Not Found");
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+
+exit:
+    cJSON_Delete(response);
+    return ret;
 }
 
 /**
- * @brief The function is to provide the favicon for GUI.
+ * @brief Provide the favicon for GUI.
  *
- * @param[in] req the request from client's browser.
- * @return ESP_OK: on success, ESP_FAIL: on failure.
+ * @param[in] req The request from client's browser.
+ * @return
+ *      -   ESP_OK                      : On success
+ *      -   ESP_ERR_INVALID_ARG         : Null request pointer
+ *      -   ESP_ERR_HTTPD_RESP_HDR      : Essential headers are too large for internal buffer
+ *      -   ESP_ERR_HTTPD_RESP_SEND     : Error in raw send
+ *      -   ESP_ERR_HTTPD_INVALID_REQ   : Invalid request
  */
 static esp_err_t favicon_get_handler(httpd_req_t *req)
 {
     extern const unsigned char favicon_ico_start[] asm("_binary_favicon_ico_start");
     extern const unsigned char favicon_ico_end[] asm("_binary_favicon_ico_end");
     const size_t favicon_ico_size = (favicon_ico_end - favicon_ico_start);
-    httpd_resp_set_type(req, "image/x-icon"); /* notice resp type to browser*/
-    httpd_resp_send(req, (const char *)favicon_ico_start, favicon_ico_size);
+
+    ESP_RETURN_ON_ERROR(httpd_resp_set_type(req, "image/x-icon"), WEB_TAG, "Failed to set http respond type");
+    ESP_RETURN_ON_ERROR(httpd_resp_send(req, (const char *)favicon_ico_start, favicon_ico_size), WEB_TAG,
+                        "Failed to send http respond");
     return ESP_OK;
 }
 
 /**
- * @brief The function provide a method to send message to @param req client accord to @param path.
+ * @brief Provide a method to send message to @param req client accord to @param path.
  *
  * @param[in] req  The request from the client
- * @param[in] path A string represents the path of file which you want to send.
- * @return Whether the message is sent or not
+ * @param[in] path The path of file which will be sent.
+ * @return
+ *      -   ESP_OK: on success
+ *      -   ESP_FAIL: on failure
  */
 static esp_err_t httpd_resp_send_spiffs_file(httpd_req_t *req, char *path)
 {
     ESP_LOGI(WEB_TAG, "-------------------------------------------");
-    ESP_LOGI(SPIFFS_TAG, "Reading %s", path);
+    ESP_LOGI(WEB_TAG, "Reading %s", path);
 
-    FILE *fp = fopen(path, "r"); // Open for reading file
-    if (fp == NULL) {
-        ESP_LOGE(SPIFFS_TAG, "Failed to open file.");
-        return ESP_FAIL;
-    }
+    FILE *fp = fopen(path, "r"); // Open and read file
+
+    ESP_RETURN_ON_FALSE(fp, ESP_FAIL, WEB_TAG, "Failed to open %s file", path);
+
     char buf[FILE_CHUNK_SIZE]; // the size of chunk
     while (!feof(fp) && !ferror(fp)) {
         fread(buf, FILE_CHUNK_SIZE - 1, 1, fp);
         buf[FILE_CHUNK_SIZE - 1] = '\0';
         httpd_resp_sendstr_chunk(req, buf);
         memset(buf, 0, sizeof(buf));
-    }
-    fclose(fp);
-    return ESP_OK;
+    };
+    return fclose(fp) == 0 ? ESP_OK : ESP_FAIL;
 }
 
 /**
- * @brief The function is to provide the index.html for GUI,when the client login the web.
+ * @brief Provide the index.html for GUI,when the client login the web.
  *
- * @param[in] req the request from client's browser.
- * @param[in] path A string pointer points to the index.hrml path.
- * @return ESP_OK: on success, ESP_FAIL: on failure
+ * @param[in] req is the request from client's browser.
+ * @param[in] path points to the index.hrml path.
+ * @return
+ *      -   ESP_OK : On success
+ *      -   ESP_ERR_INVALID_ARG : Null request pointer
+ *      -   ESP_ERR_HTTPD_RESP_HDR    : Essential headers are too large for internal buffer
+ *      -   ESP_ERR_HTTPD_RESP_SEND   : Error in raw send
+ *      -   ESP_ERR_HTTPD_INVALID_REQ : Invalid request
  */
 static esp_err_t index_html_get_handler(httpd_req_t *req, char *path)
 {
-    ESP_RETURN_ON_ERROR(httpd_resp_send_spiffs_file(req, path), WEB_TAG, "Fail to get html file.");
-    httpd_resp_sendstr_chunk(req, NULL); // end
+    ESP_RETURN_ON_ERROR(httpd_resp_send_spiffs_file(req, path), WEB_TAG, "Failed to send index html file");
+    ESP_RETURN_ON_ERROR(httpd_resp_sendstr_chunk(req, NULL), WEB_TAG, "Failed to send http string chunk");
     return ESP_OK;
 }
 
 static esp_err_t style_css_get_handler(httpd_req_t *req, char *path)
 {
-    httpd_resp_set_type(req, "text/css"); // send content-type："text/css" in http-header
-    ESP_RETURN_ON_ERROR(httpd_resp_send_spiffs_file(req, path), WEB_TAG, "Fail to get style file.");
-    httpd_resp_sendstr_chunk(req, NULL);
+    // send content-type："text/css" in http-header
+    ESP_RETURN_ON_ERROR(httpd_resp_set_type(req, "text/css"), WEB_TAG, "Failed to set http text/css type");
+    ESP_RETURN_ON_ERROR(httpd_resp_send_spiffs_file(req, path), WEB_TAG, "Failed to send css file");
+    ESP_RETURN_ON_ERROR(httpd_resp_sendstr_chunk(req, NULL), WEB_TAG, "Failed to send http string chunk");
     return ESP_OK;
 }
 
 static esp_err_t script_js_get_handler(httpd_req_t *req, char *path)
 {
-    httpd_resp_set_type(req,
-                        "application/javascript"); // send content-type："application/javascript" in http-header
-    ESP_RETURN_ON_ERROR(httpd_resp_send_spiffs_file(req, path), WEB_TAG, "Fail to get script file.");
-    httpd_resp_sendstr_chunk(req, NULL);
+    // send content-type："application/javascript" in http-header
+    ESP_RETURN_ON_ERROR(httpd_resp_set_type(req, "application/javascript"), WEB_TAG,
+                        "Failed to set http application/javascript type");
+    ESP_RETURN_ON_ERROR(httpd_resp_send_spiffs_file(req, path), WEB_TAG, "Failed to send js file");
+    ESP_RETURN_ON_ERROR(httpd_resp_sendstr_chunk(req, NULL), WEB_TAG, "Failed to send http string chunk");
     return ESP_OK;
 }
 
 /**
- * @brief The function is to parse @param parse_url to obtain vaild information for returning
+ * @brief Parse @param parse_url to obtain valid information for returning
  *
- * @param[in] uri       A string points the request uri from client
- * @param[in] parse_url A pointer point to the result structure for @function "http_parser_parse_url()".
- * @param[in] base_path A string pointer point the base files path.
- * @return the vaild information from @param parse_url
+ * @param[in] uri       A pointer points the request uri from client
+ * @param[in] parse_url A pointer points to the result structure for @function "http_parser_parse_url()".
+ * @param[in] base_path A pointer points the base files path.
+ * @return the valid information from @param parse_url
  */
 static reqeust_url_t parse_request_url_information(const char *uri, const struct http_parser_url *parse_url,
                                                    const char *base_path)
@@ -335,15 +875,17 @@ static reqeust_url_t parse_request_url_information(const char *uri, const struct
 }
 
 /**
- * @brief The function is to verify and handle the client's default request, return corrresponding file to client.
+ * @brief Verify and handle the client's default request, return corrresponding file to client.
  *
- * @param[in] req A request of client's.
- * @return ESP_OK: on success, ESP_FAIL: on failure.
+ * @param[in] req The request of http client.
+ * @return
+ *      -   ESP_OK: on success
+ *      -   ESP_FAIL: on failure.
  */
 static esp_err_t default_urls_get_handler(httpd_req_t *req)
 {
     struct http_parser_url url;
-    ESP_RETURN_ON_ERROR(http_parser_parse_url(req->uri, strlen(req->uri), 0, &url), WEB_TAG, "Fail to parse url.");
+    ESP_RETURN_ON_ERROR(http_parser_parse_url(req->uri, strlen(req->uri), 0, &url), WEB_TAG, "Failed to parse url");
     reqeust_url_t info =
         parse_request_url_information(req->uri, &url, ((http_server_data_t *)req->user_ctx)->base_path);
 
@@ -351,24 +893,27 @@ static esp_err_t default_urls_get_handler(httpd_req_t *req)
     ESP_LOGI(WEB_TAG, "%s", info.file_name);
     if (!strcmp(info.file_name, "")) // check the filename.
     {
-        ESP_LOGE(WEB_TAG, "Filename is too long or url error."); /* Respond with 500 Internal Server Error */
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Filename is too long or url error.");
+        ESP_LOGE(WEB_TAG, "Filename is too long or url error"); /* Respond with 500 Internal Server Error */
+        ESP_RETURN_ON_ERROR(
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Filename is too long or url error"), WEB_TAG,
+            "Failed to send error code");
         return ESP_FAIL;
     }
-    if (strcmp(info.file_name, "/") == 0)
+    if (strcmp(info.file_name, "/") == 0) {
         return blank_html_get_handler(req);
-    else if (strcmp(info.file_name, "/index.html") == 0)
+    } else if (strcmp(info.file_name, "/index.html") == 0) {
         return index_html_get_handler(req, info.file_path);
-    else if (strcmp(info.file_name, "/static/style.css") == 0)
+    } else if (strcmp(info.file_name, "/static/style.css") == 0) {
         return style_css_get_handler(req, info.file_path);
-    else if (strcmp(info.file_name, "/static/restful.js") == 0)
+    } else if (strcmp(info.file_name, "/static/restful.js") == 0) {
         return script_js_get_handler(req, info.file_path);
-    else if (strcmp(info.file_name, "/favicon.ico") == 0)
+    } else if (strcmp(info.file_name, "/static/bootstrap.min.css") == 0) {
+        return script_js_get_handler(req, info.file_path);
+    } else if (strcmp(info.file_name, "/favicon.ico") == 0) {
         return favicon_get_handler(req);
-    else {
+    } else {
         ESP_LOGE(WEB_TAG, "Failed to stat file : %s", info.file_path); /* Respond with 404 Not Found */
-        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "File does not exist");
-        return ESP_FAIL;
+        return NOT_FOUND_handler(req);
     }
     return ESP_OK;
 }
@@ -377,87 +922,54 @@ static esp_err_t default_urls_get_handler(httpd_req_t *req)
  Note：Server Start
 -----------------------------------------------------*/
 /**
- * @brief The function is to create an HTTP server and register an accessible URI
+ * @brief Create an HTTP server and register an accessible URI
  *
  * @param[in] base_path A string represents the basic path of http_server files.
- * @param[in] host_ip A IPvr4 address provided by the connected wifi, recorded by g_server.ip
- * @return ESP_OK: on success, ESP_FAIL: on failure
+ * @param[in] host_ip   A IPvr4 address provided by the connected wifi, recorded by s_server.ip
+ * @return
+ *      -   ESP_OK: on success
+ *      -   ESP_FAIL: on failure
  */
-static esp_err_t start_esp_br_http_server(const char *base_path, const char *host_ip)
+static httpd_handle_t *start_esp_br_http_server(const char *base_path, const char *host_ip)
 {
-    ESP_RETURN_ON_ERROR(base_path == NULL, WEB_TAG, "The base path is empty.");
+    ESP_RETURN_ON_FALSE(base_path, NULL, WEB_TAG, "Invalid http server path");
 
-    strcpy(g_server.ip, host_ip);
-    static http_server_data_t *server_data = NULL;
-
-    // avoid to create server twice
-    if (server_data) {
-        ESP_LOGE(WEB_TAG, "Http server already started!");
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    server_data = calloc(
-        1, sizeof(http_server_data_t)); /* malloc the buffer of server, when stop server, the memory needs to free */
-    if (!server_data) {
-        ESP_LOGE(WEB_TAG, "Failed to allocate memory for server data");
-        return ESP_ERR_NO_MEM;
-    }
-    strlcpy(
-        server_data->base_path, base_path,
-        sizeof(server_data->base_path)); /* take the path of web_server in flash as the root directory of the server */
+    strcpy(s_server.ip, host_ip);
+    strlcpy(s_server.data.base_path, base_path, ESP_VFS_PATH_MAX + 1);
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-
-    // Use the URI wildcard matching function to allow the same handler to respond to multiple different target URIs
-    // that match the wildcard scheme
+    config.max_uri_handlers = (sizeof(s_resource_handlers) + sizeof(s_web_gui_handlers)) / sizeof(httpd_uri_t) + 2;
+    config.max_resp_headers = (sizeof(s_resource_handlers) + sizeof(s_web_gui_handlers)) / sizeof(httpd_uri_t) + 2;
     config.uri_match_fn = httpd_uri_match_wildcard;
-    config.stack_size = 10240; // expand the stack size to fit file transmission
-    g_server.port = config.server_port;
+    config.stack_size = 8 * 1024;
+    s_server.port = config.server_port;
+
     // start http_server
-    if (httpd_start(&g_server.handle, &config) != ESP_OK) {
-        ESP_LOGE(WEB_TAG, "Failed to start file server!");
-        return ESP_FAIL;
-    }
+    ESP_RETURN_ON_FALSE(!httpd_start(&s_server.handle, &config), NULL, WEB_TAG, "Failed to start web server");
+
     httpd_uri_t default_uris_get = {.uri = "/*", // Match all URIs of type /path/to/file
                                     .method = HTTP_GET,
                                     .handler = default_urls_get_handler,
-                                    .user_ctx = server_data};
-    httpd_uri_t thread_status_uris_get = {.uri = "/thread/api/status", // match function thread status
-                                          .method = HTTP_GET,
-                                          .handler = thread_status_get_handler,
-                                          .user_ctx = server_data};
-    httpd_uri_t thread_scan_network_uris_get = {.uri = "/thread/api/scan",
-                                                .method = HTTP_GET,
-                                                .handler = thread_scan_networks_get_handler,
-                                                .user_ctx = server_data};
-    httpd_uri_t thread_join_network_uris_post = {.uri = "/thread/api/scan/join",
-                                                 .method = HTTP_POST,
-                                                 .handler = thread_join_network_post_handler,
-                                                 .user_ctx = server_data};
-    httpd_uri_t thread_form_network_uris_post = {.uri = "/thread/api/form",
-                                                 .method = HTTP_POST,
-                                                 .handler = thread_form_network_post_handler,
-                                                 .user_ctx = server_data};
-    // httpd_register_uri_handler(g_server.handle, &webSocket);            //care for the order
-    httpd_register_uri_handler(g_server.handle, &thread_status_uris_get);
-    httpd_register_uri_handler(g_server.handle, &thread_scan_network_uris_get);
-    httpd_register_uri_handler(g_server.handle, &thread_join_network_uris_post);
-    httpd_register_uri_handler(g_server.handle, &thread_form_network_uris_post);
-    httpd_register_uri_handler(g_server.handle, &default_uris_get);
-    // tip: login address
+                                    .user_ctx = &s_server.data};
+
+    httpd_server_register_http_uri(&s_server, s_resource_handlers, sizeof(s_resource_handlers) / sizeof(httpd_uri_t));
+    httpd_server_register_http_uri(&s_server, s_web_gui_handlers, sizeof(s_web_gui_handlers) / sizeof(httpd_uri_t));
+    httpd_register_uri_handler(s_server.handle, &default_uris_get);
+
+    // Show the login address in the console
     ESP_LOGI(WEB_TAG, "%s\r\n", "<=======================server start========================>");
-    ESP_LOGI(WEB_TAG, "http://%s:%d/index.html\r\n", g_server.ip, g_server.port);
+    ESP_LOGI(WEB_TAG, "http://%s:%d/index.html\r\n", s_server.ip, s_server.port);
     ESP_LOGI(WEB_TAG, "%s\r\n", "<===========================================================>");
-    return ESP_OK;
+
+    return s_server.handle;
 }
 
 void connect_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data, const char *base_path)
 {
     httpd_handle_t *server = (httpd_handle_t *)arg;
-    if (*server == NULL) {
-        ESP_LOGI(WEB_TAG, "Starting webserver");
-        *server = (httpd_handle_t *)start_esp_br_http_server(base_path, g_server.ip);
-    }
+    ESP_RETURN_ON_FALSE(server, , WEB_TAG, "Http server is invalid, failed to start it");
+    ESP_LOGI(WEB_TAG, "Start the web server for Openthread Border Router");
+    *server = (httpd_handle_t *)start_esp_br_http_server(base_path, s_server.ip);
 }
 
 /*-----------------------------------------------------
@@ -476,11 +988,10 @@ void disconnect_handler(void *arg, esp_event_base_t event_base, int32_t event_id
         data = NULL;
     }
     httpd_handle_t *server = (httpd_handle_t *)arg;
-    if (*server) {
-        ESP_LOGI(WEB_TAG, "Stopping httpserver");
-        stop_httpserver(*server);
-        *server = NULL;
-    }
+    ESP_RETURN_ON_FALSE(server, , WEB_TAG, "Web server is valid, failed to stop it");
+    ESP_LOGI(WEB_TAG, "Stop the web server for Openthread Border Router");
+    stop_httpserver(*server);
+    *server = NULL;
 }
 
 /*-----------------------------------------------------

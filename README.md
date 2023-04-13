@@ -37,8 +37,8 @@ ESP32 pin           | ESP32-H2 pin
   GND               |     G
   GPIO17 (UART RX)  |     TX
   GPIO18 (UART TX)  |     RX
-  GPIO4             |     RST
-  GPIO5  (SPI INTR) |     GPIO9 (BOOT)
+  GPIO7             |     RST
+  GPIO8  (SPI INTR) |     GPIO9 (BOOT)
   GPIO10 (SPI CS)   |     GPIO2
   GPIO11 (SPI MOSI) |     GPIO3
   GPIO12 (SPI CLK)  |     GPIO0
