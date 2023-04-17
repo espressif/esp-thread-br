@@ -23,6 +23,7 @@ ESP32-S3 is the host SoC on ESP Thread Border Router Board, so set target to esp
 ```
 idf.py set-target esp32s3
 ```
+The host could be pre-configured with `CONFIG_OPENTHREAD_RADIO_SPINEL_UART` or `CONFIG_OPENTHREAD_RADIO_SPINEL_SPI` to select UART or SPI to access the Radio Co-Processor.
 
 If the `OPENTHREAD_BR_AUTO_START` option is enabled, the device will connect to the configured Wi-Fi and form Thread network automatically then act as the border router.
 

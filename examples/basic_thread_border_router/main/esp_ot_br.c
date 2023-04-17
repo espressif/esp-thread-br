@@ -55,8 +55,9 @@ void app_main(void)
     // * netif
     // * task queue
     // * border router
+    // * spi interface
     esp_vfs_eventfd_config_t eventfd_config = {
-        .max_fds = 3,
+        .max_fds = 4,
     };
 
     esp_openthread_platform_config_t platform_config = {
