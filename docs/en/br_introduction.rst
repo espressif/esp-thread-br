@@ -68,5 +68,13 @@ It provides the following features:
 1.4. Web GUI
 ------------
 
-.. todo::
-   Add introduction to Web GUI after implementing it.
+The ESP Thread Border Router is equipped with a user-friendly graphical user interface (GUI) that enables users to easily discover, configure, and monitor Thread networks through the web server.
+
+To access the Web GUI, simply enter ``the local IPv4 address`` for the ESP Thread Border Router in your browser window with port ``80`` and the path ``index.html``.
+
+.. figure:: ../images/thread-border-router-main-gui.png
+   :align: center
+   :alt: ESP-Thread-Border-Router GUI
+   :figclass: align-center
+
+More user's guidance for Web GUI can reference to `README <https://github.com/espressif/esp-thread-br/blob/main/components/esp_ot_br_server/README.md>`_

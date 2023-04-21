@@ -31,7 +31,7 @@ esp_err_t string_to_hex(char str[], uint8_t hex[], size_t size);
 -----------------------------------------------*/
 typedef struct thread_ipv6_status {
     otIp6Address link_local_address;
-    otIp6Address local_address;
+    otIp6Address routing_local_address;
     otIp6Address mesh_local_address;
     otIp6Prefix mesh_local_prefix;
 } thread_ipv6_status_t;
@@ -45,13 +45,13 @@ typedef struct thread_network_status {
 
 typedef struct thread_information_status {
     uint16_t version;
-    uint8_t version_api;
+    int version_api;
+    otDeviceRole role;
     otPskc PSKc;
 } thread_information_status_t;
 
 typedef struct thread_rcp_status {
     uint8_t channel;
-    otDeviceRole state;
     otExtAddress EUI64;
     int8_t txpower;
     char *version;

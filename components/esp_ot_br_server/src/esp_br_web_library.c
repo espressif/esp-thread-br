@@ -99,30 +99,30 @@ esp_err_t string_to_hex(char str[], uint8_t hex[], size_t size)
  * @note return such as:
  * {
       "ipv6": {
-        "link_local_address":	"fe80:0:0:0:78a1:d169:3527:868e",
-        "local_address":		"fd3e:a1:664a:1:f495:113e:f919:d4e3",
-        "mesh_local_address":	"fdee:c9fa:497b:93f4:72c:703b:d2d5:f53b",
-        "mesh_local_prefix":	"fdee:c9fa:497b:93f4::/64"
+        "link_local_address":	 "fe80:0:0:0:78a1:d169:3527:868e",
+        "routing_local_address": "fdee:c9fa:497b:93f4:0:ff:fe00:c000",
+        "mesh_local_address":	 "fdee:c9fa:497b:93f4:72c:703b:d2d5:f53b",
+        "mesh_local_prefix":	 "fdee:c9fa:497b:93f4::/64"
 
         },
       "network":{
          "name": 			"OpenThread-b91e",
          "panid": 			"0xb91e",
          "partition_id": 	"337494241",
-         "xpanid":		"487f:73e0::/25"
+         "xpanid":		    "487f:73e0::/25"
         },
       "information":{
-          "version":     		 "3",
-          "version_api":  	"29",
-          "PSKc": 			"2226:bea9:8819:102e:bac2:4b16:776b:3189"
+          "version":     	"3",
+          "version_api":  	"292",
+          "role":           "leader",
+          "PSKc": 			"71771c3dab9ed684b82eaf5661d961d4"
         },
       "rcp":{
             "channel":      "23",
-            "state":        "leader",
-            "EUI64":        "84f7:3a0:65:7a14:7f2a:840:7cc6:fd3f",
-            "txpower":    "127",
-         "version":"openthread-esp32/20f5e180ee-; esp32h2;  2022-0W (1262285) OPENTHREAD: Dropping unsupported mldv2
- record of type 6 6-14 06:24:58 UTC"
+            "EUI64":        "6055f9f72eebfeff",
+            "txpower":      "127",
+            "version":      "openthread-esp32/20f5e180ee-; esp32h2;  2022-0W (1262285) OPENTHREAD: Dropping unsupported
+ mldv2 record of type 6 6-14 06:24:58 UTC"
         },
       "wpan": {
             "service":      "associated"
@@ -140,8 +140,9 @@ cJSON *ot_status_struct_convert2_json(openthread_status_t *status)
     otIp6AddressToString((const otIp6Address *)&status->ipv6.link_local_address, address, OT_IP6_ADDRESS_STRING_SIZE);
     cJSON_AddStringToObject(json_ipv6, "link_local_address", address);
 
-    otIp6AddressToString((const otIp6Address *)&status->ipv6.local_address, address, OT_IP6_ADDRESS_STRING_SIZE);
-    cJSON_AddStringToObject(json_ipv6, "local_address", address);
+    otIp6AddressToString((const otIp6Address *)&status->ipv6.routing_local_address, address,
+                         OT_IP6_ADDRESS_STRING_SIZE);
+    cJSON_AddStringToObject(json_ipv6, "routing_local_address", address);
 
     otIp6AddressToString((const otIp6Address *)&status->ipv6.mesh_local_address, address, OT_IP6_ADDRESS_STRING_SIZE);
     cJSON_AddStringToObject(json_ipv6, "mesh_local_address", address);
@@ -165,16 +166,16 @@ cJSON *ot_status_struct_convert2_json(openthread_status_t *status)
     cJSON_AddStringToObject(json_info, "version", format);
     sprintf(format, "%d", status->information.version_api);
     cJSON_AddStringToObject(json_info, "version_api", format);
-    otIp6AddressToString((const otIp6Address *)&status->information.PSKc, address, OT_IP6_ADDRESS_STRING_SIZE);
-    cJSON_AddStringToObject(json_info, "PSKc", address);
+    cJSON_AddStringToObject(json_info, "role", otThreadDeviceRoleToString(status->information.role));
+    hex_to_string(status->information.PSKc.m8, format, sizeof(otPskc));
+    cJSON_AddStringToObject(json_info, "PSKc", format);
 
     CREATE_JSON_CHILD_TIEM(json_rcp, root, status, thread_rcp_status_t, rcp);
     sprintf(format, "%d", status->rcp.channel);
     cJSON_AddStringToObject(json_rcp, "channel", format);
-    cJSON_AddStringToObject(json_rcp, "state", otThreadDeviceRoleToString(status->rcp.state));
-    otIp6AddressToString((const otIp6Address *)&status->rcp.EUI64, address, OT_IP6_ADDRESS_STRING_SIZE);
-    cJSON_AddStringToObject(json_rcp, "EUI64", address);
-    sprintf(format, "%d", status->rcp.txpower);
+    hex_to_string(status->rcp.EUI64.m8, format, sizeof(otExtAddress));
+    cJSON_AddStringToObject(json_rcp, "EUI64", format);
+    sprintf(format, "%d dBm", status->rcp.txpower);
     cJSON_AddStringToObject(json_rcp, "txpower", format);
     cJSON_AddStringToObject(json_rcp, "version", status->rcp.version);
 
@@ -199,14 +200,13 @@ openthread_status_t *ot_status_json_convert2_struct(cJSON *root)
 }
 
 /**
- * @brief The functio is to free the memory of thread status object pointer.
+ * @brief The function is to clear thread status object.
  *
  * @param thread_status is a pointer of ot_status_t
  */
 void free_ot_status(openthread_status_t *status)
 {
-    if (status->rcp.version != NULL)
-        free(status->rcp.version);
+    memset(status, 0x00, sizeof(openthread_status_t));
 }
 
 /*----------------------------------------------------------------------

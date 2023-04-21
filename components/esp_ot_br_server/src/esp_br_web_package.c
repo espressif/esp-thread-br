@@ -91,13 +91,8 @@ static cJSON *encode_response_client_package(repsonse_result_t res, char *msg)
 static esp_err_t get_openthread_ipv6(otInstance *ins, thread_ipv6_status_t *ipv6)
 {
     memcpy(&ipv6->link_local_address, otThreadGetLinkLocalIp6Address(ins),
-           sizeof(otIp6Address));                                       /* 1. linkLocalAddress */
-    const otNetifAddress *unicastAddrs = otIp6GetUnicastAddresses(ins); /* 2. LocalAddress */
-    for (const otNetifAddress *addr = unicastAddrs; addr; addr = addr->mNext) {
-        ipv6->local_address = addr->mAddress;
-        if (addr->mAddressOrigin == 1) // slaac type
-            break;
-    }
+           sizeof(otIp6Address));                                                           /* 1. linkLocalAddress */
+    memcpy(&ipv6->routing_local_address, otThreadGetRloc(ins), sizeof(otIp6Address));       /* 2. routingLocalAddress */
     memcpy(&ipv6->mesh_local_address, otThreadGetMeshLocalEid(ins), sizeof(otIp6Address));  /* 3. meshLocalAddress */
     memcpy(&ipv6->mesh_local_prefix, otThreadGetMeshLocalPrefix(ins), sizeof(otIp6Prefix)); /* 4. meshLocalPrefix */
 
@@ -108,41 +103,34 @@ static esp_err_t get_openthread_network(otInstance *ins, thread_network_status_t
 {
     char output[64] = "";
     sprintf(output, "%s", otThreadGetNetworkName(ins));
-    if (strlen(output) + 1 > sizeof(otNetworkName)) {
+    if (strlen(output) > sizeof(otNetworkName)) {
         ESP_LOGW(PACKAGE_TAG, "Network name is too long.");
         return ESP_FAIL;
     }
     memcpy(&network->name, output, strlen(output) + 1);                               /* 1. name */
     network->panid = otLinkGetPanId(ins);                                             /* 2. PANID */
-    network->partition_id = otThreadGetPartitionId(ins);                              /*3. paritionID */
-    memcpy(&network->xpanid, otThreadGetExtendedPanId(ins), sizeof(otExtendedPanId)); /*4. XPANID */
+    network->partition_id = otThreadGetPartitionId(ins);                              /* 3. paritionID */
+    memcpy(&network->xpanid, otThreadGetExtendedPanId(ins), sizeof(otExtendedPanId)); /* 4. XPANID */
     return ESP_OK;
 }
 
 static esp_err_t get_openthread_information(otInstance *ins, thread_information_status_t *ot_info)
 {
-    ot_info->version = otThreadGetVersion();         /* 1. version */
-    ot_info->version_api = otNetDataGetVersion(ins); /* 2. version_api */
-    otThreadGetPskc(ins, &ot_info->PSKc);            /* 3. PSKc */
+    ot_info->version = otThreadGetVersion();       /* 1. version */
+    ot_info->version_api = OPENTHREAD_API_VERSION; /* 2. version_api */
+    ot_info->role = otThreadGetDeviceRole(ins);    /* 3. state */
+    otThreadGetPskc(ins, &ot_info->PSKc);          /* 4. PSKc */
     return ESP_OK;
 }
 
 static esp_err_t get_openthread_rcp(otInstance *ins, thread_rcp_status_t *rcp)
 {
-    char output[64] = "";
+    otError error = OT_ERROR_NONE;
     rcp->channel = otLinkGetChannel(ins);                    /* 1. channel */
-    rcp->state = otThreadGetDeviceRole(ins);                 /* 2. state */
-    otThreadGetParentAverageRssi(ins, &rcp->txpower);        /* 3. txPower */
-    otLinkGetFactoryAssignedIeeeEui64(ins, &rcp->EUI64);     /* 4. eui */
-    sprintf(output, "%s", otPlatRadioGetVersionString(ins)); /* 5. rcp Version */
-    rcp->version = (char *)malloc(sizeof(output));
-    if (rcp->version != NULL)
-        memcpy(rcp->version, output, sizeof(output));
-    else {
-        ESP_LOGW(PACKAGE_TAG, "Fail to malloc memory for rcp version.");
-        return ESP_FAIL;
-    }
-    return ESP_OK;
+    error = otPlatRadioGetTransmitPower(ins, &rcp->txpower); /* 2. txPower */
+    otLinkGetFactoryAssignedIeeeEui64(ins, &rcp->EUI64);     /* 3. eui */
+    rcp->version = (char *)otPlatRadioGetVersionString(ins); /* 4. rcp Version */
+    return !error ? ESP_OK : ESP_FAIL;
 }
 
 static esp_err_t get_openthread_wpan(otInstance *ins, thread_wpan_status_t *wpan)
@@ -392,74 +380,112 @@ cJSON *form_openthread_network(cJSON *content)
     if (param.check != FORM_ERROR_NONE) {
         switch (param.check) {
         case FORM_ERROR_TYPE:
-            ESP_LOGW(PACKAGE_TAG, "Package type is error.");
-            ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "Package type is error.");
+            ESP_LOGW(PACKAGE_TAG, "Package type error");
+            ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "Package type error");
             break;
         case FORM_ERROR_NETWORK_NAME:
-            ESP_LOGW(PACKAGE_TAG, "Network Name is empty or too long.");
-            ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "Network Name is empty or too long.");
+            ESP_LOGW(PACKAGE_TAG, "Network Name is invalid");
+            ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "Network Name is invalid");
             break;
         case FORM_ERROR_NETWORK_CHANNEL:
-            ESP_LOGW(PACKAGE_TAG, "Channel ranges 11 to 26.");
-            ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "Channel ranges 11 to 26.");
+            ESP_LOGW(PACKAGE_TAG, "Channel range is from 11 to 26");
+            ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "Channel range is from 11 to 26");
             break;
         case FORM_ERROR_NETWORK_PANID:
-            ESP_LOGW(PACKAGE_TAG, "PANID requried \"0x\" prefix.");
-            ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "PANID requried \"0x\" prefix.");
+            ESP_LOGW(PACKAGE_TAG, "PANID requries to be preceded by \"0x\"");
+            ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "PANID requries to be preceded by \"0x\"");
             break;
         case FORM_ERROR_NETWORK_EXTPANID:
-            ESP_LOGW(PACKAGE_TAG, "Extended PANID required 16 bytes(0-f).");
-            ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "Extended PANID required 16 bytes(0-f).");
+            ESP_LOGW(PACKAGE_TAG, "Extended PANID requires 16 valid bytes");
+            ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "Extended PANID requires 16 valid bytes");
             break;
         case FORM_ERROR_NETWORK_KEY:
-            ESP_LOGW(PACKAGE_TAG, "Network Key required 32 bytes(0-f).");
-            ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "Network Key required 32 bytes(0-f).");
+            ESP_LOGW(PACKAGE_TAG, "Network Key requires 32 valid bytes");
+            ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "Network Key requires 32 valid bytes");
             break;
         default:
-            ESP_LOGW(PACKAGE_TAG, "None.");
-            ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "None.");
+            ESP_LOGW(PACKAGE_TAG, "None");
+            ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "None");
             break;
         }
         return ret;
     }
 
     otInstance *ins = esp_openthread_get_instance();
-    add_prefix_field(param.on_mesh_prefix); /*the prefix need to point the length of field*/
-    otOperationalDataset dataset = {.mNetworkName = param.network_name,
-                                    .mNetworkKey = param.key,
-                                    .mChannel = param.channel,
-                                    .mExtendedPanId = param.extended_panid,
-                                    .mPanId = param.panid};
+    otOperationalDataset dataset;
+    add_prefix_field(param.on_mesh_prefix);
 
-    if (otDatasetCreateNewNetwork(ins, &dataset)) /* form active dataset */
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    if (otThreadSetEnabled(ins, false)) /* thread stop */
     {
-        ESP_LOGW(PACKAGE_TAG, "Fail to active dataset.");
-        ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "Fail to active dataset.");
-        return ret;
+        ESP_LOGW(PACKAGE_TAG, "Failed to stop Thread");
+        ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "Failed to stop Thread");
+        goto exit;
+    } else {
+        ESP_LOGI(PACKAGE_TAG, "thread stop");
     }
+
+    if (otIp6SetEnabled(ins, false)) /* ifconfig down */
+    {
+        ESP_LOGW(PACKAGE_TAG, "Failed to execute config down");
+        ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "Failed to execute config down");
+        goto exit;
+    } else {
+        ESP_LOGI(PACKAGE_TAG, "ifconfig down");
+    }
+
+    if (otDatasetCreateNewNetwork(ins, &dataset)) /* create active network */
+    {
+        ESP_LOGW(PACKAGE_TAG, "Failed to create new network");
+        ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "Failed to create network");
+        goto exit;
+    } else {
+        dataset.mNetworkName = param.network_name;
+        dataset.mNetworkKey = param.key;
+        dataset.mChannel = param.channel;
+        dataset.mExtendedPanId = param.extended_panid;
+        dataset.mPanId = param.panid;
+        ESP_LOGI(PACKAGE_TAG, "dataset init new");
+    }
+
+    if (otDatasetSetActive(ins, &dataset)) /* form active dataset */
+    {
+        ESP_LOGW(PACKAGE_TAG, "Failed to set active dataset");
+        ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "Failed to active dataset");
+        goto exit;
+    } else {
+        ESP_LOGI(PACKAGE_TAG, "dataset commit active");
+    }
+
     if (otIp6SetEnabled(ins, true)) /* ifconfig up */
     {
-        ESP_LOGW(PACKAGE_TAG, "Fail to ifconfig up.");
-        ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "Fail to ifconfig up.");
-        return ret;
+        ESP_LOGW(PACKAGE_TAG, "Failed to execute ifconfig up");
+        ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "Failed to execute ifconfig up");
+        goto exit;
+    } else {
+        ESP_LOGI(PACKAGE_TAG, "ifconfig up");
     }
+
     if (otThreadSetEnabled(ins, true)) /* thread start */
     {
-        ESP_LOGW(PACKAGE_TAG, "Fail to thread start.");
-        ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "Fail to thread start.");
-        return ret;
+        ESP_LOGW(PACKAGE_TAG, "Failed to start thread");
+        ret = encode_response_client_package(RESPONSE_RESULT_FAIL, "Failed to start thread");
+        goto exit;
+    } else {
+        ESP_LOGI(PACKAGE_TAG, "thread start");
     }
 
     ESP_LOGI(PACKAGE_TAG, "<==================== Thread Form ======================>");
-    ESP_LOGD(PACKAGE_TAG, "name:%s", param.network_name.m8);
-    ESP_LOGD(PACKAGE_TAG, "prefix:%s", param.on_mesh_prefix);
-    ESP_LOGD(PACKAGE_TAG, "panid:0x%hx", param.panid);
-    ESP_LOGD(PACKAGE_TAG, "channel:%d", param.channel);
-    ESP_LOGD(PACKAGE_TAG, "default_route:%d", param.default_route);
-    ESP_LOGI(PACKAGE_TAG, "Succeed in forming network!"); /* form successfully */
+    ESP_LOGD(PACKAGE_TAG, "NetWorkName: %s", param.network_name.m8);
+    ESP_LOGD(PACKAGE_TAG, "Prefix: %s", param.on_mesh_prefix);
+    ESP_LOGD(PACKAGE_TAG, "Panid: 0x%hx", param.panid);
+    ESP_LOGD(PACKAGE_TAG, "Channel: %d", param.channel);
+    ESP_LOGD(PACKAGE_TAG, "Default route: %d", param.default_route);
+    ESP_LOGI(PACKAGE_TAG, "Form network successfully"); /* form successfully */
     ESP_LOGI(PACKAGE_TAG, "<==========================================================>");
-    ret = encode_response_client_package(RESPONSE_RESULT_SUCCESS, "Succeed in forming network!");
-
+    ret = encode_response_client_package(RESPONSE_RESULT_SUCCESS, "Form network successfully");
+exit:
+    esp_openthread_lock_release();
     free_network_form_param(&param);
     return ret;
 }

@@ -95,11 +95,11 @@
       <div class="container">
         <div class="section-header default-margin">
           <h2><span style="color: #0ea2bd">Discover</span> Thread Network</h2>
-          <p>the available thread network would be scan here, one of the networks can be opt-in.</p>
+          <p>Here, you can scan for available Thread networks, and choose to join one of them.</p>
         </div>
         <div class="row">
-          <table class="pure-table pure-table-horizontal">
-            <caption>Available thread networks</caption>
+          <table  id = "available_networks_table" class="pure-table pure-table-horizontal">
+            <caption>Available Thread Networks</caption>
             <thead>
               <tr>
                 <th style="width: 100px;">No.</th>
@@ -113,7 +113,7 @@
                 <th style="width: 150px;">Action</th>
               </tr>
             </thead>
-            <tbody id="table_available_networks">
+            <tbody id="available_networks_body">
               <tr>
                 <td></td>
                 <td></td>
@@ -138,13 +138,13 @@
       <div class="container">
         <div class="section-header default-margin">
           <h2><span style="color: #0ea2bd">Form</span> Thread Network</h2>
-          <p>In this section, you can input some parameters to structure the thread network</p>
+          <p>Here, the ESP-OpenThread network would be form using the parameter provided by you.</p>
         </div>
         <div class="part">
           <div class="submit-form">
             <div class="row">
               <div class="col-md-4">
-                <h4>Inputing Relating Value in Form.</h4>
+                <h4>Inputing the parameter of ESP-OpenThread in Form.</h4>
               </div>
               <div class="col-md-4 col-md-offset-4">
                 <h4 id="form_tip"
@@ -225,7 +225,7 @@
       <div class="container">
         <div class="section-header default-margin">
           <h2>Thread Network <span style="color: #0ea2bd" onclick="get_threadStatus_httpServer()">Status</span> </h2>
-          <p>The ESP-OpenThread status can be check here, include ipv6, network, openthread, rcp and WPAN and so on.</p>
+          <p>The ESP-OpenThread status will be displayed here, including IPv6, Network, OpenThread, RCP, WPAN, and more.</p>
         </div>
         <div class="row g-4 g-lg-5">
           <ul class="nav nav-pills mb-3">
@@ -241,26 +241,26 @@
             <div class="tab-pane active" id="tab0">
               <div class="row">
                 <div class="col-lg-3">
-                  <h4 class="tab-pane-elem" style="font-weight: bold; font-style:normal;"> IPv6 </h4>
+                  <h4 class="tab-pane-elem" style="font-weight: bold; font-style:normal; color: black"> [ IP Address ]</h4>
                   <div class="d-flex align-items-center mt-4">
-                    <h4>linkLocalAddress</h4>
+                    <h4>Link Local Address</h4>
                   </div>
                   <p id="ipv6-link_local_address" class="tab-elem-value">none</p>
                   <div class="d-flex align-items-center mt-4">
-                    <h4>localAddress</h4>
+                    <h4>Routing Local Address</h4>
                   </div>
-                  <p id="ipv6-local_address" class="tab-elem-value">none</p>
+                  <p id="ipv6-routing_local_address" class="tab-elem-value">none</p>
                   <div class="d-flex align-items-center mt-4">
-                    <h4>meshLocalAddress</h4>
+                    <h4>Mesh Local Address</h4>
                   </div>
                   <p id="ipv6-mesh_local_address" class="tab-elem-value">none</p>
                   <div class="d-flex align-items-center mt-4">
-                    <h4>meshLocalPrefix</h4>
+                    <h4>Mesh Local Prefix</h4>
                   </div>
                   <p id="ipv6-mesh_local_prefix" class="tab-elem-value">none</p>
                 </div>
                 <div class="col-lg-2">
-                  <h4 class="tab-pane-elem" style="font-weight: bold; font-style:normal;"> Network </h4>
+                  <h4 class="tab-pane-elem" style="font-weight: bold; font-style:normal; color: black"> [ Network Information ]</h4>
                   <div class="d-flex align-items-center mt-4">
                     <h4>Name</h4>
                   </div>
@@ -270,7 +270,7 @@
                   </div>
                   <p id="network-panid" class="tab-elem-value">none</p>
                   <div class="d-flex align-items-center mt-4">
-                    <h4>PartitionID</h4>
+                    <h4>Partition ID</h4>
                   </div>
                   <p id="network-partition_id" class="tab-elem-value">none</p>
                   <div class="d-flex align-items-center mt-4">
@@ -279,36 +279,36 @@
                   <p id="network-xpanid" class="tab-elem-value">none</p>
                 </div>
                 <div class="col-lg-3">
-                  <h4 class="tab-pane-elem" style="font-weight: bold; font-style:normal;"> OpenThread </h4>
+                  <h4 class="tab-pane-elem" style="font-weight: bold; font-style:normal; color: black"> [ OpenThread Parameter ]</h4>
                   <div class="d-flex align-items-center mt-4">
                     <h4>Version</h4>
                   </div>
-                  <p id="openThread-version" class="tab-elem-value">none</p>
+                  <p id="openthread-version" class="tab-elem-value">none</p>
                   <div class="d-flex align-items-center mt-4">
-                    <h4>Version_api</h4>
+                    <h4>Version API</h4>
                   </div>
-                  <p id="openThread-version_api" class="tab-elem-value">none</p>
+                  <p id="openthread-version_api" class="tab-elem-value">none</p>
+                  <div class="d-flex align-items-center mt-4">
+                    <h4>Role</h4>
+                  </div>
+                  <p id="t-openthread-state" class="tab-elem-value">none</p>
                   <div class="d-flex align-items-center mt-4">
                     <h4>PSKc</h4>
                   </div>
-                  <p id="openThread-PSKc" class="tab-elem-value">none</p>
+                  <p id="openthread-PSKc" class="tab-elem-value">none</p>
                 </div>
                 <div class="col-lg-2">
-                  <h4 class="tab-pane-elem" style="font-weight: bold; font-style:normal;"> RCP </h4>
+                  <h4 class="tab-pane-elem" style="font-weight: bold; font-style:normal; color: black"> [ RCP Information ]</h4>
                   <div class="d-flex align-items-center mt-4">
                     <h4>Channel</h4>
                   </div>
                   <p id="rcp-channel" class="tab-elem-value">none</p>
                   <div class="d-flex align-items-center mt-4">
-                    <h4>State</h4>
-                  </div>
-                  <p id="rcp-state" class="tab-elem-value">none</p>
-                  <div class="d-flex align-items-center mt-4">
-                    <h4>EUI64</h4>
+                    <h4>IEEE EUI64</h4>
                   </div>
                   <p id="rcp-EUI64" class="tab-elem-value">none</p>
                   <div class="d-flex align-items-center mt-4">
-                    <h4>txPower</h4>
+                    <h4>Tx Power</h4>
                   </div>
                   <p id="rcp-txpower" class="tab-elem-value">none</p>
                   <div class="d-flex align-items-center mt-4">
@@ -317,7 +317,7 @@
                   <p id="rcp-version" class="tab-elem-value">none</p>
                 </div>
                 <div class="col-lg-2">
-                  <h4 class="tab-pane-elem" style="font-weight: bold; font-style:normal;"> WPAN </h4>
+                  <h4 class="tab-pane-elem" style="font-weight: bold; font-style:normal; color: black"> [ WPAN Status ]</h4>
                   <div class="d-flex align-items-center mt-4">
                     <h4>Service</h4>
                   </div>
@@ -329,19 +329,19 @@
             <div class="tab-pane" id="tab1">
               <div class="row">
                 <div class="d-flex align-items-center mt-4">
-                  <h4>linkLocalAddress</h4>
+                  <h4>Link Local Address</h4>
                 </div>
                 <p id="t-ipv6-link_local_address" class="tab-elem-value">none</p>
                 <div class="d-flex align-items-center mt-4">
-                  <h4>localAddress</h4>
+                  <h4>Routing Local Address</h4>
                 </div>
-                <p id="t-ipv6-local_address" class="tab-elem-value">none</p>
+                <p id="t-ipv6-routing_local_address" class="tab-elem-value">none</p>
                 <div class="d-flex align-items-center mt-4">
-                  <h4>meshLocalAddress</h4>
+                  <h4>Mesh Local Address</h4>
                 </div>
                 <p id="t-ipv6-mesh_local_address" class="tab-elem-value">none</p>
                 <div class="d-flex align-items-center mt-4">
-                  <h4>meshLocalPrefix</h4>
+                  <h4>Mesh Local Prefix</h4>
                 </div>
                 <p id="t-ipv6-mesh_local_prefix" class="tab-elem-value">none</p>
               </div>
@@ -357,7 +357,7 @@
                 </div>
                 <p id="t-network-panid" class="tab-elem-value">none</p>
                 <div class="d-flex align-items-center mt-4">
-                  <h4>PartitionID</h4>
+                  <h4>Partition ID</h4>
                 </div>
                 <p id="t-network-partition_id" class="tab-elem-value">none</p>
                 <div class="d-flex align-items-center mt-4">
@@ -371,15 +371,19 @@
                 <div class="d-flex align-items-center mt-4">
                   <h4>Version</h4>
                 </div>
-                <p id="t-openThread-version" class="tab-elem-value">none</p>
+                <p id="t-openthread-version" class="tab-elem-value">none</p>
                 <div class="d-flex align-items-center mt-4">
-                  <h4>Version_api</h4>
+                  <h4>Version API</h4>
                 </div>
-                <p id="t-openThread-version_api" class="tab-elem-value">none</p>
+                <p id="t-openthread-version_api" class="tab-elem-value">none</p>
+                <div class="d-flex align-items-center mt-4">
+                  <h4>Role</h4>
+                </div>
+                <p id="t-openthread-state" class="tab-elem-value">none</p>
                 <div class="d-flex align-items-center mt-4">
                   <h4>PSKc</h4>
                 </div>
-                <p id="t-openThread-PSKc" class="tab-elem-value">none</p>
+                <p id="t-openthread-PSKc" class="tab-elem-value">none</p>
               </div>
             </div>
             <div class="tab-pane" id="tab4">
@@ -389,15 +393,11 @@
                 </div>
                 <p id="t-rcp-channel" class="tab-elem-value">none</p>
                 <div class="d-flex align-items-center mt-4">
-                  <h4>State</h4>
-                </div>
-                <p id="t-rcp-state" class="tab-elem-value">none</p>
-                <div class="d-flex align-items-center mt-4">
-                  <h4>EUI64</h4>
+                  <h4>IEEE EUI64</h4>
                 </div>
                 <p id="t-rcp-EUI64" class="tab-elem-value">none</p>
                 <div class="d-flex align-items-center mt-4">
-                  <h4>txPower</h4>
+                  <h4>Tx Power</h4>
                 </div>
                 <p id="t-rcp-txpower" class="tab-elem-value">none</p>
                 <div class="d-flex align-items-center mt-4">
@@ -428,8 +428,8 @@
           <div class="col-md-11">
             <div class="info">
               <h3>Get in Touch</h3>
-              <p>There are some contact information maybe help to you, include Sales Questions, Technical Inquiries,
-                Get-Samples and Comments & Suggestions.</p>
+              <p>The following is a list of contact information that may be helpful to you, including Sales Questions, Technical Inquiries,
+                Get-Samples, and Comments & Suggestions.</p>
               <div class="info-item">
                 <div>
                   <h4>Technical Inquiries:</h4>
