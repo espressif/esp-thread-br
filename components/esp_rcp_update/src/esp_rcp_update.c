@@ -225,7 +225,7 @@ static esp_err_t esp_rcp_boot_pin_mux(void)
     io_conf.pin_bit_mask = (1ULL << s_handle.update_config.boot_pin);
     io_conf.mode = GPIO_MODE_INPUT;
     io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
-    ESP_RETURN_ON_ERROR(gpio_config(&io_conf), TAG, "Fail to config GPIO[%d]", s_handle.update_config.boot_pin);
+    ESP_RETURN_ON_ERROR(gpio_config(&io_conf), TAG, "Failed to config GPIO[%d]", s_handle.update_config.boot_pin);
     return ESP_OK;
 }
 #endif
@@ -281,7 +281,7 @@ esp_err_t esp_rcp_update(void)
     esp_loader_reset_target();
 
 #if CONFIG_OPENTHREAD_RADIO_SPINEL_SPI
-    ESP_RETURN_ON_ERROR(esp_rcp_boot_pin_mux(), TAG, "Fail to multiplexing boot pin");
+    ESP_RETURN_ON_ERROR(esp_rcp_boot_pin_mux(), TAG, "Failed to multiplex boot pin");
 #endif
     return ESP_OK;
 }
@@ -308,15 +308,13 @@ esp_err_t esp_rcp_mark_image_verified(bool verified)
 void esp_rcp_reset(void)
 {
     gpio_config_t io_conf = {};
-    uint8_t boot_pin = s_handle.update_config.boot_pin;
     uint8_t reset_pin = s_handle.update_config.reset_pin;
-    io_conf.pin_bit_mask = ((1ULL << boot_pin) | (1ULL << reset_pin));
+    io_conf.pin_bit_mask = ((1ULL << reset_pin));
     io_conf.mode = GPIO_MODE_OUTPUT;
     io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     io_conf.intr_type = GPIO_INTR_DISABLE;
     gpio_config(&io_conf);
-    gpio_set_level(boot_pin, 1);
     gpio_set_level(reset_pin, 0);
     vTaskDelay(pdMS_TO_TICKS(150));
     gpio_set_level(reset_pin, 1);

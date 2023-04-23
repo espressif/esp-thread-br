@@ -12,6 +12,7 @@
 #include "esp_event.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
+#include "esp_openthread_border_router.h"
 #include "esp_spiffs.h"
 #include "esp_vfs.h"
 #include "http_parser.h"
@@ -487,7 +488,7 @@ void disconnect_handler(void *arg, esp_event_base_t event_base, int32_t event_id
 -----------------------------------------------------*/
 static void ot_task_br_web(void *arg)
 {
-    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    esp_netif_t *netif = esp_openthread_get_backbone_netif();
     esp_netif_ip_info_t ip_info;
     char ipv4_address[SERVER_IPV4_LEN];
     esp_netif_get_ip_info(netif, &ip_info);

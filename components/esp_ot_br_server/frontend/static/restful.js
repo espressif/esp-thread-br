@@ -59,7 +59,7 @@ $("document").ready(function() {
 
 function fill_avai_thread_network_table(data) {
 
-  document.getElementById("table_available_networks").innerHTML =
+  document.getElementById("available_networks_body").innerHTML =
       "<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>"; // clear table
   var rows = '';
   var row_id = 1;
@@ -77,9 +77,14 @@ function fill_avai_thread_network_table(data) {
     rows += '</tr>'
     row_id++;
   });
-  document.getElementById("table_available_networks").innerHTML = rows;
+
+  document.getElementById("available_networks_table").caption.innerText =
+      "Available Thread Networks: Scan Completed"
+  document.getElementById("available_networks_body").innerHTML = rows;
 }
 function get_threadScan_httpServer() {
+  document.getElementById("available_networks_table").caption.innerText =
+      "Available Thread Networks: Waiting ..."
 
   $.ajax({
     url : '/thread/api/scan',
@@ -169,8 +174,8 @@ function decode_thread_status_package(package) {
   if (package.version == OT_SERVER_PACKAGE_VERSION) {
     document.getElementById("ipv6-link_local_address").innerHTML =
         package.content.ipv6.link_local_address;
-    document.getElementById("ipv6-local_address").innerHTML =
-        package.content.ipv6.local_address;
+    document.getElementById("ipv6-routing_local_address").innerHTML =
+        package.content.ipv6.routing_local_address;
     document.getElementById("ipv6-mesh_local_address").innerHTML =
         package.content.ipv6.mesh_local_address;
     document.getElementById("ipv6-mesh_local_prefix").innerHTML =
@@ -185,16 +190,17 @@ function decode_thread_status_package(package) {
     document.getElementById("network-xpanid").innerHTML =
         package.content.network.xpanid;
 
-    document.getElementById("openThread-version").innerHTML =
+    document.getElementById("openthread-version").innerHTML =
         package.content.information.version;
-    document.getElementById("openThread-version_api").innerHTML =
+    document.getElementById("openthread-version_api").innerHTML =
         package.content.information.version_api;
-    document.getElementById("openThread-PSKc").innerHTML =
+    document.getElementById("t-openthread-state").innerHTML =
+        package.content.information.role;
+    document.getElementById("openthread-PSKc").innerHTML =
         package.content.information.PSKc;
 
     document.getElementById("rcp-channel").innerHTML =
         package.content.rcp.channel;
-    document.getElementById("rcp-state").innerHTML = package.content.rcp.state;
     document.getElementById("rcp-EUI64").innerHTML = package.content.rcp.EUI64;
     document.getElementById("rcp-txpower").innerHTML =
         package.content.rcp.txpower;
@@ -206,8 +212,8 @@ function decode_thread_status_package(package) {
 
     document.getElementById("t-ipv6-link_local_address").innerHTML =
         package.content.ipv6.link_local_address;
-    document.getElementById("t-ipv6-local_address").innerHTML =
-        package.content.ipv6.local_address;
+    document.getElementById("ipv6-routing_local_address").innerHTML =
+        package.content.ipv6.routing_local_address;
     document.getElementById("t-ipv6-mesh_local_address").innerHTML =
         package.content.ipv6.mesh_local_address;
     document.getElementById("t-ipv6-mesh_local_prefix").innerHTML =
@@ -222,17 +228,17 @@ function decode_thread_status_package(package) {
     document.getElementById("t-network-xpanid").innerHTML =
         package.content.network.xpanid;
 
-    document.getElementById("t-openThread-version").innerHTML =
+    document.getElementById("t-openthread-version").innerHTML =
         package.content.information.version;
-    document.getElementById("t-openThread-version_api").innerHTML =
+    document.getElementById("t-openthread-version_api").innerHTML =
         package.content.information.version_api;
-    document.getElementById("t-openThread-PSKc").innerHTML =
+    document.getElementById("t-openthread-state").innerHTML =
+        package.content.information.role;
+    document.getElementById("t-openthread-PSKc").innerHTML =
         package.content.information.PSKc;
 
     document.getElementById("t-rcp-channel").innerHTML =
         package.content.rcp.channel;
-    document.getElementById("t-rcp-state").innerHTML =
-        package.content.rcp.state;
     document.getElementById("t-rcp-EUI64").innerHTML =
         package.content.rcp.EUI64;
     document.getElementById("t-rcp-txpower").innerHTML =
