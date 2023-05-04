@@ -16,6 +16,7 @@
 #include "esp_openthread_lock.h"
 #include "esp_ot_cli_extension.h"
 #include "esp_wifi.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,6 +30,7 @@ static EventGroupHandle_t wifi_event_group;
 const int CONNECTED_IP4_BIT = BIT0;
 const int CONNECTED_IP6_BIT = BIT1;
 static bool s_wifi_connected = false;
+static uint32_t s_wifi_disconnect_delay_ms = 0;
 ESP_EVENT_DEFINE_BASE(WIFI_ADDRESS_EVENT);
 
 void esp_ot_wifi_netif_init(void)
@@ -40,9 +42,12 @@ void esp_ot_wifi_netif_init(void)
 static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        xEventGroupClearBits(wifi_event_group, CONNECTED_IP4_BIT);
-        xEventGroupClearBits(wifi_event_group, CONNECTED_IP6_BIT);
+        if (s_wifi_disconnect_delay_ms) {
+            vTaskDelay(s_wifi_disconnect_delay_ms / portTICK_PERIOD_MS);
+            s_wifi_disconnect_delay_ms = 0;
+        }
         esp_wifi_connect();
+        otCliOutputFormat("wifi reconnecting...\n");
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         xEventGroupSetBits(wifi_event_group, CONNECTED_IP4_BIT);
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
@@ -52,7 +57,7 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
     }
 }
 
-void handle_wifi_addr_init(void)
+static void handle_wifi_addr_init(void)
 {
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_ADDRESS_EVENT, WIFI_ADDRESS_EVENT_ADD_IP6,
                                                esp_netif_action_add_ip6_address,
@@ -109,12 +114,6 @@ static void wifi_join(const char *ssid, const char *psk)
         s_wifi_connected = true;
         xEventGroupClearBits(wifi_event_group, CONNECTED_IP4_BIT);
         xEventGroupClearBits(wifi_event_group, CONNECTED_IP6_BIT);
-        esp_event_handler_unregister(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &event_handler);
-        esp_event_handler_unregister(WIFI_EVENT, WIFI_EVENT_STA_CONNECTED, &event_handler);
-        esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler);
-        esp_event_handler_unregister(IP_EVENT, IP_EVENT_GOT_IP6, &event_handler);
-        vEventGroupDelete(wifi_event_group);
-        s_initialized = false;
         esp_openthread_lock_acquire(portMAX_DELAY);
         esp_openthread_border_router_init();
         esp_openthread_lock_release();
@@ -143,6 +142,10 @@ otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs
         otCliOutputFormat("state                :     get wifi state, disconnect or connect\n");
         otCliOutputFormat("---example---\n");
         otCliOutputFormat("get wifi state       :     wifi state\n");
+        otCliOutputFormat("disconnect           :     wifi disconnect once, only for test\n");
+        otCliOutputFormat("---example---\n");
+        otCliOutputFormat("wifi disconnect once :     wifi disconnect\n");
+        otCliOutputFormat("reconnect after 2s   :     wifi disconnect 2000\n");
     } else if (strcmp(aArgs[0], "connect") == 0) {
         for (int i = 1; i < aArgsLength; i++) {
             if (strcmp(aArgs[i], "-s") == 0) {
@@ -165,6 +168,18 @@ otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs
             otCliOutputFormat("connected\n");
         } else {
             otCliOutputFormat("disconnected\n");
+        }
+    } else if (strcmp(aArgs[0], "disconnect") == 0) {
+        if (aArgsLength == 2) {
+            s_wifi_disconnect_delay_ms = atoi(aArgs[1]);
+            otCliOutputFormat("wifi reconnect delay in ms: %d\n", s_wifi_disconnect_delay_ms);
+        } else if (aArgsLength > 2) {
+            otCliOutputFormat("invalid commands\n");
+        }
+        if (s_wifi_connected) {
+            esp_wifi_disconnect();
+        } else {
+            otCliOutputFormat("wifi is not ready, please connect wifi first\n");
         }
     } else {
         otCliOutputFormat("invalid commands\n");
