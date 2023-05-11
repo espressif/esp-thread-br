@@ -8,10 +8,12 @@
   <link href="/static/style.css" type="text/css" rel="stylesheet">
   <script src="/static/restful.js" defer="true"></script>
   <link href="/favicon.ico" rel="icon">
-
-  <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- <link href="/static/bootstrap.min.css" rel="stylesheet"> -->
+  <!--  <script src="/static/jquery.min.js"></script> -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
-
+  <script src="https://d3js.org/d3.v3.min.js"></script>
   <style>
     .container {
       width: 1500px;
@@ -35,7 +37,9 @@
               </li>
               <li><a class="nav-link" href="index.html#Scan">Scan</a></li>
               <li><a class="nav-link" href="index.html#Form">Form</a></li>
+              <li><a class="nav-link" href="index.html#Settings">Settings</a></li>
               <li><a class="nav-link" href="index.html#Status">Status</a></li>
+              <li><a class="nav-link" href="index.html#Topology">Topology</a></li>
               <li><a class="nav-link" href="index.html#Contact">Contact</a></li>
             </ul>
           </nav>
@@ -98,7 +102,7 @@
           <p>Here, you can scan for available Thread networks, and choose to join one of them.</p>
         </div>
         <div class="row">
-          <table  id = "available_networks_table" class="pure-table pure-table-horizontal">
+          <table id="available_networks_table" class="pure-table pure-table-horizontal">
             <caption>Available Thread Networks</caption>
             <thead>
               <tr>
@@ -123,14 +127,51 @@
                 <td></td>
                 <td></td>
                 <td></td>
-                <td><button class="btn-submit" onclick="click_copy_network_info_to_form(this)">FILL</button></td>
+                <td><button class="btn-submit" onclick="frontend_show_join_network_window(this)">Join</button></td>
               </tr>
             </tbody>
           </table>
+          <div id="join_window" class="dialog">
+            <div class="dialog-content">
+              <h2>Join Information</h2>
+                <form id = "join_network_table" onsubmit="return false">
+                  <div>
+                    <label for="credentialType">Credential Type:</label>
+                    <select id="credentialType" name="credentialType" onclick="frontend_join_type_select(this)">
+                      <option value="networkKeyType">Network Key</option>
+                      <option value="pskdType">Thread PSKD</option>
+                    </select>
+                  </div>
+                  <div id="join_networkKey" style="margin-top: 40px;">
+                    <label for="networkKey">Network Key:</label>
+					          <input type="text" name="networkKey" value="00112233445566778899aabbccddeeff">
+                  </div>
+                  <div id="join_pskd" style="margin-top: 40px; display: none;">
+                      <label for="pskd">Pskd:</label>
+					            <input type="text"  name="pskd" placeholder="Pskd">
+                  </div>
+                  <div id = "join_prefix">
+                      <label for="prefix">Prefix:</label>
+                      <input type="text" name="prefix" value="fd11:22::">
+                  </div>
+
+                  <div id = "join_defaultRoute">
+                    <label for="defaultRoute">Default Route: </label>
+                    <input type="checkbox" name="defaultRoute" checked>
+                  </div>
+                                  
+                  <button type = "submit" class="dialog-button" onclick="frontend_submit_join_network(this)">Submit</button>
+                  <button type = "submit" class="dialog-button" onclick="frontend_cancel_join_network(this)">Cancel</button>
+                  <br/>
+                  <br/>
+                </form>
+            </div>
+          </div>
         </div>
-        <div class="row">
-          <button class="btn-submit" style="margin-top: 1%; margin-left: 1275px;"
-            onclick="get_threadScan_httpServer()">SCAN</button>
+          <div class="row">
+            <button class="btn-submit" style="margin-top: 1%; margin-left: 1275px;"
+              onclick="http_server_scan_thread_network()">SCAN</button>
+          </div>         
         </div>
       </div>
     </section>
@@ -143,29 +184,30 @@
         <div class="part">
           <div class="submit-form">
             <div class="row">
-              <div class="col-md-4">
+              <div class="col-md-8">
                 <h4>Inputing the parameter of ESP-OpenThread in Form.</h4>
               </div>
-              <div class="col-md-4 col-md-offset-4">
+              <div class="col-md-4">
                 <h4 id="form_tip"
                   style="color: green; font-weight: 200; font-family: 'Times New Roman', Times, serif; display: none;">
                   upload...</h4>
               </div>
             </div>
             <p>note: the table which marks * must be filled.</p>
+            <hr/>
             <form action="" enctype='application/json' method="post" id="network_form">
               <div class="row">
                 <div class="col-md-6 form-group">
                   <span>
                     <p style="font-size: 16px; font-weight:700;">Network Name <span style="color: red;">*</span></p>
                   </span>
-                  <input name="network_name" type="text" class="form-control" value="OpenThread-0x99">
+                  <input name="networkName" type="text" class="form-control" value="OpenThread-0x99">
                 </div>
                 <div class="col-md-6 form-group">
                   <span>
                     <p style="font-size: 16px; font-weight:700;">Network Key <span style="color: red;">*</span></p>
                   </span>
-                  <input name="key" type="text" class="form-control" value="00112233445566778899aabbccddeeff">
+                  <input name="networkKey" type="text" class="form-control" value="00112233445566778899aabbccddeeff">
                 </div>
               </div>
               <div class="row">
@@ -173,7 +215,7 @@
                   <span>
                     <p style="font-size: 16px; font-weight:700;">PANID <span style="color: red;">*</span></p>
                   </span>
-                  <input name="panid" type="text" class="form-control" value="0x1234">
+                  <input name="panId" type="text" class="form-control" value="0x1234">
                 </div>
                 <div class="col-md-6 form-group">
                   <span>
@@ -189,7 +231,7 @@
                     <span>
                       <p style="font-size: 16px; font-weight:700;">Network Extended PANID </p>
                     </span>
-                    <input name="extended_panid" type="text" class="form-control" value="1111111122222222">
+                    <input name="extPanId" type="text" class="form-control" value="1111111122222222">
                   </div>
                   <div class="col-md-6 form-group">
                     <span>
@@ -200,22 +242,70 @@
                 </div>
                 <div class="row">
                   <div class="col-md-12 form-group">
-                    <p style="font-size: 16px; font-weight:700;">On-mesh Prefix</p>
-                    <input name="on_mesh_prefix" type="text" class="form-control" value="fd11:22::">
+                    <p style="font-size: 16px; font-weight:700;">On-Mesh Prefix</p>
+                    <input name="prefix" type="text" class="form-control" value="fd11:22::">
                   </div>
                 </div>
                 <div class="row">
                   <div class="col-md-3 form-checkbox">
-                    <input type="checkbox" checked="check" name="default_route" />
+                    <input type="checkbox" checked="check" name="defaultRoute" />
                     <span style="font-size: 16px;">Default Route</span>
                   </div>
                 </div>
               </div>
               <div class="row" style="float: right;">
-                <a id="form-more-tip" style="font-size:16px" onclick="click_for_more_form_param()">for more &#x21B5;</a>
+                <a id="form-more-tip" style="font-size:16px" onclick="frontend_click_for_more_form_param()">for more &#x21B5;</a>
               </div>
-              <button type="button" class="btn btn-primary" onclick="upload_form_network_param_package()">Form or
-                Join</button>
+              <div class="row">
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-primary" onclick="http_server_upload_form_network_table()">Form Network</button>
+                </div>
+              </div>
+            </form>
+          </div><!-- End blog comments -->
+        </div>
+      </div>
+    </section>
+    <section id="Settings" class="sub-section">
+      <div class="container">
+        <div class="section-header default-margin">
+          <h2>Thread Network <span style="color: #0ea2bd">Settings</span></h2>
+          <p>Here, setting the default options for the ESP-OpenThread network can make your Thread device more flexible.</p>
+        </div>
+        <div class="part">
+          <div class="submit-form">
+            <div class="row">
+              <div class="col-md-8">
+                <h4>ESP-OpenThread Settings.</h4>
+              </div>
+              <div class="col-md-4">
+                <h4 id="setting_tip"
+                  style="color: green; font-weight: 200; font-family: 'Times New Roman', Times, serif; display: none;">
+                  completed...</h4>
+              </div>
+            </div>
+            <hr/>
+            <form action="" enctype='application/json' method="post" id="network_setting">
+              <div class="row">
+                <div class="col-md-12 form-group">
+                  <p style="font-size: 16px; font-weight:700;">On-Mesh Prefix</p>
+                  <input name="prefix" type="text" class="form-control" value="fd11:22::">
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-3 form-checkbox">
+                  <input type="checkbox" checked="check" name="defaultRoute" />
+                  <span style="font-size: 16px;">Default Route</span>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-1">
+                    <button type="button" class="btn btn-primary" onclick="http_server_add_prefix_to_thread_network()">Add</button>
+                </div>
+                <div class="col-md-1">
+                    <button type="button" class="btn btn-primary" onclick="http_server_delete_prefix_from_thread_network()">Delete</button>
+                </div>
+              </div>
             </form>
           </div><!-- End blog comments -->
         </div>
@@ -224,13 +314,13 @@
     <section id="Status" class="sub-section">
       <div class="container">
         <div class="section-header default-margin">
-          <h2>Thread Network <span style="color: #0ea2bd" onclick="get_threadStatus_httpServer()">Status</span> </h2>
-          <p>The ESP-OpenThread status will be displayed here, including IPv6, Network, OpenThread, RCP, WPAN, and more.</p>
+          <h2>Thread Network <span style="color: #0ea2bd" onclick="http_server_get_thread_network_properties()">Status</span> </h2>
+          <p>The status of the ESP-OpenThread network, including its IPv6, network, OpenThread, RCP, WPAN, and other components, would be displayed here.</p>
         </div>
         <div class="row g-4 g-lg-5">
           <ul class="nav nav-pills mb-3">
             <li><a class="nav-link active" data-bs-toggle="pill" id="link_0"
-                onclick="get_threadStatus_httpServer()">OverView</a></li>
+                onclick="http_server_get_thread_network_properties()">OverView</a></li>
             <li><a class="nav-link" data-bs-toggle="pill" id="link_1">IPv6</a></li>
             <li><a class="nav-link" data-bs-toggle="pill" id="link_2">Network</a></li>
             <li><a class="nav-link" data-bs-toggle="pill" id="link_3">OpenThread</a></li>
@@ -245,83 +335,83 @@
                   <div class="d-flex align-items-center mt-4">
                     <h4>Link Local Address</h4>
                   </div>
-                  <p id="ipv6-link_local_address" class="tab-elem-value">none</p>
+                  <p id="ipv6-link_local_address" class="tab-elem-value">unknown</p>
                   <div class="d-flex align-items-center mt-4">
                     <h4>Routing Local Address</h4>
                   </div>
-                  <p id="ipv6-routing_local_address" class="tab-elem-value">none</p>
+                  <p id="ipv6-routing_local_address" class="tab-elem-value">unknown</p>
                   <div class="d-flex align-items-center mt-4">
                     <h4>Mesh Local Address</h4>
                   </div>
-                  <p id="ipv6-mesh_local_address" class="tab-elem-value">none</p>
+                  <p id="ipv6-mesh_local_address" class="tab-elem-value">unknown</p>
                   <div class="d-flex align-items-center mt-4">
                     <h4>Mesh Local Prefix</h4>
                   </div>
-                  <p id="ipv6-mesh_local_prefix" class="tab-elem-value">none</p>
+                  <p id="ipv6-mesh_local_prefix" class="tab-elem-value">unknown</p>
                 </div>
                 <div class="col-lg-2">
                   <h4 class="tab-pane-elem" style="font-weight: bold; font-style:normal; color: black"> [ Network Information ]</h4>
                   <div class="d-flex align-items-center mt-4">
                     <h4>Name</h4>
                   </div>
-                  <p id="network-name" class="tab-elem-value">none</p>
+                  <p id="network-name" class="tab-elem-value">unknown</p>
                   <div class="d-flex align-items-center mt-4">
                     <h4>PANID</h4>
                   </div>
-                  <p id="network-panid" class="tab-elem-value">none</p>
+                  <p id="network-panid" class="tab-elem-value">unknown</p>
                   <div class="d-flex align-items-center mt-4">
                     <h4>Partition ID</h4>
                   </div>
-                  <p id="network-partition_id" class="tab-elem-value">none</p>
+                  <p id="network-partition_id" class="tab-elem-value">unknown</p>
                   <div class="d-flex align-items-center mt-4">
-                    <h4>XPANID</h4>
+                    <h4>Extended PANID</h4>
                   </div>
-                  <p id="network-xpanid" class="tab-elem-value">none</p>
+                  <p id="network-xpanid" class="tab-elem-value">unknown</p>
                 </div>
                 <div class="col-lg-3">
                   <h4 class="tab-pane-elem" style="font-weight: bold; font-style:normal; color: black"> [ OpenThread Parameter ]</h4>
                   <div class="d-flex align-items-center mt-4">
                     <h4>Version</h4>
                   </div>
-                  <p id="openthread-version" class="tab-elem-value">none</p>
+                  <p id="openthread-version" class="tab-elem-value">unknown</p>
                   <div class="d-flex align-items-center mt-4">
                     <h4>Version API</h4>
                   </div>
-                  <p id="openthread-version_api" class="tab-elem-value">none</p>
+                  <p id="openthread-version_api" class="tab-elem-value">unknown</p>
                   <div class="d-flex align-items-center mt-4">
                     <h4>Role</h4>
                   </div>
-                  <p id="t-openthread-state" class="tab-elem-value">none</p>
+                  <p id="openthread-role" class="tab-elem-value">unknown</p>
                   <div class="d-flex align-items-center mt-4">
                     <h4>PSKc</h4>
                   </div>
-                  <p id="openthread-PSKc" class="tab-elem-value">none</p>
+                  <p id="openthread-PSKc" class="tab-elem-value">unknown</p>
                 </div>
                 <div class="col-lg-2">
                   <h4 class="tab-pane-elem" style="font-weight: bold; font-style:normal; color: black"> [ RCP Information ]</h4>
                   <div class="d-flex align-items-center mt-4">
                     <h4>Channel</h4>
                   </div>
-                  <p id="rcp-channel" class="tab-elem-value">none</p>
+                  <p id="rcp-channel" class="tab-elem-value">unknown</p>
                   <div class="d-flex align-items-center mt-4">
-                    <h4>IEEE EUI64</h4>
+                    <h4>IEEE EUI-64</h4>
                   </div>
-                  <p id="rcp-EUI64" class="tab-elem-value">none</p>
+                  <p id="rcp-EUI64" class="tab-elem-value">unknown</p>
                   <div class="d-flex align-items-center mt-4">
-                    <h4>Tx Power</h4>
+                    <h4>TxPower</h4>
                   </div>
-                  <p id="rcp-txpower" class="tab-elem-value">none</p>
+                  <p id="rcp-txpower" class="tab-elem-value">unknown</p>
                   <div class="d-flex align-items-center mt-4">
                     <h4>Version</h4>
                   </div>
-                  <p id="rcp-version" class="tab-elem-value">none</p>
+                  <p id="rcp-version" class="tab-elem-value">unknown</p>
                 </div>
                 <div class="col-lg-2">
                   <h4 class="tab-pane-elem" style="font-weight: bold; font-style:normal; color: black"> [ WPAN Status ]</h4>
                   <div class="d-flex align-items-center mt-4">
                     <h4>Service</h4>
                   </div>
-                  <p id="WPAN-service" class="tab-elem-value">none</p>
+                  <p id="WPAN-service" class="tab-elem-value">unknown</p>
                 </div>
               </div>
             </div>
@@ -331,19 +421,19 @@
                 <div class="d-flex align-items-center mt-4">
                   <h4>Link Local Address</h4>
                 </div>
-                <p id="t-ipv6-link_local_address" class="tab-elem-value">none</p>
+                <p id="t-ipv6-link_local_address" class="tab-elem-value">unknown</p>
                 <div class="d-flex align-items-center mt-4">
                   <h4>Routing Local Address</h4>
                 </div>
-                <p id="t-ipv6-routing_local_address" class="tab-elem-value">none</p>
+                <p id="t-ipv6-routing_local_address" class="tab-elem-value">unknown</p>
                 <div class="d-flex align-items-center mt-4">
                   <h4>Mesh Local Address</h4>
                 </div>
-                <p id="t-ipv6-mesh_local_address" class="tab-elem-value">none</p>
+                <p id="t-ipv6-mesh_local_address" class="tab-elem-value">unknown</p>
                 <div class="d-flex align-items-center mt-4">
                   <h4>Mesh Local Prefix</h4>
                 </div>
-                <p id="t-ipv6-mesh_local_prefix" class="tab-elem-value">none</p>
+                <p id="t-ipv6-mesh_local_prefix" class="tab-elem-value">unknown</p>
               </div>
             </div>
             <div class="tab-pane" id="tab2">
@@ -351,19 +441,19 @@
                 <div class="d-flex align-items-center mt-4">
                   <h4>Name</h4>
                 </div>
-                <p id="t-network-name" class="tab-elem-value">none</p>
+                <p id="t-network-name" class="tab-elem-value">unknown</p>
                 <div class="d-flex align-items-center mt-4">
                   <h4>PANID</h4>
                 </div>
-                <p id="t-network-panid" class="tab-elem-value">none</p>
+                <p id="t-network-panid" class="tab-elem-value">unknown</p>
                 <div class="d-flex align-items-center mt-4">
                   <h4>Partition ID</h4>
                 </div>
-                <p id="t-network-partition_id" class="tab-elem-value">none</p>
+                <p id="t-network-partition_id" class="tab-elem-value">unknown</p>
                 <div class="d-flex align-items-center mt-4">
                   <h4>XPANID</h4>
                 </div>
-                <p id="t-network-xpanid" class="tab-elem-value">none</p>
+                <p id="t-network-xpanid" class="tab-elem-value">unknown</p>
               </div>
             </div>
             <div class="tab-pane" id="tab3">
@@ -371,19 +461,19 @@
                 <div class="d-flex align-items-center mt-4">
                   <h4>Version</h4>
                 </div>
-                <p id="t-openthread-version" class="tab-elem-value">none</p>
+                <p id="t-openthread-version" class="tab-elem-value">unknown</p>
                 <div class="d-flex align-items-center mt-4">
                   <h4>Version API</h4>
                 </div>
-                <p id="t-openthread-version_api" class="tab-elem-value">none</p>
+                <p id="t-openthread-version_api" class="tab-elem-value">unknown</p>
                 <div class="d-flex align-items-center mt-4">
                   <h4>Role</h4>
                 </div>
-                <p id="t-openthread-state" class="tab-elem-value">none</p>
+                <p id="t-openthread-role" class="tab-elem-value">unknown</p>
                 <div class="d-flex align-items-center mt-4">
                   <h4>PSKc</h4>
-                </div>
-                <p id="t-openthread-PSKc" class="tab-elem-value">none</p>
+                </div>PSKc
+                <p id="t-openthread-PSKc" class="tab-elem-value">unknown</p>
               </div>
             </div>
             <div class="tab-pane" id="tab4">
@@ -391,19 +481,19 @@
                 <div class="d-flex align-items-center mt-4">
                   <h4>Channel</h4>
                 </div>
-                <p id="t-rcp-channel" class="tab-elem-value">none</p>
+                <p id="t-rcp-channel" class="tab-elem-value">unknown</p>
                 <div class="d-flex align-items-center mt-4">
-                  <h4>IEEE EUI64</h4>
+                  <h4>EUI64</h4>
                 </div>
-                <p id="t-rcp-EUI64" class="tab-elem-value">none</p>
+                <p id="t-rcp-EUI64" class="tab-elem-value">unknown</p>
                 <div class="d-flex align-items-center mt-4">
                   <h4>Tx Power</h4>
                 </div>
-                <p id="t-rcp-txpower" class="tab-elem-value">none</p>
+                <p id="t-rcp-txpower" class="tab-elem-value">unknown</p>
                 <div class="d-flex align-items-center mt-4">
                   <h4>Version</h4>
                 </div>
-                <p id="t-rcp-version" class="tab-elem-value">none</p>
+                <p id="t-rcp-version" class="tab-elem-value">unknown</p>
               </div>
             </div>
             <div class="tab-pane" id="tab5">
@@ -411,10 +501,44 @@
                 <div class="d-flex align-items-center mt-4">
                   <h4>Service</h4>
                 </div>
-                <p id="t-WPAN-service" class="tab-elem-value">none</p>
+                <p id="t-WPAN-service" class="tab-elem-value">unknown</p>
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+    <section id="Topology" class="sub-section">
+      <div class="container">
+        <div class="section-header default-margin">
+          <h2>Thread Network <span style="color: #0ea2bd">Topology</span></h2>
+          <p>The network topology structure of Thread will be shown in a more intuitive and detailed manner here.</p>
+        </div>
+        <div class="part">
+          <hr />
+          <div class="row">
+            <div class="col-md-3 col-md-offset-1">
+              <h4 style="font-weight:800">Network Name: &nbsp;<span id="topology_netwotkname" style="color: gray;">
+                  unknown</span></h4>
+            </div>
+            <div class="col-md-2">
+              <h4 style="font-weight:800">Leader: &nbsp;<span id="topology_leader" style="color: gray;"> unknown</span>
+              </h4>
+            </div>
+            <div class="col-md-3">
+              <h4 style="font-weight:800">Router Number: &nbsp;<span id="topology_router_number" style="color: gray;">
+                  unknown</span>
+              </h4>
+            </div>
+            <div class="col-md-3">
+              <button id="btn_topology" type="submit" value="Running" style="font-weight: bold;"
+                onclick="http_server_build_thread_network_topology(this)">Start Topology</button>
+            </div>
+          </div>
+          <hr />
+          <!-- <div class="topology-graph"> -->
+          <div class="d3graph" id="tolology_canvas"></div>
+          <!-- </div> -->
         </div>
       </div>
     </section>
@@ -428,8 +552,8 @@
           <div class="col-md-11">
             <div class="info">
               <h3>Get in Touch</h3>
-              <p>The following is a list of contact information that may be helpful to you, including Sales Questions, Technical Inquiries,
-                Get-Samples, and Comments & Suggestions.</p>
+              <p>The following is a list of contact information that may be helpful to you, including Sales Questions, Technical Inquiries, 
+                  Get-Samples, and Comments & Suggestions.</p>
               <div class="info-item">
                 <div>
                   <h4>Technical Inquiries:</h4>
@@ -442,6 +566,16 @@
         </div>
       </div>
     </section>
+    <div id="log_window" class="dialog" style="padding-top: 10px;">
+      <div class="dialog-content" style="width: 400px; padding-top: 10px;">
+        <div id = "log_window_title"><span style="font-size: 30px;">Tip:</span></div>
+        <div style="width:100%; height:2px; border-top:1px solid #cecaca; clear:both;"></div>
+        <div class="row" style="text-align: center; padding-top: 20px; font-size: 18px;">
+          <p id = "log_window_content" style="display: inline-block;">Known</p>
+        </div>
+        <button type = "button" class="dialog-button" style ="width: 60px; height: 30px; " onclick="frontend_log_close(this)">Okay</button>
+      </div>
+    </div>
   </main>
   <footer id="footer" class="footer">
     <div class="footer-content">
