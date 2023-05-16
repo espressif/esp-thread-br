@@ -50,7 +50,7 @@ ESP Thread Border Router SDK could also run on a single SoC which supports both 
 1.2.2. Ethernet based Thread Border Router
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Similar to the previous Wi-Fi based Thread Border Route setup, but a device with Ethernet interface is required, such as `ESP32-Ethernet-Kit <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/hw-reference/esp32/get-started-ethernet-kit.html>`_.
+Similar to the previous Wi-Fi based Thread Border Router setup, but a device with Ethernet interface is required, such as `ESP32-Ethernet-Kit <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/hw-reference/esp32/get-started-ethernet-kit.html>`_.
 
 1.3. Key Features
 -----------------
