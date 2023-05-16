@@ -57,7 +57,7 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
     }
 }
 
-static void handle_wifi_addr_init(void)
+void handle_wifi_addr_init(void)
 {
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_ADDRESS_EVENT, WIFI_ADDRESS_EVENT_ADD_IP6,
                                                esp_netif_action_add_ip6_address,
