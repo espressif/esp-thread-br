@@ -204,6 +204,7 @@ static void ot_task_worker(void *ctx)
 
     (void)otLoggingSetLevel(CONFIG_LOG_DEFAULT_LEVEL);
     esp_openthread_cli_init();
+    ESP_ERROR_CHECK(esp_netif_set_default_netif(openthread_netif));
     esp_cli_custom_command_init();
 #if CONFIG_OPENTHREAD_BR_AUTO_START
     ESP_ERROR_CHECK(esp_openthread_border_router_init());
