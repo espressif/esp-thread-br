@@ -6,7 +6,9 @@
  */
 
 #include "border_router_launch.h"
+#include "border_router_board.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -192,6 +194,7 @@ static void ot_task_worker(void *ctx)
     assert(openthread_netif != NULL);
 
     // Initialize the OpenThread stack
+    ESP_ERROR_CHECK(border_router_board_init());
     esp_openthread_register_rcp_failure_handler(rcp_failure_handler);
     ESP_ERROR_CHECK(esp_openthread_init(&s_openthread_platform_config));
 

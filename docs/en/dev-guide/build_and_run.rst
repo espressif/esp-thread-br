@@ -95,18 +95,66 @@ If the ``OPENTHREAD_BR_AUTO_START`` option is enabled, the device will connect t
 2.1.3.2. Ethernet based Thread Border Router
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The border router can also be configured to connect to Ethernet network. In this case, a host device with Ethernet interface is required, such as `ESP32-Ethernet-Kit <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/hw-reference/esp32/get-started-ethernet-kit.html>`_.
+The border router can also be configured to connect to an Ethernet network. In this case, the daughter board ``ESP Thread Border Router/Zigbee Gateway Sub-Ethernet`` is required to extend the Ethernet interface.
 
 The following options need to be set:
 
 - Enable ``EXAMPLE_CONNECT_ETHERNET``
 - Disable ``EXAMPLE_CONNECT_WIFI``
 
+The configurations of ``EXAMPLE_CONNECT_ETHERNET`` as following:
+
+    +---------------+----------------+---------------+
+    |   Parameter   |     Value      |     Note      |
+    +---------------+----------------+---------------+
+    |      Type     |  W5500 Module  |   Mandatory   |
+    +---------------+----------------+---------------+
+    |   Stack Size  |      2048      |   Customized  |
+    +---------------+----------------+---------------+
+    |    SPI Host   |      SPI2      |   Mandatory   |
+    +---------------+----------------+---------------+
+    |    SPI SCLK   |     GPIO21     |   Mandatory   |
+    +---------------+----------------+---------------+
+    |    SPI MOSI   |     GPIO45     |   Mandatory   |
+    +---------------+----------------+---------------+
+    |    SPI MISO   |     GPIO38     |   Mandatory   |
+    +---------------+----------------+---------------+
+    |    SPI  CS    |     GPIO41     |   Mandatory   |
+    +---------------+----------------+---------------+
+    | SPI Interrupt |     GPIO39     |   Mandatory   |
+    +---------------+----------------+---------------+
+    |    SPI SPEED  |     36 MHz     |  Customized   |
+    +---------------+----------------+---------------+
+    |    PHY Reset  |     GPIO40     |   Mandatory   |
+    +---------------+----------------+---------------+
+    |  PHY Address  |        1       |   Mandatory   |
+    +---------------+----------------+---------------+
+
+The configuration result would look like this.
+
+.. code-block:: bash
+                                                                                                                                                                                                                                                   
+   Espressif IoT Development Framework Configuration                                                                                                                     
+   [ ] connect using WiFi interface                                                                                                                                                                                                                                                          
+   [*] connect using Ethernet interface                                                                                                                                                                                                                                                      
+   (2048)  emac_rx task stack size                                                                                                                                                                                                                                                           
+         Ethernet Type (W5500 Module)  --->                                                                                                                                                                                                                                                
+   (2)     SPI Host Number                                                                                                                                                                                                                                                                   
+   (21)    SPI SCLK GPIO number                                                                                                                                                                                                                                                              
+   (45)    SPI MOSI GPIO number                                                                                                                                                                                                                                                              
+   (38)    SPI MISO GPIO number                                                                                                                                                                                                                                                              
+   (41)    SPI CS GPIO number                                                                                                                                                                                                                                                                
+   (36)    SPI clock speed (MHz)                                                                                                                                                                                                                                                             
+   (39)    Interrupt GPIO number                                                                                                                                                                                                                                                             
+   (40)    PHY Reset GPIO number                                                                                                                                                                                                                                                             
+   (1)     PHY Address                                                                                                                                                                                                                                                                       
+   [*] Obtain IPv6 address                                                                                                                                                                                                                                                                   
+        Preferred IPv6 Type (Local Link Address)  --->    
 
 2.1.4. Build and Run the ESP Thread Border Router
 -------------------------------------------------
 
-Build and Flash the example to the host SoC, either the ESP32-S3 on the ESP-Threa-Border-Router board, or the host SoC in your manual setup.
+Build and Flash the example to the host SoC.
 
 .. code-block:: bash
 

@@ -31,26 +31,60 @@ Espressif provides a Border Router board which integrates the host SoC and the R
 
 .. figure:: ../images/esp-thread-border-router-board.png
    :align: center
-   :alt: ESP-Thread-Border-Router Board
+   :alt: ESP Thread Border Router/Zigbee Gateway Board
    :figclass: align-center
 
-   ESP-Thread-Border-Router Board
+   ESP Thread Border Router/Zigbee Gateway Board
 
 The SDK also supports manually connecting an ESP32-H2 RCP to an ESP32 series Wi-Fi SoC.
 
-.. figure:: ../images/thread-border-router-esp32-esp32h2.jpg
-   :align: center
-   :alt: ESP-Thread-Border-Router Standalone Modules
-   :figclass: align-center
-
-   ESP-Thread-Border-Router Standalone Modules
-
-ESP Thread Border Router SDK could also run on a single SoC which supports both Wi-Fi and Thread (e.g., ESP32-C6), check `OpenThread Border Router Example <https://github.com/espressif/esp-idf/blob/master/examples/openthread/ot_br/README.md>`_ for more information. But since there is only one RF path in ESP32-C6, which means Wi-Fi and Thread can't receivce simultaneously, it has a significant impact on performance. Hence the two SoCs solution is recommended.
+ESP Thread Border Router SDK could also run on a single SoC which supports both Wi-Fi and Thread (e.g., ESP32-C6), check `OpenThread Border Router Example <https://github.com/espressif/esp-idf/blob/master/examples/openthread/ot_br/README.md>`_ for more information. But since there is only one RF path in ESP32-C6, which means Wi-Fi and Thread can't receive simultaneously, it has a significant impact on performance. Hence the two SoCs solution is recommended.
 
 1.2.2. Ethernet based Thread Border Router
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Similar to the previous Wi-Fi based Thread Border Router setup, but a device with Ethernet interface is required, such as `ESP32-Ethernet-Kit <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/hw-reference/esp32/get-started-ethernet-kit.html>`_.
+Similar to the previous Wi-Fi based Thread Border Route setup, but a device with Ethernet interface is required.
+
+.. figure:: ../images/esp-thread-border-router-sub-ethernet.png
+   :align: center
+   :width: 480 px
+   :height: 360 px
+   :alt: ESP Thread Border Router/Zigbee Gateway Sub-Ethernet
+   :figclass: align-center
+
+   ESP Thread Border Router/Zigbee Gateway Sub-Ethernet
+
+1.2.3 Contents and Packaging
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Ordering Information
+^^^^^^^^^^^^^^^^^^^^
+
+The development board has a variety of variants to choose from, as shown in the table below.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 31 30 7 7 25
+
+   * - Ordering Code
+     - On-board Module
+     - Flash [A]_
+     - PSRAM
+     - Description
+
+   * - ESP Thread BR-Zigbee GW
+     - ESP32-S3-WROOM-1 and ESP32-H2-MINI-1
+     - 4 MB
+     - 2 MB
+     - ESP Thread Border Router/Zigbee Gateway Board
+   * - ESP Thread BR-Zigbee GW_SUB
+     -
+     -
+     -
+     - ESP Thread Border Router/Zigbee Gateway Sub-Ethernet
+
+.. [A] The flash is integrated in the chip's package.
+
 
 1.3. Key Features
 -----------------
@@ -76,3 +110,5 @@ To access the Web GUI, simply enter ``the local IPv4 address`` for the ESP Threa
    :align: center
    :alt: ESP-Thread-Border-Router GUI
    :figclass: align-center
+
+   ESP-Thread-Border-Router GUI

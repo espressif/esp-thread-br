@@ -1,4 +1,4 @@
-set(requires esp_ot_cli_extension openthread vfs)
+set(requires esp_ot_cli_extension openthread vfs border_router_board)
 
 if(CONFIG_OPENTHREAD_CLI_OTA)
     list(APPEND requires esp_http_client esp_br_http_ota)
