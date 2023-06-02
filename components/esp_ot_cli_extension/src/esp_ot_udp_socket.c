@@ -131,8 +131,6 @@ static void udp_socket_server_task(void *pvParameters)
 {
     UDP_SERVER *udp_server_member = (UDP_SERVER *)pvParameters;
 
-    udp_server_event_group = xEventGroupCreate();
-
     while (true) {
         int bits = xEventGroupWaitBits(udp_server_event_group,
                                        UDP_SERVER_BIND_BIT | UDP_SERVER_SEND_BIT | UDP_SERVER_CLOSE_BIT, pdFALSE,
@@ -187,10 +185,15 @@ otError esp_ot_process_udp_server(void *aContext, uint8_t aArgsLength, char *aAr
                           udp_server_member.local_port);
     } else if (strcmp(aArgs[0], "open") == 0) {
         if (udp_server_handle == NULL) {
+            udp_server_event_group = xEventGroupCreate();
+            ESP_RETURN_ON_FALSE(udp_server_event_group != NULL, OT_ERROR_FAILED, TAG, "Fail to open udp server");
             if (pdPASS !=
                 xTaskCreate(udp_socket_server_task, "udp_socket_server", 4096, &udp_server_member, 4,
                             &udp_server_handle)) {
                 udp_server_handle = NULL;
+                vEventGroupDelete(udp_server_event_group);
+                udp_server_event_group = NULL;
+                ESP_LOGE(TAG, "Fail to open udp server");
                 return OT_ERROR_FAILED;
             }
         } else {
@@ -302,7 +305,6 @@ static void udp_client_delete(UDP_CLIENT *udp_client_member)
 static void udp_socket_client_task(void *pvParameters)
 {
     UDP_CLIENT *udp_client_member = (UDP_CLIENT *)pvParameters;
-    udp_client_event_group = xEventGroupCreate();
 
     esp_err_t ret = ESP_OK;
     int err = 0;
@@ -403,11 +405,16 @@ otError esp_ot_process_udp_client(void *aContext, uint8_t aArgsLength, char *aAr
             if (aArgsLength == 2) {
                 udp_client_member.local_port = atoi(aArgs[1]);
             }
+            udp_client_event_group = xEventGroupCreate();
+            ESP_RETURN_ON_FALSE(udp_client_event_group != NULL, OT_ERROR_FAILED, TAG, "Fail to open udp client");
             if (pdPASS !=
                 xTaskCreate(udp_socket_client_task, "udp_socket_client", 4096, &udp_client_member, 4,
                             &udp_client_handle)) {
                 udp_client_handle = NULL;
                 udp_client_member.local_port = -1;
+                vEventGroupDelete(udp_client_event_group);
+                udp_client_event_group = NULL;
+                ESP_LOGE(TAG, "Fail to open udp client");
                 return OT_ERROR_FAILED;
             }
         } else {
