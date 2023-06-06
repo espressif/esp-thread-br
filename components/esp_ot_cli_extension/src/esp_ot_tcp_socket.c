@@ -123,8 +123,6 @@ static void tcp_socket_client_task(void *pvParameters)
 {
     TCP_CLIENT *tcp_client_member = (TCP_CLIENT *)pvParameters;
 
-    tcp_client_event_group = xEventGroupCreate();
-
     while (true) {
         int bits =
             xEventGroupWaitBits(tcp_client_event_group,
@@ -183,10 +181,15 @@ otError esp_ot_process_tcp_client(void *aContext, uint8_t aArgsLength, char *aAr
         otCliOutputFormat("connected\tremote ipaddr: %s\n", tcp_client_member.remote_ipaddr);
     } else if (strcmp(aArgs[0], "open") == 0) {
         if (tcp_client_handle == NULL) {
+            tcp_client_event_group = xEventGroupCreate();
+            ESP_RETURN_ON_FALSE(tcp_client_event_group != NULL, OT_ERROR_FAILED, TAG, "Fail to open tcp client");
             if (pdPASS !=
                 xTaskCreate(tcp_socket_client_task, "tcp_socket_client", 4096, &tcp_client_member, 4,
                             &tcp_client_handle)) {
                 tcp_client_handle = NULL;
+                vEventGroupDelete(tcp_client_event_group);
+                tcp_client_event_group = NULL;
+                ESP_LOGE(TAG, "Fail to open tcp client");
                 return OT_ERROR_FAILED;
             }
         } else {
@@ -365,8 +368,6 @@ static void tcp_socket_server_task(void *pvParameters)
 {
     TCP_SERVER *tcp_server_member = (TCP_SERVER *)pvParameters;
 
-    tcp_server_event_group = xEventGroupCreate();
-
     while (true) {
         int bits =
             xEventGroupWaitBits(tcp_server_event_group,
@@ -429,10 +430,15 @@ otError esp_ot_process_tcp_server(void *aContext, uint8_t aArgsLength, char *aAr
         }
     } else if (strcmp(aArgs[0], "open") == 0) {
         if (tcp_server_handle == NULL) {
+            tcp_server_event_group = xEventGroupCreate();
+            ESP_RETURN_ON_FALSE(tcp_server_event_group != NULL, OT_ERROR_FAILED, TAG, "Fail to open tcp server");
             if (pdPASS !=
                 xTaskCreate(tcp_socket_server_task, "tcp_socket_server", 4096, &tcp_server_member, 4,
                             &tcp_server_handle)) {
                 tcp_server_handle = NULL;
+                vEventGroupDelete(tcp_server_event_group);
+                tcp_server_event_group = NULL;
+                ESP_LOGE(TAG, "Fail to open tcp server");
                 return OT_ERROR_FAILED;
             }
         } else {
