@@ -97,7 +97,15 @@ connected
 Done
 ```
 
-For forming the Thread network, please refer to the [ot_cli_README](https://github.com/espressif/esp-idf/tree/master/examples/openthread/ot_cli).
+For forming the Thread network, please refer to the [ot_cli_README](https://github.com/espressif/esp-idf/tree/master/examples/openthread/ot_cli):
+
+```bash
+> ifconfig up
+Done
+> thread start
+Done
+```
+
 
 ## Example Output
 
