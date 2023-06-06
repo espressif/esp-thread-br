@@ -202,8 +202,9 @@ static void ot_task_worker(void *ctx)
 #endif
     ESP_ERROR_CHECK(esp_netif_attach(openthread_netif, esp_openthread_netif_glue_init(&s_openthread_platform_config)));
 
-    (void)otLoggingSetLevel(OT_LOG_LEVEL_INFO);
+    (void)otLoggingSetLevel(CONFIG_LOG_DEFAULT_LEVEL);
     esp_openthread_cli_init();
+    ESP_ERROR_CHECK(esp_netif_set_default_netif(openthread_netif));
     esp_cli_custom_command_init();
 #if CONFIG_OPENTHREAD_BR_AUTO_START
     ESP_ERROR_CHECK(esp_openthread_border_router_init());

@@ -446,6 +446,13 @@ psk: threadcertAP    :     wifi connect -s threadcertAP -p threadcertAP
 state                :     get wifi state, disconnect or connect
 ---example---
 get wifi state       :     wifi state
+disconnect           :     wifi disconnect once, only for test
+---example---
+wifi disconnect once :     wifi disconnect
+reconnect after 2s   :     wifi disconnect 2000
+mac                  :     get mac address of wifi netif
+---example---
+get wifi mac address :     wifi mac
 Done
 ```
 
