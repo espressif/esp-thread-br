@@ -23,15 +23,16 @@ ESP32-S3 is the host SoC on ESP Thread Border Router Board, so set target to esp
 ```
 idf.py set-target esp32s3
 ```
-The host could be pre-configured with `CONFIG_OPENTHREAD_RADIO_SPINEL_UART` or `CONFIG_OPENTHREAD_RADIO_SPINEL_SPI` to select UART or SPI to access the Radio Co-Processor.
+
+The host could be pre-configured with `OPENTHREAD_RADIO_SPINEL_UART` or `OPENTHREAD_RADIO_SPINEL_SPI` to select UART or SPI to access the Radio Co-Processor.
 
 If the `OPENTHREAD_BR_AUTO_START` option is enabled, the device will connect to the configured Wi-Fi and form Thread network automatically then act as the border router.
 
-The Wi-Fi network's ssid and psk needs to be pre-configured with `CONFIG_EXAMPLE_WIFI_SSID` and `CONFIG_EXAMPLE_WIFI_PASSWORD`.
+The Wi-Fi network's ssid and psk needs to be pre-configured with `EXAMPLE_WIFI_SSID` and `EXAMPLE_WIFI_PASSWORD`.
 
-The Thread network parameters could be pre-configured with `CONFIG_OPENTHREAD_NETWORK_xx` options.
+The Thread network parameters could be pre-configured with `OPENTHREAD_NETWORK_xx` options.
 
-If the `CONFIG_OPENTHREAD_BR_START_WEB` option is enabled, [ESP Thread Border Router Web Server](../../components/esp_ot_br_server/README.md) will be provided to configure and query Thread network via a Web GUI.
+If the `OPENTHREAD_BR_START_WEB` option is enabled, [ESP Thread Border Router Web Server](../../components/esp_ot_br_server/README.md) will be provided to configure and query Thread network via a Web GUI.
 
 ### Create the RCP firmware image
 
