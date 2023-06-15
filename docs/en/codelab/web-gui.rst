@@ -2,10 +2,19 @@
 3.5. WEB GUI
 ************
 
-The ESP Thread Border Router supports web server which provides visual graphical interface and practical REST API.
+The ESP Thread Border Router is equipped with a user-friendly graphical user interface (GUI) that enables users to easily discover, configure, and monitor Thread networks through the web server.
+
+To access the Web GUI, simply enter ``the local IPv4 address`` for the ESP Thread Border Router in your browser window with port ``80`` and the path ``index.html``.
+
+.. figure:: ../../images/thread-border-router-main-gui.png
+   :align: center
+   :alt: ESP-Thread-Border-Router GUI
+   :figclass: align-center
+
+   ESP-Thread-Border-Router GUI
 
 Prerequisites
----------------
+-------------
 
 To perform web gui, the follow device are required:
 
@@ -32,7 +41,7 @@ such as:
 All REST APIs can be accessed by visiting the IPv4 address of the Thread-Border-Router-Board using the ``HTTP`` on port 80 with the API field specified.
 
 Thread REST APIs
---------------------
+----------------
 
 The ESP Thread Border Router server provides the REST APIs that are compatible with `ot-br-posix <https://github.com/openthread/ot-br-posix>`_
 
