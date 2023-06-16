@@ -133,23 +133,23 @@ The configurations of ``EXAMPLE_CONNECT_ETHERNET`` as following:
 The configuration result would look like this.
 
 .. code-block:: bash
-                                                                                                                                                                                                                                                   
-   Espressif IoT Development Framework Configuration                                                                                                                     
-   [ ] connect using WiFi interface                                                                                                                                                                                                                                                          
-   [*] connect using Ethernet interface                                                                                                                                                                                                                                                      
-   (2048)  emac_rx task stack size                                                                                                                                                                                                                                                           
-         Ethernet Type (W5500 Module)  --->                                                                                                                                                                                                                                                
-   (2)     SPI Host Number                                                                                                                                                                                                                                                                   
-   (21)    SPI SCLK GPIO number                                                                                                                                                                                                                                                              
-   (45)    SPI MOSI GPIO number                                                                                                                                                                                                                                                              
-   (38)    SPI MISO GPIO number                                                                                                                                                                                                                                                              
-   (41)    SPI CS GPIO number                                                                                                                                                                                                                                                                
-   (36)    SPI clock speed (MHz)                                                                                                                                                                                                                                                             
-   (39)    Interrupt GPIO number                                                                                                                                                                                                                                                             
-   (40)    PHY Reset GPIO number                                                                                                                                                                                                                                                             
-   (1)     PHY Address                                                                                                                                                                                                                                                                       
-   [*] Obtain IPv6 address                                                                                                                                                                                                                                                                   
-        Preferred IPv6 Type (Local Link Address)  --->    
+
+   Espressif IoT Development Framework Configuration
+   [ ] connect using WiFi interface
+   [*] connect using Ethernet interface
+   (2048)  emac_rx task stack size
+         Ethernet Type (W5500 Module)  --->
+   (2)     SPI Host Number
+   (21)    SPI SCLK GPIO number
+   (45)    SPI MOSI GPIO number
+   (38)    SPI MISO GPIO number
+   (41)    SPI CS GPIO number
+   (36)    SPI clock speed (MHz)
+   (39)    Interrupt GPIO number
+   (40)    PHY Reset GPIO number
+   (1)     PHY Address
+   [*] Obtain IPv6 address
+        Preferred IPv6 Type (Local Link Address)  --->
 
 2.1.4. Build and Run the ESP Thread Border Router
 -------------------------------------------------
