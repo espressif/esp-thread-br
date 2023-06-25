@@ -53,6 +53,10 @@ static void print_ip_address(void)
 
 bool is_netif_exist(const char *if_name)
 {
+    if (strlen(if_name) != 2) {
+        otCliOutputFormat("no such netif: %s\n", if_name);
+        return false;
+    }
     struct netif *netif;
     NETIF_FOREACH(netif)
     {
@@ -136,12 +140,18 @@ otError esp_ot_process_ip(void *aContext, uint8_t aArgsLength, char *aArgs[])
         if (strcmp(aArgs[0], "print") == 0) {
             print_ip_address();
         } else if (strcmp(aArgs[0], "add") == 0) {
+            if (aArgsLength != 3) {
+                return OT_ERROR_INVALID_ARGS;
+            }
             char dest_addr[128];
             strncpy(dest_addr, aArgs[2], strlen(aArgs[2]) + 1);
             ip_event_add_ip6_t add_addr;
             inet6_aton(dest_addr, &add_addr.addr);
             esp_lwip_add_del_ip(&add_addr, aArgs[1], true);
         } else if (strcmp(aArgs[0], "del") == 0) {
+            if (aArgsLength != 3) {
+                return OT_ERROR_INVALID_ARGS;
+            }
             char dest_addr[128];
             strncpy(dest_addr, aArgs[2], strlen(aArgs[2]));
             ip_event_add_ip6_t add_addr;
