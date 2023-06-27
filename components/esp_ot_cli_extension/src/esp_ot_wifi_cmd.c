@@ -8,6 +8,7 @@
 #include "esp_coexist.h"
 #include "esp_err.h"
 #include "esp_event.h"
+#include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_netif_ip_addr.h"
 #include "esp_netif_net_stack.h"
@@ -133,22 +134,28 @@ otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs
     (void)(aContext);
     if (aArgsLength == 0) {
         otCliOutputFormat("---wifi parameter---\n");
-        otCliOutputFormat("connect\n");
-        otCliOutputFormat("-s                   :     wifi ssid\n");
-        otCliOutputFormat("-p                   :     wifi psk\n");
+        otCliOutputFormat(
+            "connect -s <ssid> -p <psk>               :       connect to a wifi network with an ssid and a psk\n");
+        otCliOutputFormat("connect -s <ssid>                        :       connect to a wifi network with an ssid\n");
+        otCliOutputFormat("disconnect                               :       wifi disconnect once, only for test\n");
+        otCliOutputFormat("disconnect <delay>                       :       wifi disconnect, and reconnect after "
+                          "delay(ms), only for test\n");
+        otCliOutputFormat("state                                    :       get wifi state, disconnect or connect\n");
+        otCliOutputFormat("mac <role>                               :       get mac address of wifi netif, <role> can "
+                          "be 'sta' or 'ap'\n");
         otCliOutputFormat("---example---\n");
-        otCliOutputFormat("join a wifi:\nssid: threadcertAP \npsk: threadcertAP    :     wifi connect -s threadcertAP "
-                          "-p threadcertAP\n");
-        otCliOutputFormat("state                :     get wifi state, disconnect or connect\n");
-        otCliOutputFormat("---example---\n");
-        otCliOutputFormat("get wifi state       :     wifi state\n");
-        otCliOutputFormat("disconnect           :     wifi disconnect once, only for test\n");
-        otCliOutputFormat("---example---\n");
-        otCliOutputFormat("wifi disconnect once :     wifi disconnect\n");
-        otCliOutputFormat("reconnect after 2s   :     wifi disconnect 2000\n");
-        otCliOutputFormat("mac                  :     get mac address of wifi netif\n");
-        otCliOutputFormat("---example---\n");
-        otCliOutputFormat("get wifi mac address :     wifi mac\n");
+        otCliOutputFormat("join a wifi:\n");
+        otCliOutputFormat("ssid: threadcertAP\n");
+        otCliOutputFormat(
+            "psk: threadcertAP                        :       wifi connect -s threadcertAP -p threadcertAP\n");
+        otCliOutputFormat("join a wifi:\n");
+        otCliOutputFormat("ssid: threadAP\n");
+        otCliOutputFormat("does not have a psk                      :       wifi connect -s threadAP\n");
+        otCliOutputFormat("get wifi state                           :       wifi state\n");
+        otCliOutputFormat("wifi disconnect once                     :       wifi disconnect\n");
+        otCliOutputFormat("wifi disconnec, and reconnect after 2s   :       wifi disconnect 2000\n");
+        otCliOutputFormat("get mac address of WiFi station          :       wifi mac sta\n");
+        otCliOutputFormat("get mac address of WiFi soft-AP          :       wifi mac ap\n");
     } else if (strcmp(aArgs[0], "connect") == 0) {
         for (int i = 1; i < aArgsLength; i++) {
             if (strcmp(aArgs[i], "-s") == 0) {
@@ -186,11 +193,26 @@ otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs
         }
     } else if (strcmp(aArgs[0], "mac") == 0) {
         uint8_t mac[6];
-        esp_netif_get_mac(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), mac);
-        for (int i = 0; i < 6; i++) {
-            otCliOutputFormat("%02x", mac[i]);
+        if (aArgsLength != 2) {
+            return OT_ERROR_INVALID_ARGS;
         }
-        otCliOutputFormat("\n");
+        esp_err_t error = ESP_OK;
+        if (strcmp(aArgs[1], "sta") == 0) {
+            error = esp_read_mac(mac, ESP_MAC_WIFI_STA);
+        } else if (strcmp(aArgs[1], "ap") == 0) {
+            error = esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP);
+        } else {
+            otCliOutputFormat("invalid arguments: %s\n", aArgs[1]);
+            return OT_ERROR_INVALID_ARGS;
+        }
+        if (error == ESP_OK) {
+            for (int i = 0; i < 5; i++) {
+                otCliOutputFormat("%02x:", mac[i]);
+            }
+            otCliOutputFormat("%02x\n", mac[5]);
+        } else {
+            otCliOutputFormat("Fail to get the mac address\n");
+        }
     } else {
         otCliOutputFormat("invalid commands\n");
     }
