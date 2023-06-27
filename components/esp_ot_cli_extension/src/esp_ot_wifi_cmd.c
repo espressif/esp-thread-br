@@ -153,9 +153,9 @@ otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs
         otCliOutputFormat("does not have a psk                      :       wifi connect -s threadAP\n");
         otCliOutputFormat("get wifi state                           :       wifi state\n");
         otCliOutputFormat("wifi disconnect once                     :       wifi disconnect\n");
-        otCliOutputFormat("wifi disconnec, and reconnect after 2s   :       wifi disconnect 2000\n");
-        otCliOutputFormat("get mac address of WiFi station          :       wifi mac sta\n");
-        otCliOutputFormat("get mac address of WiFi soft-AP          :       wifi mac ap\n");
+        otCliOutputFormat("wifi disconnect, and reconnect after 2s  :       wifi disconnect 2000\n");
+        otCliOutputFormat("get mac address of Wi-Fi station         :       wifi mac sta\n");
+        otCliOutputFormat("get mac address of Wi-Fi soft-AP         :       wifi mac ap\n");
     } else if (strcmp(aArgs[0], "connect") == 0) {
         for (int i = 1; i < aArgsLength; i++) {
             if (strcmp(aArgs[i], "-s") == 0) {
