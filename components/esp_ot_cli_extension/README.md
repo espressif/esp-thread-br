@@ -435,25 +435,25 @@ Used for connecting the border router to the Wi-Fi network.
 
 ```bash
 > wifi
---wifi parameter---
-connect
--s                   :     wifi ssid
--p                   :     wifi psk
+---wifi parameter---
+connect -s <ssid> -p <psk>               :      connect to a wifi network with an ssid and a psk
+connect -s <ssid>                        :      connect to a wifi network with an ssid
+disconnect                               :      wifi disconnect once, only for test
+disconnect <delay>                       :      wifi disconnect, and reconnect after delay(ms), only for test
+state                                    :      get wifi state, disconnect or connect
+mac <role>                               :      get mac address of wifi netif, <role> can be "sta" or "ap"
 ---example---
 join a wifi:
 ssid: threadcertAP
-psk: threadcertAP    :     wifi connect -s threadcertAP -p threadcertAP
-state                :     get wifi state, disconnect or connect
----example---
-get wifi state       :     wifi state
-disconnect           :     wifi disconnect once, only for test
----example---
-wifi disconnect once :     wifi disconnect
-reconnect after 2s   :     wifi disconnect 2000
-mac                  :     get mac address of wifi netif
----example---
-get wifi mac address :     wifi mac
-Done
+psk: threadcertAP                        :      wifi connect -s threadcertAP -p threadcertAP
+join a wifi:
+ssid: threadAP
+does not have a psk                      :      wifi connect -s threadAP
+get wifi state                           :      wifi state
+wifi disconnect once                     :      wifi disconnect
+wifi disconnec, and reconnect after 2s   :      wifi disconnect 2000
+get mac address of WiFi station          :      wifi mac sta
+get mac address of WiFi soft-AP          :      wifi mac ap
 ```
 
 To join a Wi-Fi network, please use the `wifi connect` command:
