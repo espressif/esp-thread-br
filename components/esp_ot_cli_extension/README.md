@@ -451,9 +451,9 @@ ssid: threadAP
 does not have a psk                      :      wifi connect -s threadAP
 get wifi state                           :      wifi state
 wifi disconnect once                     :      wifi disconnect
-wifi disconnec, and reconnect after 2s   :      wifi disconnect 2000
-get mac address of WiFi station          :      wifi mac sta
-get mac address of WiFi soft-AP          :      wifi mac ap
+wifi disconnect, and reconnect after 2s  :      wifi disconnect 2000
+get mac address of Wi-Fi station         :      wifi mac sta
+get mac address of Wi-Fi soft-AP         :      wifi mac ap
 ```
 
 To join a Wi-Fi network, please use the `wifi connect` command:

@@ -93,7 +93,7 @@
         },                                                     \
     }
 
-#define ESP_OPENTHREAD_DEFAULT_PORT_CONFIG()                                                   \
-    {                                                                                          \
-        .storage_partition_name = "ot_storage", .netif_queue_size = 10, .task_queue_size = 10, \
+#define ESP_OPENTHREAD_DEFAULT_PORT_CONFIG()                                            \
+    {                                                                                   \
+        .storage_partition_name = "nvs", .netif_queue_size = 10, .task_queue_size = 10, \
     }
