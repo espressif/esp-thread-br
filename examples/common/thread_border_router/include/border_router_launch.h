@@ -18,8 +18,6 @@ extern "C" {
 void launch_openthread_border_router(const esp_openthread_platform_config_t *config,
                                      const esp_rcp_update_config_t *update_config);
 
-void border_router_register_extension_commands(void);
-
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
