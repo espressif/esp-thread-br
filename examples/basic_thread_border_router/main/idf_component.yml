@@ -1,6 +1,6 @@
 ## IDF Component Manager Manifest File
 dependencies:
-  espressif/mdns: "~1.0.0"
+  espressif/mdns: "^1.0.0"
   espressif/esp_ot_cli_extension: "~0.3.0"
   espressif/esp_rcp_update: "~0.3.0"
   espressif/esp-serial-flasher: "~0.0.0"
