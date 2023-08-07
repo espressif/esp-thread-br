@@ -69,29 +69,37 @@ static esp_err_t parse_ipv6_prefix_from_string(char *string, otIp6Prefix *prefix
 cJSON *handle_ot_resource_node_rloc_request()
 {
     char rloc[OT_IP6_ADDRESS_STRING_SIZE];
+    esp_openthread_lock_acquire(portMAX_DELAY);
     otIp6AddressToString((const otIp6Address *)otThreadGetRloc(esp_openthread_get_instance()), rloc,
                          OT_IP6_ADDRESS_STRING_SIZE);
+    esp_openthread_lock_release();
     return cJSON_CreateString(rloc);
 }
 
 cJSON *handle_ot_resource_node_rloc16_request()
 {
     uint16_t rloc16 = 0xffff;
+    esp_openthread_lock_acquire(portMAX_DELAY);
     rloc16 = otThreadGetRloc16(esp_openthread_get_instance());
+    esp_openthread_lock_release();
     return cJSON_CreateNumber(rloc16);
 }
 
 cJSON *handle_ot_resource_node_state_request()
 {
     uint16_t state = 0;
+    esp_openthread_lock_acquire(portMAX_DELAY);
     state = otThreadGetDeviceRole(esp_openthread_get_instance());
+    esp_openthread_lock_release();
     return cJSON_CreateNumber(state);
 }
 
 cJSON *handle_ot_resource_node_extaddress_request()
 {
     char format[OT_EXT_ADDRESS_SIZE * 2 + 1];
+    esp_openthread_lock_acquire(portMAX_DELAY);
     const otExtAddress *address = otLinkGetExtendedAddress(esp_openthread_get_instance());
+    esp_openthread_lock_release();
     ESP_RETURN_ON_FALSE(!hex_to_string(address->m8, format, OT_EXT_ADDRESS_SIZE), NULL, API_TAG,
                         "Failed to convert thread extended address");
     return cJSON_CreateString(format);
@@ -99,13 +107,18 @@ cJSON *handle_ot_resource_node_extaddress_request()
 
 cJSON *handle_ot_resource_node_network_name_request()
 {
-    return cJSON_CreateString(otThreadGetNetworkName(esp_openthread_get_instance()));
+    const char *ot_network_name;
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    ot_network_name = otThreadGetNetworkName(esp_openthread_get_instance());
+    esp_openthread_lock_release();
+    return cJSON_CreateString(ot_network_name);
 }
 
 cJSON *handle_ot_resource_node_leader_data_request()
 {
     cJSON *root = NULL;
     otLeaderData data;
+    esp_openthread_lock_acquire(portMAX_DELAY);
     ESP_RETURN_ON_FALSE(!otThreadGetLeaderData(esp_openthread_get_instance(), &data), NULL, API_TAG,
                         "Failed to get thread leader data");
     root = cJSON_CreateObject();
@@ -115,11 +128,13 @@ cJSON *handle_ot_resource_node_leader_data_request()
     cJSON_AddItemToObject(root, "StableDataVersion", cJSON_CreateNumber(data.mStableDataVersion));
     cJSON_AddItemToObject(root, "LeaderRouterId", cJSON_CreateNumber(data.mLeaderRouterId));
 
+    esp_openthread_lock_release();
     return root;
 }
 
 cJSON *handle_ot_resource_node_numofrouter_request()
 {
+    esp_openthread_lock_acquire(portMAX_DELAY);
     int8_t max_router_id = otThreadGetMaxRouterId(esp_openthread_get_instance());
     otRouterInfo router_info;
     uint8_t router_number = 0;
@@ -128,13 +143,16 @@ cJSON *handle_ot_resource_node_numofrouter_request()
             continue;
         ++router_number;
     }
+    esp_openthread_lock_release();
     return cJSON_CreateNumber(router_number);
 }
 
 cJSON *handle_ot_resource_node_extpanid_request()
 {
     char format[OT_EXT_PAN_ID_SIZE * 2 + 1];
+    esp_openthread_lock_acquire(portMAX_DELAY);
     const otExtendedPanId *extpanid = otThreadGetExtendedPanId(esp_openthread_get_instance());
+    esp_openthread_lock_release();
     ESP_RETURN_ON_FALSE(!hex_to_string(extpanid->m8, format, OT_EXT_ADDRESS_SIZE), NULL, API_TAG,
                         "Failed to convert thread extended panid");
     return cJSON_CreateString(format);
@@ -144,8 +162,10 @@ cJSON *handle_ot_resource_node_active_dataset_tlv_request()
 {
     char format[256];
     otOperationalDatasetTlvs dataset;
+    esp_openthread_lock_acquire(portMAX_DELAY);
     ESP_RETURN_ON_FALSE(!otDatasetGetActiveTlvs(esp_openthread_get_instance(), &dataset), NULL, API_TAG,
                         "Failed to get thread dataset tlv");
+    esp_openthread_lock_release();
     ESP_RETURN_ON_FALSE(sizeof(format) >= (dataset.mLength * 2), NULL, API_TAG, "Invalid Size");
     ESP_RETURN_ON_FALSE(!hex_to_string(dataset.mTlvs, format, dataset.mLength), NULL, API_TAG,
                         "Failed to convert thread dataset tlv");
@@ -221,6 +241,7 @@ static esp_err_t get_openthread_wpan_properties(otInstance *ins, thread_wpan_sta
 
 static esp_err_t get_openthread_properties(openthread_properties_t *properties)
 {
+    esp_openthread_lock_acquire(portMAX_DELAY);
     otInstance *ins = esp_openthread_get_instance(); /* get the api of openthread */
     ESP_RETURN_ON_FALSE(ins, ESP_FAIL, API_TAG, "Failed to get openthread instance");
 
@@ -236,6 +257,7 @@ static esp_err_t get_openthread_properties(openthread_properties_t *properties)
     ESP_RETURN_ON_ERROR(get_openthread_wpan_properties(ins, &properties->wpan), API_TAG,
                         "Failed to get status of wpan"); /* wpan */
 
+    esp_openthread_lock_release();
     return ESP_OK;
 }
 
@@ -711,9 +733,9 @@ static esp_err_t build_thread_network_topology()
 {
     otError error = OT_ERROR_NONE;
     otInstance *ins = esp_openthread_get_instance();
+    esp_openthread_lock_acquire(portMAX_DELAY);
     otIp6Address rloc16address = *otThreadGetRloc(ins);
     otIp6Address multicastAddress;
-    esp_openthread_lock_acquire(portMAX_DELAY);
     ESP_RETURN_ON_ERROR(error = otThreadSendDiagnosticGet(ins, &rloc16address, kAllTlvTypes, sizeof(kAllTlvTypes),
                                                           &diagnosticTlv_result_handler, NULL),
                         API_TAG, "Fail to send diagnostic rloc16address.");
@@ -754,7 +776,9 @@ static thread_node_informaiton_t get_openthread_node_information(otInstance *ins
 
 cJSON *handle_ot_resource_node_information_request()
 {
+    esp_openthread_lock_acquire(portMAX_DELAY);
     thread_node_informaiton_t node = get_openthread_node_information(esp_openthread_get_instance());
+    esp_openthread_lock_release();
     return thread_node_struct_convert2_json(&node);
 }
 
