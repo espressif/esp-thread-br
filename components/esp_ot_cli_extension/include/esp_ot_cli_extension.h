@@ -26,6 +26,8 @@ typedef enum {
  */
 void esp_cli_custom_command_init(void);
 
+#define OT_EXT_CLI_TAG "ot_ext_cli"
+
 #ifdef __cplusplus
 }
 #endif

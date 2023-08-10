@@ -8,23 +8,22 @@
 #include "esp_http_client.h"
 #include "esp_log.h"
 #include "esp_openthread.h"
+#include "esp_ot_cli_extension.h"
 #include "http_parser.h"
 #include "openthread/cli.h"
-
-#define TAG "curl"
 
 static char s_arg_buf[128];
 
 static esp_err_t _http_handle_response_code(esp_http_client_handle_t http_client, int status_code)
 {
     if (status_code == HttpStatus_NotFound || status_code == HttpStatus_Forbidden) {
-        ESP_LOGE(TAG, "File not found(%d)", status_code);
+        ESP_LOGE(OT_EXT_CLI_TAG, "File not found(%d)", status_code);
         return ESP_FAIL;
     } else if (status_code >= HttpStatus_BadRequest && status_code < HttpStatus_InternalError) {
-        ESP_LOGE(TAG, "Client error (%d)", status_code);
+        ESP_LOGE(OT_EXT_CLI_TAG, "Client error (%d)", status_code);
         return ESP_FAIL;
     } else if (status_code >= HttpStatus_InternalError) {
-        ESP_LOGE(TAG, "Server error (%d)", status_code);
+        ESP_LOGE(OT_EXT_CLI_TAG, "Server error (%d)", status_code);
         return ESP_FAIL;
     }
 
@@ -43,7 +42,7 @@ static esp_err_t _http_connect(esp_http_client_handle_t http_client)
     int post_len = esp_http_client_get_post_field(http_client, &post_data);
     err = esp_http_client_open(http_client, post_len);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to open HTTP connection: %s", esp_err_to_name(err));
+        ESP_LOGE(OT_EXT_CLI_TAG, "Failed to open HTTP connection: %s", esp_err_to_name(err));
         return err;
     }
     if (post_len) {
@@ -51,7 +50,7 @@ static esp_err_t _http_connect(esp_http_client_handle_t http_client)
         while (post_len > 0) {
             write_len = esp_http_client_write(http_client, post_data, post_len);
             if (write_len < 0) {
-                ESP_LOGE(TAG, "Write failed");
+                ESP_LOGE(OT_EXT_CLI_TAG, "Write failed");
                 return ESP_FAIL;
             }
             post_len -= write_len;
@@ -79,12 +78,12 @@ static void curl_task(void *pvParameters)
     esp_http_client_handle_t http_client = esp_http_client_init(&config);
 
     if (http_client == NULL) {
-        ESP_LOGE(TAG, "Failed to initialize HTTP client");
+        ESP_LOGE(OT_EXT_CLI_TAG, "Failed to initialize HTTP client");
         vTaskDelete(NULL);
         return;
     }
     if (_http_connect(http_client) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to connect to HTTP server");
+        ESP_LOGE(OT_EXT_CLI_TAG, "Failed to connect to HTTP server");
         vTaskDelete(NULL);
         return;
     }
@@ -93,7 +92,7 @@ static void curl_task(void *pvParameters)
         char data_buf[1024];
         int len = esp_http_client_read(http_client, data_buf, sizeof(data_buf));
         if (len < 0 || (len == 0 && (errno == ENOTCONN || errno == ECONNRESET || errno == ECONNABORTED))) {
-            ESP_LOGE(TAG, "Connection closed, errno = %d", errno);
+            ESP_LOGE(OT_EXT_CLI_TAG, "Connection closed, errno = %d", errno);
             vTaskDelete(NULL);
             return;
         }

@@ -10,6 +10,7 @@
 #include "esp_err.h"
 
 #include "esp_log.h"
+#include "esp_ot_cli_extension.h"
 #include <sys/unistd.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -17,8 +18,6 @@
 #include "lwip/err.h"
 #include "lwip/sockets.h"
 #include "openthread/cli.h"
-
-#define TAG "ot_socket"
 
 static EventGroupHandle_t tcp_client_event_group;
 static EventGroupHandle_t tcp_server_event_group;
@@ -37,22 +36,22 @@ static void tcp_client_receive_task(void *pvParameters)
             receive_error_nums++;
             if (receive_error_nums >= 5 && !set_exit && tcp_client_member->sock != -1) {
                 set_exit = 1;
-                ESP_LOGW(TAG, "TCP client fail when receiving message");
+                ESP_LOGW(OT_EXT_CLI_TAG, "TCP client fail when receiving message");
                 xEventGroupSetBits(tcp_client_event_group, TCP_CLIENT_DELETE_BIT);
             }
         }
         if (len > 0) {
             receive_error_nums = 0;
-            ESP_LOGI(TAG, "sock %d Received %d bytes from %s", tcp_client_member->sock, len,
+            ESP_LOGI(OT_EXT_CLI_TAG, "sock %d Received %d bytes from %s", tcp_client_member->sock, len,
                      tcp_client_member->remote_ipaddr);
             rx_buffer[len] = '\0';
-            ESP_LOGI(TAG, "%s", rx_buffer);
+            ESP_LOGI(OT_EXT_CLI_TAG, "%s", rx_buffer);
         }
         if (tcp_client_member->exist == 0 && tcp_client_member->sock == -1) {
             break;
         }
     }
-    ESP_LOGI(TAG, "TCP client receive task exiting");
+    ESP_LOGI(OT_EXT_CLI_TAG, "TCP client receive task exiting");
     vTaskDelete(NULL);
 }
 
@@ -75,18 +74,20 @@ static void tcp_client_add(TCP_CLIENT *tcp_client_member)
     tcp_client_member->sock = socket(AF_INET6, SOCK_STREAM, IPPROTO_IPV6);
     err_flag = 1;
 
-    ESP_GOTO_ON_FALSE((tcp_client_member->sock >= 0), ESP_FAIL, exit, TAG, "Unable to create socket: errno %d", errno);
+    ESP_GOTO_ON_FALSE((tcp_client_member->sock >= 0), ESP_FAIL, exit, OT_EXT_CLI_TAG,
+                      "Unable to create socket: errno %d", errno);
 
-    ESP_LOGI(TAG, "Socket created, connecting to %s:%d", tcp_client_member->remote_ipaddr,
+    ESP_LOGI(OT_EXT_CLI_TAG, "Socket created, connecting to %s:%d", tcp_client_member->remote_ipaddr,
              tcp_client_member->remote_port);
     err = connect(tcp_client_member->sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
-    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "Socket unable to connect: errno %d", errno);
-    ESP_LOGI(TAG, "Successfully connected");
+    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, OT_EXT_CLI_TAG, "Socket unable to connect: errno %d", errno);
+    ESP_LOGI(OT_EXT_CLI_TAG, "Successfully connected");
 
     if (pdPASS != xTaskCreate(tcp_client_receive_task, "tcp_client_receive", 4096, tcp_client_member, 4, NULL)) {
         err = -1;
     }
-    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "The TCP client is unable to receive: errno %d", errno);
+    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, OT_EXT_CLI_TAG, "The TCP client is unable to receive: errno %d",
+                      errno);
 
 exit:
     if (ret != ESP_OK) {
@@ -95,7 +96,7 @@ exit:
             close(tcp_client_member->sock);
             tcp_client_member->sock = -1;
         }
-        ESP_LOGI(TAG, "Fail to create TCP client");
+        ESP_LOGI(OT_EXT_CLI_TAG, "Fail to create TCP client");
     } else {
         tcp_client_member->exist = 1;
     }
@@ -106,13 +107,13 @@ static void tcp_client_send(TCP_CLIENT *tcp_client_member)
     int len = 0;
     len = send(tcp_client_member->sock, tcp_client_member->message, strlen(tcp_client_member->message), 0);
     if (len < 0) {
-        ESP_LOGI(TAG, "Fail to send message");
+        ESP_LOGI(OT_EXT_CLI_TAG, "Fail to send message");
     }
 }
 
 static void tcp_client_delete(TCP_CLIENT *tcp_client_member)
 {
-    ESP_LOGI(TAG, "TCP client is disconnecting with %s", tcp_client_member->remote_ipaddr);
+    ESP_LOGI(OT_EXT_CLI_TAG, "TCP client is disconnecting with %s", tcp_client_member->remote_ipaddr);
     tcp_client_member->exist = 0;
     shutdown(tcp_client_member->sock, 0);
     close(tcp_client_member->sock);
@@ -146,7 +147,7 @@ static void tcp_socket_client_task(void *pvParameters)
             break;
         }
     }
-    ESP_LOGI(TAG, "Closed TCP client successfully");
+    ESP_LOGI(OT_EXT_CLI_TAG, "Closed TCP client successfully");
     vEventGroupDelete(tcp_client_event_group);
     vTaskDelete(NULL);
 }
@@ -182,14 +183,15 @@ otError esp_ot_process_tcp_client(void *aContext, uint8_t aArgsLength, char *aAr
     } else if (strcmp(aArgs[0], "open") == 0) {
         if (tcp_client_handle == NULL) {
             tcp_client_event_group = xEventGroupCreate();
-            ESP_RETURN_ON_FALSE(tcp_client_event_group != NULL, OT_ERROR_FAILED, TAG, "Fail to open tcp client");
+            ESP_RETURN_ON_FALSE(tcp_client_event_group != NULL, OT_ERROR_FAILED, OT_EXT_CLI_TAG,
+                                "Fail to open tcp client");
             if (pdPASS !=
                 xTaskCreate(tcp_socket_client_task, "tcp_socket_client", 4096, &tcp_client_member, 4,
                             &tcp_client_handle)) {
                 tcp_client_handle = NULL;
                 vEventGroupDelete(tcp_client_event_group);
                 tcp_client_event_group = NULL;
-                ESP_LOGE(TAG, "Fail to open tcp client");
+                ESP_LOGE(OT_EXT_CLI_TAG, "Fail to open tcp client");
                 return OT_ERROR_FAILED;
             }
         } else {
@@ -205,7 +207,7 @@ otError esp_ot_process_tcp_client(void *aContext, uint8_t aArgsLength, char *aAr
             return OT_ERROR_NONE;
         }
         if (aArgsLength != 3) {
-            ESP_LOGE(TAG, "Invalid arguments.");
+            ESP_LOGE(OT_EXT_CLI_TAG, "Invalid arguments.");
             return OT_ERROR_INVALID_ARGS;
         }
         strncpy(tcp_client_member.remote_ipaddr, aArgs[1], sizeof(tcp_client_member.remote_ipaddr));
@@ -221,7 +223,7 @@ otError esp_ot_process_tcp_client(void *aContext, uint8_t aArgsLength, char *aAr
             return OT_ERROR_NONE;
         }
         if (aArgsLength != 2) {
-            ESP_LOGE(TAG, "Invalid arguments.");
+            ESP_LOGE(OT_EXT_CLI_TAG, "Invalid arguments.");
             return OT_ERROR_INVALID_ARGS;
         }
         strncpy(tcp_client_member.message, aArgs[1], sizeof(tcp_client_member.message));
@@ -253,7 +255,7 @@ static void tcp_server_task(void *pvParameters)
     socklen_t addr_len = sizeof(source_addr);
     connect_sock = accept(tcp_server_member->listen_sock, (struct sockaddr *)&source_addr, &addr_len);
     if (connect_sock < 0) {
-        ESP_LOGE(TAG, "Unable to accept connection: errno %d", errno);
+        ESP_LOGE(OT_EXT_CLI_TAG, "Unable to accept connection: errno %d", errno);
         if (tcp_server_member->listen_sock != -1) {
             xEventGroupSetBits(tcp_server_event_group, TCP_SERVER_DELETE_BIT);
         }
@@ -265,30 +267,30 @@ static void tcp_server_task(void *pvParameters)
     } else {
         tcp_server_member->connect_sock = connect_sock;
         inet6_ntoa_r(((struct sockaddr_in6 *)&source_addr)->sin6_addr, addr_str, sizeof(addr_str) - 1);
-        ESP_LOGI(TAG, "Socket accepted ip address: %s", addr_str);
+        ESP_LOGI(OT_EXT_CLI_TAG, "Socket accepted ip address: %s", addr_str);
         strncpy(tcp_server_member->remote_ipaddr, addr_str, strlen(addr_str) + 1);
         while (true) {
             len = recv(connect_sock, rx_buffer, sizeof(rx_buffer) - 1, 0);
             if (len < 0) {
                 receive_error_nums++;
                 if (receive_error_nums >= 5 && !set_exit && tcp_server_member->connect_sock != -1) {
-                    ESP_LOGW(TAG, "TCP server fail when receiving message");
+                    ESP_LOGW(OT_EXT_CLI_TAG, "TCP server fail when receiving message");
                     xEventGroupSetBits(tcp_server_event_group, TCP_SERVER_DELETE_BIT);
                     set_exit = 1;
                 }
             }
             if (len > 0) {
                 receive_error_nums = 0;
-                ESP_LOGI(TAG, "sock %d Received %d bytes from %s", connect_sock, len, addr_str);
+                ESP_LOGI(OT_EXT_CLI_TAG, "sock %d Received %d bytes from %s", connect_sock, len, addr_str);
                 rx_buffer[len] = '\0';
-                ESP_LOGI(TAG, "%s", rx_buffer);
+                ESP_LOGI(OT_EXT_CLI_TAG, "%s", rx_buffer);
             }
             if (tcp_server_member->exist == 0 && tcp_server_member->connect_sock == -1) {
                 break;
             }
         }
     }
-    ESP_LOGI(TAG, "TCP server receive task exiting");
+    ESP_LOGI(OT_EXT_CLI_TAG, "TCP server receive task exiting");
     vTaskDelete(NULL);
 }
 
@@ -306,23 +308,25 @@ static void tcp_server_add(TCP_SERVER *tcp_server_member)
     listen_addr.sin6_port = htons(tcp_server_member->local_port);
 
     listen_sock = socket(AF_INET6, SOCK_STREAM, IPPROTO_IPV6);
-    ESP_GOTO_ON_FALSE((listen_sock >= 0), ESP_FAIL, exit, TAG, "Unable to create socket: errno %d", errno);
-    ESP_LOGI(TAG, "Socket created");
+    ESP_GOTO_ON_FALSE((listen_sock >= 0), ESP_FAIL, exit, OT_EXT_CLI_TAG, "Unable to create socket: errno %d", errno);
+    ESP_LOGI(OT_EXT_CLI_TAG, "Socket created");
     tcp_server_member->listen_sock = listen_sock;
     err_flag = 1;
 
     err = bind(listen_sock, (struct sockaddr *)&listen_addr, sizeof(struct sockaddr_in6));
-    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "Socket unable to bind: errno %d, IPPROTO: %d", errno, AF_INET6);
-    ESP_LOGI(TAG, "Socket bound, port %d", tcp_server_member->local_port);
+    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, OT_EXT_CLI_TAG, "Socket unable to bind: errno %d, IPPROTO: %d", errno,
+                      AF_INET6);
+    ESP_LOGI(OT_EXT_CLI_TAG, "Socket bound, port %d", tcp_server_member->local_port);
 
     err = listen(listen_sock, 1);
-    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "Error occurred during listen: errno %d", errno);
-    ESP_LOGI(TAG, "Socket listening");
+    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, OT_EXT_CLI_TAG, "Error occurred during listen: errno %d", errno);
+    ESP_LOGI(OT_EXT_CLI_TAG, "Socket listening");
 
     if (pdPASS != xTaskCreate(tcp_server_task, "tcp_server_receive", 4096, tcp_server_member, 4, NULL)) {
         err = -1;
     }
-    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "The TCP server is unable to accept: errno %d", errno);
+    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, OT_EXT_CLI_TAG, "The TCP server is unable to accept: errno %d",
+                      errno);
 
 exit:
     if (ret != ESP_OK) {
@@ -331,9 +335,9 @@ exit:
             close(listen_sock);
             tcp_server_member->listen_sock = -1;
         }
-        ESP_LOGI(TAG, "Fail to create a TCP server");
+        ESP_LOGI(OT_EXT_CLI_TAG, "Fail to create a TCP server");
     } else {
-        ESP_LOGI(TAG, "Successfully created");
+        ESP_LOGI(OT_EXT_CLI_TAG, "Successfully created");
         tcp_server_member->exist = 1;
     }
 }
@@ -343,7 +347,7 @@ static void tcp_server_send(TCP_SERVER *tcp_server_member)
     int len = 0;
     len = send(tcp_server_member->connect_sock, tcp_server_member->message, strlen(tcp_server_member->message), 0);
     if (len < 0) {
-        ESP_LOGI(TAG, "Fail to send message");
+        ESP_LOGI(OT_EXT_CLI_TAG, "Fail to send message");
     }
 }
 
@@ -360,7 +364,7 @@ static void tcp_server_delete(TCP_SERVER *tcp_server_member)
     if (connect_sock >= 0) {
         shutdown(connect_sock, 0);
         close(connect_sock);
-        ESP_LOGI(TAG, "TCP server is disconnecting with %s", tcp_server_member->remote_ipaddr);
+        ESP_LOGI(OT_EXT_CLI_TAG, "TCP server is disconnecting with %s", tcp_server_member->remote_ipaddr);
     }
 }
 
@@ -391,7 +395,7 @@ static void tcp_socket_server_task(void *pvParameters)
             break;
         }
     }
-    ESP_LOGI(TAG, "Closed TCP server successfully");
+    ESP_LOGI(OT_EXT_CLI_TAG, "Closed TCP server successfully");
     vEventGroupDelete(tcp_server_event_group);
     vTaskDelete(NULL);
 }
@@ -431,14 +435,15 @@ otError esp_ot_process_tcp_server(void *aContext, uint8_t aArgsLength, char *aAr
     } else if (strcmp(aArgs[0], "open") == 0) {
         if (tcp_server_handle == NULL) {
             tcp_server_event_group = xEventGroupCreate();
-            ESP_RETURN_ON_FALSE(tcp_server_event_group != NULL, OT_ERROR_FAILED, TAG, "Fail to open tcp server");
+            ESP_RETURN_ON_FALSE(tcp_server_event_group != NULL, OT_ERROR_FAILED, OT_EXT_CLI_TAG,
+                                "Fail to open tcp server");
             if (pdPASS !=
                 xTaskCreate(tcp_socket_server_task, "tcp_socket_server", 4096, &tcp_server_member, 4,
                             &tcp_server_handle)) {
                 tcp_server_handle = NULL;
                 vEventGroupDelete(tcp_server_event_group);
                 tcp_server_event_group = NULL;
-                ESP_LOGE(TAG, "Fail to open tcp server");
+                ESP_LOGE(OT_EXT_CLI_TAG, "Fail to open tcp server");
                 return OT_ERROR_FAILED;
             }
         } else {
@@ -454,7 +459,7 @@ otError esp_ot_process_tcp_server(void *aContext, uint8_t aArgsLength, char *aAr
             return OT_ERROR_NONE;
         }
         if (aArgsLength != 3) {
-            ESP_LOGE(TAG, "Invalid arguments.");
+            ESP_LOGE(OT_EXT_CLI_TAG, "Invalid arguments.");
             return OT_ERROR_INVALID_ARGS;
         }
         strncpy(tcp_server_member.local_ipaddr, aArgs[1], sizeof(tcp_server_member.local_ipaddr));
@@ -470,7 +475,7 @@ otError esp_ot_process_tcp_server(void *aContext, uint8_t aArgsLength, char *aAr
             return OT_ERROR_NONE;
         }
         if (aArgsLength != 2) {
-            ESP_LOGE(TAG, "Invalid arguments.");
+            ESP_LOGE(OT_EXT_CLI_TAG, "Invalid arguments.");
             return OT_ERROR_INVALID_ARGS;
         }
         strncpy(tcp_server_member.message, aArgs[1], sizeof(tcp_server_member.message));

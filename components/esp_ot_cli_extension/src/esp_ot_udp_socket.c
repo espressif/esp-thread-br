@@ -13,6 +13,7 @@
 #include "esp_netif.h"
 #include "esp_netif_net_stack.h"
 #include "esp_openthread_lock.h"
+#include "esp_ot_cli_extension.h"
 #include <sys/unistd.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -21,8 +22,6 @@
 #include "lwip/mld6.h"
 #include "lwip/sockets.h"
 #include "openthread/cli.h"
-
-#define TAG "ot_socket"
 
 static EventGroupHandle_t udp_server_event_group;
 static EventGroupHandle_t udp_client_event_group;
@@ -41,20 +40,21 @@ static void udp_server_receive_task(void *pvParameters)
         len = recvfrom(udp_server_member->sock, rx_buffer, sizeof(rx_buffer) - 1, 0, (struct sockaddr *)&source_addr,
                        &socklen);
         if (len < 0) {
-            ESP_LOGW(TAG, "UDP server fail when receiving message");
+            ESP_LOGW(OT_EXT_CLI_TAG, "UDP server fail when receiving message");
         }
         if (len > 0) {
             inet6_ntoa_r(((struct sockaddr_in6 *)&source_addr)->sin6_addr, addr_str, sizeof(addr_str) - 1);
             port = ntohs(((struct sockaddr_in6 *)&source_addr)->sin6_port);
-            ESP_LOGI(TAG, "sock %d Received %d bytes from %s : %d", udp_server_member->sock, len, addr_str, port);
+            ESP_LOGI(OT_EXT_CLI_TAG, "sock %d Received %d bytes from %s : %d", udp_server_member->sock, len, addr_str,
+                     port);
             rx_buffer[len] = '\0';
-            ESP_LOGI(TAG, "%s", rx_buffer);
+            ESP_LOGI(OT_EXT_CLI_TAG, "%s", rx_buffer);
         }
         if (udp_server_member->exist == 0) {
             break;
         }
     }
-    ESP_LOGI(TAG, "UDP server receive task exiting");
+    ESP_LOGI(OT_EXT_CLI_TAG, "UDP server receive task exiting");
     vTaskDelete(NULL);
 }
 
@@ -74,19 +74,22 @@ static void udp_server_bind(UDP_SERVER *udp_server_member)
     listen_addr.sin6_port = htons(udp_server_member->local_port);
 
     sock = socket(AF_INET6, SOCK_DGRAM, IPPROTO_IPV6);
-    ESP_GOTO_ON_FALSE((sock >= 0), ESP_FAIL, exit, TAG, "Unable to create socket: errno %d", errno);
-    ESP_LOGI(TAG, "Socket created");
+    ESP_GOTO_ON_FALSE((sock >= 0), ESP_FAIL, exit, OT_EXT_CLI_TAG, "Unable to create socket: errno %d", errno);
+    ESP_LOGI(OT_EXT_CLI_TAG, "Socket created");
     udp_server_member->sock = sock;
     err_flag = 1;
 
     err = bind(sock, (struct sockaddr *)&listen_addr, sizeof(struct sockaddr_in6));
-    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "Socket unable to bind: errno %d, IPPROTO: %d", errno, AF_INET6);
-    ESP_LOGI(TAG, "Socket bound, ipaddr %s, port %d", udp_server_member->local_ipaddr, udp_server_member->local_port);
+    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, OT_EXT_CLI_TAG, "Socket unable to bind: errno %d, IPPROTO: %d", errno,
+                      AF_INET6);
+    ESP_LOGI(OT_EXT_CLI_TAG, "Socket bound, ipaddr %s, port %d", udp_server_member->local_ipaddr,
+             udp_server_member->local_port);
 
     if (pdPASS != xTaskCreate(udp_server_receive_task, "udp_server_receive", 4096, udp_server_member, 4, NULL)) {
         err = -1;
     }
-    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "The UDP server is unable to receive: errno %d", errno);
+    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, OT_EXT_CLI_TAG, "The UDP server is unable to receive: errno %d",
+                      errno);
 
 exit:
     if (ret != ESP_OK) {
@@ -95,9 +98,9 @@ exit:
             close(sock);
             udp_server_member->sock = -1;
         }
-        ESP_LOGI(TAG, "Fail to create a UDP server");
+        ESP_LOGI(OT_EXT_CLI_TAG, "Fail to create a UDP server");
     } else {
-        ESP_LOGI(TAG, "Successfully created");
+        ESP_LOGI(OT_EXT_CLI_TAG, "Successfully created");
         udp_server_member->exist = 1;
     }
 }
@@ -110,12 +113,13 @@ static void udp_server_send(UDP_SERVER *udp_server_member)
     inet6_aton(udp_server_member->messagesend.ipaddr, &dest_addr.sin6_addr);
     dest_addr.sin6_family = AF_INET6;
     dest_addr.sin6_port = htons(udp_server_member->messagesend.port);
-    ESP_LOGI(TAG, "Sending to %s : %d", udp_server_member->messagesend.ipaddr, udp_server_member->messagesend.port);
+    ESP_LOGI(OT_EXT_CLI_TAG, "Sending to %s : %d", udp_server_member->messagesend.ipaddr,
+             udp_server_member->messagesend.port);
 
     len = sendto(udp_server_member->sock, udp_server_member->messagesend.message,
                  strlen(udp_server_member->messagesend.message), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
     if (len < 0) {
-        ESP_LOGW(TAG, "Fail to send message");
+        ESP_LOGW(OT_EXT_CLI_TAG, "Fail to send message");
     }
 }
 
@@ -148,7 +152,7 @@ static void udp_socket_server_task(void *pvParameters)
             break;
         }
     }
-    ESP_LOGI(TAG, "Closed UDP server successfully");
+    ESP_LOGI(OT_EXT_CLI_TAG, "Closed UDP server successfully");
     vEventGroupDelete(udp_server_event_group);
     vTaskDelete(NULL);
 }
@@ -186,14 +190,15 @@ otError esp_ot_process_udp_server(void *aContext, uint8_t aArgsLength, char *aAr
     } else if (strcmp(aArgs[0], "open") == 0) {
         if (udp_server_handle == NULL) {
             udp_server_event_group = xEventGroupCreate();
-            ESP_RETURN_ON_FALSE(udp_server_event_group != NULL, OT_ERROR_FAILED, TAG, "Fail to open udp server");
+            ESP_RETURN_ON_FALSE(udp_server_event_group != NULL, OT_ERROR_FAILED, OT_EXT_CLI_TAG,
+                                "Fail to open udp server");
             if (pdPASS !=
                 xTaskCreate(udp_socket_server_task, "udp_socket_server", 4096, &udp_server_member, 4,
                             &udp_server_handle)) {
                 udp_server_handle = NULL;
                 vEventGroupDelete(udp_server_event_group);
                 udp_server_event_group = NULL;
-                ESP_LOGE(TAG, "Fail to open udp server");
+                ESP_LOGE(OT_EXT_CLI_TAG, "Fail to open udp server");
                 return OT_ERROR_FAILED;
             }
         } else {
@@ -209,7 +214,7 @@ otError esp_ot_process_udp_server(void *aContext, uint8_t aArgsLength, char *aAr
             return OT_ERROR_NONE;
         }
         if (aArgsLength != 2) {
-            ESP_LOGE(TAG, "Invalid arguments.");
+            ESP_LOGE(OT_EXT_CLI_TAG, "Invalid arguments.");
             return OT_ERROR_INVALID_ARGS;
         }
         strncpy(udp_server_member.local_ipaddr, "::", sizeof(udp_server_member.local_ipaddr));
@@ -225,7 +230,7 @@ otError esp_ot_process_udp_server(void *aContext, uint8_t aArgsLength, char *aAr
             return OT_ERROR_NONE;
         }
         if (aArgsLength != 4) {
-            ESP_LOGE(TAG, "Invalid arguments.");
+            ESP_LOGE(OT_EXT_CLI_TAG, "Invalid arguments.");
             return OT_ERROR_INVALID_ARGS;
         }
         strncpy(udp_server_member.messagesend.ipaddr, aArgs[1], sizeof(udp_server_member.messagesend.ipaddr));
@@ -259,20 +264,21 @@ static void udp_client_receive_task(void *pvParameters)
         len = recvfrom(udp_client_member->sock, rx_buffer, sizeof(rx_buffer) - 1, 0, (struct sockaddr *)&source_addr,
                        &socklen);
         if (len < 0) {
-            ESP_LOGW(TAG, "UDP client fail when receiving message");
+            ESP_LOGW(OT_EXT_CLI_TAG, "UDP client fail when receiving message");
         }
         if (len > 0) {
             inet6_ntoa_r(((struct sockaddr_in6 *)&source_addr)->sin6_addr, addr_str, sizeof(addr_str) - 1);
             port = ntohs(((struct sockaddr_in6 *)&source_addr)->sin6_port);
-            ESP_LOGI(TAG, "sock %d Received %d bytes from %s : %d", udp_client_member->sock, len, addr_str, port);
+            ESP_LOGI(OT_EXT_CLI_TAG, "sock %d Received %d bytes from %s : %d", udp_client_member->sock, len, addr_str,
+                     port);
             rx_buffer[len] = '\0';
-            ESP_LOGI(TAG, "%s", rx_buffer);
+            ESP_LOGI(OT_EXT_CLI_TAG, "%s", rx_buffer);
         }
         if (udp_client_member->exist == 0) {
             break;
         }
     }
-    ESP_LOGI(TAG, "UDP client receive task exiting");
+    ESP_LOGI(OT_EXT_CLI_TAG, "UDP client receive task exiting");
     vTaskDelete(NULL);
 }
 
@@ -284,12 +290,13 @@ static void udp_client_send(UDP_CLIENT *udp_client_member)
     inet6_aton(udp_client_member->messagesend.ipaddr, &dest_addr.sin6_addr);
     dest_addr.sin6_family = AF_INET6;
     dest_addr.sin6_port = htons(udp_client_member->messagesend.port);
-    ESP_LOGI(TAG, "Sending to %s : %d", udp_client_member->messagesend.ipaddr, udp_client_member->messagesend.port);
+    ESP_LOGI(OT_EXT_CLI_TAG, "Sending to %s : %d", udp_client_member->messagesend.ipaddr,
+             udp_client_member->messagesend.port);
 
     len = sendto(udp_client_member->sock, udp_client_member->messagesend.message,
                  strlen(udp_client_member->messagesend.message), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
     if (len < 0) {
-        ESP_LOGW(TAG, "Fail to send message");
+        ESP_LOGW(OT_EXT_CLI_TAG, "Fail to send message");
     }
 }
 
@@ -313,8 +320,8 @@ static void udp_socket_client_task(void *pvParameters)
     struct sockaddr_in6 bind_addr = {0};
 
     sock = socket(AF_INET6, SOCK_DGRAM, IPPROTO_IPV6);
-    ESP_GOTO_ON_FALSE((sock >= 0), ESP_FAIL, exit, TAG, "Unable to create socket: errno %d", errno);
-    ESP_LOGI(TAG, "Socket created");
+    ESP_GOTO_ON_FALSE((sock >= 0), ESP_FAIL, exit, OT_EXT_CLI_TAG, "Unable to create socket: errno %d", errno);
+    ESP_LOGI(OT_EXT_CLI_TAG, "Socket created");
     udp_client_member->sock = sock;
     err_flag = 1;
 
@@ -326,16 +333,17 @@ static void udp_socket_client_task(void *pvParameters)
         bind_addr.sin6_port = htons(udp_client_member->local_port);
 
         err = bind(sock, (struct sockaddr *)&bind_addr, sizeof(bind_addr));
-        ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "Socket unable to bind: errno %d", errno);
-        ESP_LOGI(TAG, "Socket bound, port %d", udp_client_member->local_port);
+        ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, OT_EXT_CLI_TAG, "Socket unable to bind: errno %d", errno);
+        ESP_LOGI(OT_EXT_CLI_TAG, "Socket bound, port %d", udp_client_member->local_port);
     }
 
     if (pdPASS != xTaskCreate(udp_client_receive_task, "udp_client_receive", 4096, udp_client_member, 4, NULL)) {
         err = -1;
     }
-    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, TAG, "The UDP client is unable to receive: errno %d", errno);
+    ESP_GOTO_ON_FALSE((err == 0), ESP_FAIL, exit, OT_EXT_CLI_TAG, "The UDP client is unable to receive: errno %d",
+                      errno);
     udp_client_member->exist = 1;
-    ESP_LOGI(TAG, "Successfully created");
+    ESP_LOGI(OT_EXT_CLI_TAG, "Successfully created");
 
     while (true) {
         int bits = xEventGroupWaitBits(udp_client_event_group, UDP_CLIENT_SEND_BIT | UDP_CLIENT_CLOSE_BIT, pdFALSE,
@@ -350,7 +358,7 @@ static void udp_socket_client_task(void *pvParameters)
             break;
         }
     }
-    ESP_LOGI(TAG, "Closed UDP client successfully");
+    ESP_LOGI(OT_EXT_CLI_TAG, "Closed UDP client successfully");
 
 exit:
     if (ret != ESP_OK) {
@@ -360,7 +368,7 @@ exit:
             close(sock);
         }
         udp_client_member->local_port = -1;
-        ESP_LOGI(TAG, "Fail to create a UDP client");
+        ESP_LOGI(OT_EXT_CLI_TAG, "Fail to create a UDP client");
     }
     vEventGroupDelete(udp_client_event_group);
     vTaskDelete(NULL);
@@ -398,7 +406,7 @@ otError esp_ot_process_udp_client(void *aContext, uint8_t aArgsLength, char *aAr
 
     } else if (strcmp(aArgs[0], "open") == 0) {
         if (aArgsLength != 1 && aArgsLength != 2) {
-            ESP_LOGE(TAG, "Invalid arguments.");
+            ESP_LOGE(OT_EXT_CLI_TAG, "Invalid arguments.");
             return OT_ERROR_INVALID_ARGS;
         }
         if (udp_client_handle == NULL) {
@@ -406,7 +414,8 @@ otError esp_ot_process_udp_client(void *aContext, uint8_t aArgsLength, char *aAr
                 udp_client_member.local_port = atoi(aArgs[1]);
             }
             udp_client_event_group = xEventGroupCreate();
-            ESP_RETURN_ON_FALSE(udp_client_event_group != NULL, OT_ERROR_FAILED, TAG, "Fail to open udp client");
+            ESP_RETURN_ON_FALSE(udp_client_event_group != NULL, OT_ERROR_FAILED, OT_EXT_CLI_TAG,
+                                "Fail to open udp client");
             if (pdPASS !=
                 xTaskCreate(udp_socket_client_task, "udp_socket_client", 4096, &udp_client_member, 4,
                             &udp_client_handle)) {
@@ -414,7 +423,7 @@ otError esp_ot_process_udp_client(void *aContext, uint8_t aArgsLength, char *aAr
                 udp_client_member.local_port = -1;
                 vEventGroupDelete(udp_client_event_group);
                 udp_client_event_group = NULL;
-                ESP_LOGE(TAG, "Fail to open udp client");
+                ESP_LOGE(OT_EXT_CLI_TAG, "Fail to open udp client");
                 return OT_ERROR_FAILED;
             }
         } else {
@@ -431,7 +440,7 @@ otError esp_ot_process_udp_client(void *aContext, uint8_t aArgsLength, char *aAr
             return OT_ERROR_NONE;
         }
         if (aArgsLength != 2) {
-            ESP_LOGE(TAG, "Invalid arguments.");
+            ESP_LOGE(OT_EXT_CLI_TAG, "Invalid arguments.");
             return OT_ERROR_INVALID_ARGS;
         }
 
@@ -445,7 +454,7 @@ otError esp_ot_process_udp_client(void *aContext, uint8_t aArgsLength, char *aAr
             return OT_ERROR_NONE;
         }
         if (aArgsLength != 4) {
-            ESP_LOGE(TAG, "Invalid arguments.");
+            ESP_LOGE(OT_EXT_CLI_TAG, "Invalid arguments.");
             return OT_ERROR_INVALID_ARGS;
         }
         strncpy(udp_client_member.messagesend.ipaddr, aArgs[1], sizeof(udp_client_member.messagesend.ipaddr));
@@ -481,7 +490,7 @@ esp_err_t leave_ip6_mcast(void *ctx)
 otError esp_ot_process_mcast_group(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
     if (aArgsLength != 2 || (strncmp(aArgs[0], "join", 4) != 0 && strncmp(aArgs[0], "leave", 5) != 0)) {
-        ESP_LOGE(TAG, "Invalid arguments: mcast [join|leave] group_address");
+        ESP_LOGE(OT_EXT_CLI_TAG, "Invalid arguments: mcast [join|leave] group_address");
         return OT_ERROR_INVALID_ARGS;
     }
     otError ret = OT_ERROR_NONE;
@@ -491,12 +500,12 @@ otError esp_ot_process_mcast_group(void *aContext, uint8_t aArgsLength, char *aA
     inet6_aton(aArgs[1], &group);
     if (strncmp(aArgs[0], "join", 4) == 0) {
         if (esp_netif_tcpip_exec(join_ip6_mcast, &group) != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to join group");
+            ESP_LOGE(OT_EXT_CLI_TAG, "Failed to join group");
             ret = OT_ERROR_FAILED;
         }
     } else {
         if (esp_netif_tcpip_exec(leave_ip6_mcast, &group) != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to leave group");
+            ESP_LOGE(OT_EXT_CLI_TAG, "Failed to leave group");
             ret = OT_ERROR_FAILED;
         }
     }
