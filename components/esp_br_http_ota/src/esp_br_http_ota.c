@@ -183,7 +183,8 @@ static int write_file_for_length(FILE *fp, const void *buf, size_t size)
     int offset = 0;
     const uint8_t *data = (const uint8_t *)buf;
     while (offset < size) {
-        int ret = fwrite(data + offset, 1, size - offset, fp);
+        int ret =
+            fwrite(data + offset, 1, ((size - offset) < OTA_MAX_WRITE_SIZE ? (size - offset) : OTA_MAX_WRITE_SIZE), fp);
         if (ret < 0) {
             return ret;
         }
@@ -213,6 +214,11 @@ static esp_err_t download_ota_image(esp_http_client_config_t *config, const char
     ESP_RETURN_ON_FALSE(http_client != NULL, ESP_FAIL, TAG, "Failed to create HTTP client");
     esp_err_t ret = ESP_OK;
     FILE *fp = fopen(rcp_target_path, "w");
+    if (!fp) {
+        ESP_LOGE(TAG, "Fail to open %s, will delete it and create a new one", rcp_target_path);
+        remove(rcp_target_path);
+        fp = fopen(rcp_target_path, "w");
+    }
 
     ESP_GOTO_ON_FALSE(fp != NULL, ESP_FAIL, exit, TAG, "Failed to open target file");
     ESP_GOTO_ON_ERROR(_http_connect(http_client), exit, TAG, "Failed to connect to HTTP server");

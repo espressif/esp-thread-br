@@ -26,6 +26,8 @@ extern "C" {
  */
 esp_err_t esp_br_http_ota(esp_http_client_config_t *http_config);
 
+#define OTA_MAX_WRITE_SIZE 16
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

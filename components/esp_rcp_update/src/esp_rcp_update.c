@@ -92,7 +92,7 @@ static esp_err_t seek_to_subfile(FILE *fp, esp_br_filetag_t tag, esp_br_subfile_
 esp_err_t esp_rcp_load_version_in_storage(char *version_str, size_t size)
 {
     char fullpath[RCP_FILENAME_MAX_SIZE];
-    int8_t update_seq = s_handle.update_seq;
+    int8_t update_seq = esp_rcp_get_update_seq();
 
     sprintf(fullpath, "%s_%d/" ESP_BR_RCP_IMAGE_FILENAME, s_handle.update_config.firmware_dir, update_seq);
     FILE *fp = fopen(fullpath, "r");
@@ -156,11 +156,6 @@ static esp_loader_error_t flash_binary(FILE *firmware, size_t size, size_t addre
     return ESP_LOADER_SUCCESS;
 }
 
-static void set_rcp_seq(int seq)
-{
-    nvs_set_i8(s_handle.nvs_handle, RCP_SEQ_KEY, seq);
-}
-
 static void load_rcp_update_seq(esp_rcp_update_handle *handle)
 {
     int8_t seq = 0;
@@ -201,7 +196,12 @@ esp_err_t esp_rcp_submit_new_image()
     s_handle.verified = true;
 
     int8_t new_seq = s_handle.update_seq | RCP_VERIFIED_FLAG;
-    return nvs_set_i8(s_handle.nvs_handle, RCP_SEQ_KEY, new_seq);
+    esp_err_t error = nvs_set_i8(s_handle.nvs_handle, RCP_SEQ_KEY, new_seq);
+    if (error == ESP_OK) {
+        return nvs_commit(s_handle.nvs_handle);
+    } else {
+        return error;
+    }
 }
 
 esp_err_t esp_rcp_update_init(const esp_rcp_update_config_t *update_config)
@@ -277,7 +277,6 @@ esp_err_t esp_rcp_update(void)
         fseek(fp, current, SEEK_SET);
     }
     fclose(fp);
-    set_rcp_seq(update_seq);
     esp_loader_reset_target();
 
 #if CONFIG_OPENTHREAD_RADIO_SPINEL_SPI
@@ -297,12 +296,33 @@ esp_err_t esp_rcp_mark_image_verified(bool verified)
                         "RCP update not initialized");
     int8_t val;
     if (!verified) {
-        val = 1 - s_handle.update_seq;
+        val = esp_rcp_get_update_seq();
     } else {
-        val = s_handle.update_seq | RCP_VERIFIED_FLAG;
+        val = esp_rcp_get_update_seq() | RCP_VERIFIED_FLAG;
     }
     s_handle.verified = verified;
-    return nvs_set_i8(s_handle.nvs_handle, RCP_SEQ_KEY, val);
+    s_handle.update_seq = (val & ~RCP_VERIFIED_FLAG);
+    esp_err_t error = nvs_set_i8(s_handle.nvs_handle, RCP_SEQ_KEY, val);
+    if (error == ESP_OK) {
+        return nvs_commit(s_handle.nvs_handle);
+    } else {
+        return error;
+    }
+}
+
+esp_err_t esp_rcp_mark_image_unusable(void)
+{
+    ESP_RETURN_ON_FALSE(s_handle.update_config.rcp_type != RCP_TYPE_INVALID, ESP_ERR_INVALID_STATE, TAG,
+                        "RCP update not initialized");
+
+    s_handle.verified = 0;
+    int8_t val = s_handle.update_seq & ~RCP_VERIFIED_FLAG;
+    esp_err_t error = nvs_set_i8(s_handle.nvs_handle, RCP_SEQ_KEY, val);
+    if (error == ESP_OK) {
+        return nvs_commit(s_handle.nvs_handle);
+    } else {
+        return error;
+    }
 }
 
 void esp_rcp_reset(void)

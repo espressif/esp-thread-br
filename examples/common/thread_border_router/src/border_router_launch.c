@@ -48,7 +48,9 @@ static void update_rcp(void)
 {
     // Deinit uart to transfer UART to the serial loader
     esp_openthread_rcp_deinit();
-    if (esp_rcp_update() != ESP_OK) {
+    if (esp_rcp_update() == ESP_OK) {
+        esp_rcp_mark_image_verified(true);
+    } else {
         esp_rcp_mark_image_verified(false);
     }
     esp_restart();
@@ -62,10 +64,10 @@ static void try_update_ot_rcp(const esp_openthread_platform_config_t *config)
     if (esp_rcp_load_version_in_storage(internal_rcp_version, sizeof(internal_rcp_version)) == ESP_OK) {
         ESP_LOGI(TAG, "Internal RCP Version: %s", internal_rcp_version);
         ESP_LOGI(TAG, "Running  RCP Version: %s", running_rcp_version);
-        if (strcmp(internal_rcp_version, running_rcp_version)) {
-            update_rcp();
-        } else {
+        if (strcmp(internal_rcp_version, running_rcp_version) == 0) {
             esp_rcp_mark_image_verified(true);
+        } else {
+            update_rcp();
         }
     } else {
         ESP_LOGI(TAG, "RCP firmware not found in storage, will reboot to try next image");
@@ -78,6 +80,7 @@ static void try_update_ot_rcp(const esp_openthread_platform_config_t *config)
 static void rcp_failure_handler(void)
 {
 #if CONFIG_OPENTHREAD_BR_AUTO_UPDATE_RCP
+    esp_rcp_mark_image_unusable();
     try_update_ot_rcp(&s_openthread_platform_config);
 #endif // CONFIG_OPENTHREAD_BR_AUTO_UPDATE_RCP
     esp_rcp_reset();

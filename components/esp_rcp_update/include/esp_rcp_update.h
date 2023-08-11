@@ -117,6 +117,16 @@ esp_err_t esp_rcp_submit_new_image(void);
 esp_err_t esp_rcp_mark_image_verified(bool verified);
 
 /**
+ * @brief This function marks previously downloaded image as unusable.
+ *
+ * @return
+ *  - ESP_OK
+ *  - ESP_ERR_INVALID_STASTE    If the RCP update is not initialized.
+ *
+ */
+esp_err_t esp_rcp_mark_image_unusable(void);
+
+/**
  * @brief This function loads the RCP version in the current update image.
  *
  * @param[out] version_str      The RCP version string output.
