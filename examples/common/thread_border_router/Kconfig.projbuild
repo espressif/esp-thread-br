@@ -59,6 +59,8 @@ menu "ESP Thread Border Router Example"
 
     config OPENTHREAD_BR_START_WEB
         bool 'Enable the web server in Thread Border Router.'
+        select OPENTHREAD_COMMISSIONER
+        select OPENTHREAD_JOINER
         default False
         help
             If enabled, a web server will be provided to configure and query Thread network via a Web GUI. 
