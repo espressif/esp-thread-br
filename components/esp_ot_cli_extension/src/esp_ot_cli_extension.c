@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2021-2022 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2021-2023 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -8,6 +8,7 @@
 #include "esp_openthread.h"
 #include "esp_ot_curl.h"
 #include "esp_ot_dns64.h"
+#include "esp_ot_heap_diag.h"
 #include "esp_ot_ip.h"
 #include "esp_ot_iperf.h"
 #include "esp_ot_loglevel.h"
@@ -43,11 +44,15 @@ static const otCliCommand kCommands[] = {
 #if CONFIG_OPENTHREAD_DNS64_CLIENT
     {"dns64server", esp_openthread_process_dns64_server},
 #endif // CONFIG_OPENTHREAD_DNS64_CLIENT
+#if CONFIG_OPENTHREAD_CLI_HEAP_DIAG
+    {"heapdiag", esp_ot_process_heap_diag},
+#endif // CONFIG_OPENTHREAD_CLI_HEAP_DIAG
     {"ip", esp_ot_process_ip},
     {"loglevel", esp_ot_process_logset}};
 
 void esp_cli_custom_command_init()
 {
+    esp_ot_heap_diag_init();
     otInstance *instance = esp_openthread_get_instance();
     otCliSetUserCommands(kCommands, (sizeof(kCommands) / sizeof(kCommands[0])), instance);
 }
