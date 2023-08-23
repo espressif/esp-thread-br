@@ -26,6 +26,8 @@ Espressif provides a Border Router board which integrates the host SoC and the R
 
 Similar to the previous Wi-Fi based Thread Border Route setup, but a device with Ethernet interface is required.
 
+Espressif provides a Sub-Ethernet daughter board, which works with the ESP Thread Border Router board to extend Ethernet interface.
+
 .. figure:: ../images/esp-thread-border-router-sub-ethernet.png
    :align: center
    :width: 480 px

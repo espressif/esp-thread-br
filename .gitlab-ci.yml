@@ -43,7 +43,7 @@ pre_commit:
 
 .build_basic_thread_border_router: &build_basic_thread_border_router
   - cd $IDF_PATH/examples/openthread/ot_rcp
-  - idf.py --preview set-target esp32h2
+  - idf.py set-target esp32h2
   - git rev-parse HEAD
   - idf.py build
 
@@ -52,7 +52,7 @@ pre_commit:
 
 .build_local_components: &build_local_components
   - cd $IDF_PATH/examples/openthread/ot_rcp
-  - idf.py --preview set-target esp32h2
+  - idf.py set-target esp32h2
   - git rev-parse HEAD
   - idf.py build
 
@@ -70,7 +70,7 @@ pre_commit:
   - cp ${CI_TOOLS_PATH}/ot_br.cmake CMakeLists.txt
   - idf.py set-target esp32s3
   - idf.py build
-  - idf.py --preview set-target esp32c6
+  - idf.py set-target esp32c6
   - idf.py build
 
 .build_idf_example_ot_br_autostart: &build_idf_example_ot_br_autostart
@@ -84,7 +84,7 @@ pre_commit:
   - cp ${CI_TOOLS_PATH}/sdkconfig.br.autostart sdkconfig.defaults
   - idf.py set-target esp32s3
   - idf.py build
-  - idf.py --preview set-target esp32c6
+  - idf.py set-target esp32c6
   - idf.py build
 
 .build_idf_example_ot_cli: &build_idf_example_ot_cli
@@ -94,9 +94,9 @@ pre_commit:
   - cd ..
   - rm -rf CMakeLists.txt
   - cp ${CI_TOOLS_PATH}/ot_cli.cmake CMakeLists.txt
-  - idf.py --preview set-target esp32c6
+  - idf.py set-target esp32c6
   - idf.py build
-  - idf.py --preview set-target esp32h2
+  - idf.py set-target esp32h2
   - idf.py build
 
 build_examples:
@@ -149,7 +149,7 @@ build_idf_otcli_examples:
         - build
 
 build_docs:
-    stage: docs
+    stage: build
     image: $CI_DOCKER_REGISTRY/esp-idf-doc-env-v5.0:2-3
     variables:
         ESP_DOCS_LATEST_BRANCH_NAME: "main"

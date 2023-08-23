@@ -22,33 +22,26 @@
 #include "openthread/cli.h"
 
 static const otCliCommand kCommands[] = {
-#if CONFIG_OPENTHREAD_CLI_SOCKET
-    {"tcpsockserver", esp_ot_process_tcp_server},
-    {"tcpsockclient", esp_ot_process_tcp_client},
-    {"udpsockserver", esp_ot_process_udp_server},
-    {"udpsockclient", esp_ot_process_udp_client},
-    {"mcast", esp_ot_process_mcast_group},
-#endif // CONFIG_OPENTHREAD_CLI_SOCKET
-#if CONFIG_OPENTHREAD_CLI_IPERF
-    {"iperf", esp_ot_process_iperf},
-#endif // CONFIG_OPENTHREAD_CLI_IPERF
-#if CONFIG_OPENTHREAD_CLI_WIFI
-    {"wifi", esp_ot_process_wifi_cmd},
-#endif // CONFIG_OPENTHREAD_CLI_WIFI
-#if CONFIG_OPENTHREAD_CLI_OTA
-    {"ota", esp_openthread_process_ota_command},
-#endif // CONFIG_OPENTHREAD_CLI_RCP_UPDATE
-#if CONFIG_OPENTHREAD_CLI_CURL
     {"curl", esp_openthread_process_curl},
-#endif //
 #if CONFIG_OPENTHREAD_DNS64_CLIENT
     {"dns64server", esp_openthread_process_dns64_server},
 #endif // CONFIG_OPENTHREAD_DNS64_CLIENT
-#if CONFIG_OPENTHREAD_CLI_HEAP_DIAG
     {"heapdiag", esp_ot_process_heap_diag},
-#endif // CONFIG_OPENTHREAD_CLI_HEAP_DIAG
     {"ip", esp_ot_process_ip},
-    {"loglevel", esp_ot_process_logset}};
+    {"iperf", esp_ot_process_iperf},
+    {"loglevel", esp_ot_process_logset},
+    {"mcast", esp_ot_process_mcast_group},
+#if CONFIG_OPENTHREAD_CLI_OTA
+    {"ota", esp_openthread_process_ota_command},
+#endif // CONFIG_OPENTHREAD_CLI_OTA
+    {"tcpsockclient", esp_ot_process_tcp_client},
+    {"tcpsockserver", esp_ot_process_tcp_server},
+    {"udpsockclient", esp_ot_process_udp_client},
+    {"udpsockserver", esp_ot_process_udp_server},
+#if CONFIG_OPENTHREAD_CLI_WIFI
+    {"wifi", esp_ot_process_wifi_cmd},
+#endif // CONFIG_OPENTHREAD_CLI_WIFI
+};
 
 void esp_cli_custom_command_init()
 {

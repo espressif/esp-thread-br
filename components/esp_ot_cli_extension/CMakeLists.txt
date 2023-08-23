@@ -1,13 +1,11 @@
-set(srcs    src/esp_ot_cli_extension.c src/esp_ot_ip.c src/esp_ot_loglevel.c)
-
-if(CONFIG_OPENTHREAD_CLI_IPERF)
-    list(APPEND srcs   "src/esp_ot_iperf.c")
-endif()
-
-if(CONFIG_OPENTHREAD_CLI_SOCKET)
-    list(APPEND srcs    "src/esp_ot_tcp_socket.c"
-                        "src/esp_ot_udp_socket.c")
-endif()
+set(srcs    "src/esp_ot_cli_extension.c"
+            "src/esp_ot_curl.c"
+            "src/esp_ot_heap_diag.c"
+            "src/esp_ot_ip.c"
+            "src/esp_ot_iperf.c"
+            "src/esp_ot_loglevel.c"
+            "src/esp_ot_tcp_socket.c"
+            "src/esp_ot_udp_socket.c")
 
 if(CONFIG_OPENTHREAD_CLI_WIFI)
     list(APPEND srcs   "src/esp_ot_wifi_cmd.c")
@@ -19,14 +17,6 @@ endif()
 
 if(CONFIG_OPENTHREAD_DNS64_CLIENT)
     list(APPEND srcs   "src/esp_ot_dns64.c")
-endif()
-
-if(CONFIG_OPENTHREAD_CLI_CURL)
-    list(APPEND srcs   "src/esp_ot_curl.c")
-endif()
-
-if(CONFIG_OPENTHREAD_CLI_HEAP_DIAG)
-    list(APPEND srcs   "src/esp_ot_heap_diag.c")
 endif()
 
 set(include "include")

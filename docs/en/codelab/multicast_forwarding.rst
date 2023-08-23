@@ -86,7 +86,7 @@ After launching the script and the Thread CLI device will be able to send UDP me
 	udp send ff04::123 5083 hello
 
 
-You will get a result ``Done`` after excuting each of the commands, the expected output is below:
+You will get a result ``Done`` after executing each of the commands, the expected output is below:
 
 .. code-block::
 

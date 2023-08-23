@@ -2,7 +2,7 @@
 3.1. Bi-directional IPv6 Connectivity
 *************************************
 
-The ESP Thread Border Router allows the devices on the Wi-Fi and the Thread network to reach each other with IPv6 addresses.
+The ESP Thread Border Router allows the devices on the Wi-Fi/Ethernet and the Thread network to reach each other with IPv6 addresses.
 
 Hardware Prerequisites
 ------------------------

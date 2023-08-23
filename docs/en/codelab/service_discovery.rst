@@ -2,7 +2,7 @@
 3.3. Service Discovery
 **********************
 
-The ESP Thread Border Router allows devices on the Thread and Wi-Fi network to discover services published on both the networks.
+The ESP Thread Border Router allows devices on the Thread and Wi-Fi/Ethernet network to discover services published on both the networks.
 
 Hardware Prerequisites
 ------------------------
@@ -48,7 +48,7 @@ Using this command line to enable the service:
     srp client autostart enable
 
 
-You will get a result ``Done`` after excuting each of the commands, the expected output is below:
+You will get a result ``Done`` after executing each of the commands, the expected output is below:
 
 .. code-block::
 
@@ -62,7 +62,7 @@ You will get a result ``Done`` after excuting each of the commands, the expected
    Done
 
 
-You can excute this command on the Border Router to resolve the service:
+You can execute this command on the Border Router to resolve the service:
 
 .. code-block::
 
@@ -114,7 +114,7 @@ The expected output is below:
 
 
 Publishing Services from the Wi-Fi Network
---------------------------------------------
+------------------------------------------
 
 First publish the service on the Linux Host machine with mDNS:
 
@@ -161,7 +161,7 @@ You will get:
     Done
 
 
-The service can be resolved on the Thread CLI device by excuting this command:
+The service can be resolved on the Thread CLI device by executing this command:
 
 .. code-block::
 

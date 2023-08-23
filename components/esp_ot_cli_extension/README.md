@@ -9,18 +9,76 @@ To enable OpenThread extension commands, the following Kconfig option needs to b
 
 ## Commands
 
+* [curl](#curl)
+* [dns64server](#dns64server)
+* [heapdiag](#heapdiag)
 * [ip](#ip)
 * [iperf](#iperf)
+* [loglevel](#loglevel)
+* [mcast](#mcast)
+* [ota](#ota)
 * [tcpsockclient](#tcpsockclient)
 * [tcpsockserver](#tcpsockserver)
 * [udpsockclient](#udpsockclient)
 * [udpsockserver](#udpsockserver)
 * [wifi](#wifi)
-* [ota](#ota)
-* [dns64server](#dns64server)
-* [curl](#curl)
-* [heapdiag](#heapdiag)
-* [loglevel](#loglevel)
+
+
+### curl
+
+Used for fetching the content of a HTTP web page. Note that the border router must support NAT64.
+
+```
+> curl http://www.espressif.com
+Done
+<html>
+<head><title>301 Moved Permanently</title></head>
+<body bgcolor="white">
+<center><h1>301 Moved Permanently</h1></center>
+<hr><center>CloudFront</center>
+</body>
+</html>
+```
+
+### dns64server
+
+Used for setting the dns64 server. Note that the border router must support NAT64.
+
+```
+> dns64server 8.8.8.8
+```
+
+### heapdiag
+
+Used for heap diagnostics.
+
+To get the current heap usage:
+
+```
+> heapdiag print
+        Description     Internal        SPIRAM
+Current Free Memory     246680          0
+Largest Free Block      180224          0
+Min. Ever Free Size     246072          0
+Done
+```
+To reset the heap trace baseline if the menuconfig option `HEAP_TRACING_STANDALONE` is selected:
+
+```
+> heapdiag tracereset
+```
+
+To dump the heap trace record if the menuconfig option `HEAP_TRACING_STANDALONE` is selected:
+
+```
+> heapdiag tracedump
+```
+
+To dump heap usage of each task of the menuconfig option `HEAP_TASK_TRACKING` is selected:
+
+```
+> heapdiag tracetask
+```
 
 ### ip
 
@@ -127,6 +185,55 @@ Then create an iperf client:
 > iperf -V -u -c fdde:ad00:beef:0:a7c6:6311:9c8c:271b -t 20 -i 1 -p 5001 -l 85
 Done
 ```
+
+### loglevel
+
+Used for setting the log level for various log tags.
+
+To set log level of all the tags to INFO:
+
+```
+> loglevel set * 3
+```
+
+To set log level of OpenThread to None:
+
+```
+> loglevel set OPENTHREAD 0
+```
+
+Notes:
+- Support 6 levels : 0(NONE), 1(ERROR), 2(WARN), 3(INFO), 4(DEBUG), 5(VERBOSE)
+- The log level of the tags cannot be bigger than the maximum log level. The maximum log level is determined by the menuconfig option `LOG_MAXIMUM_LEVEL`.
+
+### mcast
+
+Use this command to join or leave a multicast group.
+
+```bash
+> mcast join ff04::123
+
+Done
+> mcast leave ff04::123
+
+Done
+```
+
+### ota
+
+Used for downloading border router firmware and updating the border router or the RCP alone.
+
+```
+> ota download https://192.168.1.2:8070/br_ota_image
+```
+
+After downloading the device will restart and update itself with the new firmware. The RCP will also be updated if the firmware version changes.
+
+```
+> ota rcpudate
+```
+
+This command will enforce a RCP update regardless of the RCP version.
 
 ### tcpsockserver
 
@@ -472,102 +579,3 @@ connected
 Done
 ```
 
-### ota
-
-Used for downloading border router firmware and updating the border router or the RCP alone.
-
-```
-> ota download https://192.168.1.2:8070/br_ota_image
-```
-
-After downloading the device will restart and update itself with the new firmware. The RCP will also be updated if the firmware version changes.
-
-```
-> ota rcpudate
-```
-
-This command will enforce a RCP update regardless of the RCP version.
-
-### dns64server
-
-Used for setting the dns64 server. Note that the border router must support NAT64.
-
-```
-> dns64server 8.8.8.8
-```
-
-### curl
-
-Used for fetching the content of a HTTP web page. Note that the border router must support NAT64.
-
-```
-> curl http://www.espressif.com
-Done
-<html>
-<head><title>301 Moved Permanently</title></head>
-<body bgcolor="white">
-<center><h1>301 Moved Permanently</h1></center>
-<hr><center>CloudFront</center>
-</body>
-</html>
-```
-
-### heapdiag
-
-Used for heap diagnostics.
-
-To get the current heap usage:
-
-```
-> heapdiag print
-        Description     Internal        SPIRAM
-Current Free Memory     246680          0
-Largest Free Block      180224          0
-Min. Ever Free Size     246072          0
-Done
-```
-
-To start or stop the daemon task that prints the heap usage periodically:
-
-```
-heapdiag daemon on <period_ms>
-heapdiag daemon off
-```
-
-To reset the heap trace baseline if the menuconfig option `HEAP_TRACING_STANDALONE` is selected:
-
-```
-> heapdiag tracereset
-```
-
-To dump the heap trace record if the menuconfig option `HEAP_TRACING_STANDALONE` is selected:
-
-```
-> heapdiag tracedump
-```
-
-To dump heap usage of each task of the menuconfig option `HEAP_TASK_TRACKING` is selected:
-
-```
-> heapdiag tracetask
-```
-
-### loglevel
-
-Used for setting the log level for various log tag
-
-To set log level of all the tags to INFO
-
-```
-> loglevel set * 3
-```
-
-To set log level of OpenThread to None
-
-```
-> loglevel set OPENTHREAD 0
-```
-
-Notes:
-- Support 6 levels : 0(NONE), 1(ERROR), 2(WARN), 3(INFO), 4(DEBUG), 5(VERBOSE)
-- The log level of the tags cannot be bigger than the maximum log level. The maximum log level is determined by the menuconfig option `LOG_MAXIMUM_LEVEL`.
