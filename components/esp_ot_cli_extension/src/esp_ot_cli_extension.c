@@ -10,6 +10,7 @@
 #include "esp_ot_dns64.h"
 #include "esp_ot_ip.h"
 #include "esp_ot_iperf.h"
+#include "esp_ot_loglevel.h"
 #include "esp_ot_ota_commands.h"
 #include "esp_ot_tcp_socket.h"
 #include "esp_ot_udp_socket.h"
@@ -42,7 +43,8 @@ static const otCliCommand kCommands[] = {
 #if CONFIG_OPENTHREAD_DNS64_CLIENT
     {"dns64server", esp_openthread_process_dns64_server},
 #endif // CONFIG_OPENTHREAD_DNS64_CLIENT
-    {"ip", esp_ot_process_ip}};
+    {"ip", esp_ot_process_ip},
+    {"loglevel", esp_ot_process_logset}};
 
 void esp_cli_custom_command_init()
 {

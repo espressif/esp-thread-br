@@ -1,4 +1,4 @@
-set(srcs    "src/esp_ot_cli_extension.c")
+set(srcs    src/esp_ot_cli_extension.c src/esp_ot_ip.c src/esp_ot_loglevel.c)
 
 if(CONFIG_OPENTHREAD_CLI_IPERF)
     list(APPEND srcs   "src/esp_ot_iperf.c")
@@ -24,8 +24,6 @@ endif()
 if(CONFIG_OPENTHREAD_CLI_CURL)
     list(APPEND srcs   "src/esp_ot_curl.c")
 endif()
-
-list(APPEND srcs   "src/esp_ot_ip.c")
 
 set(include "include")
 idf_component_register(SRCS "${srcs}"

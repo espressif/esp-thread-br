@@ -7,6 +7,7 @@
 #include "esp_ot_iperf.h"
 #include "esp_check.h"
 #include "esp_log.h"
+#include "esp_ot_cli_extension.h"
 #include "iperf.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +15,6 @@
 #include "lwip/inet.h"
 #include "openthread/cli.h"
 
-#define TAG "ot-iperf"
 static char s_dest_ip_addr[50];
 
 otError esp_ot_process_iperf(void *aContext, uint8_t aArgsLength, char *aArgs[])
@@ -91,7 +91,7 @@ otError esp_ot_process_iperf(void *aContext, uint8_t aArgsLength, char *aArgs[])
             } else if (strcmp(aArgs[i], "-l") == 0) {
                 i++;
                 if (atoi(aArgs[i]) <= 0) {
-                    ESP_LOGE(TAG, "Invalid arguments.");
+                    ESP_LOGE(OT_EXT_CLI_TAG, "Invalid arguments.");
                 } else {
                     cfg.len_send_buf = atoi(aArgs[i]);
                 }
