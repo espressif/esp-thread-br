@@ -27,11 +27,16 @@
 #include "freertos/task.h"
 #include "openthread/cli.h"
 
-static EventGroupHandle_t wifi_event_group;
-const int CONNECTED_IP4_BIT = BIT0;
-const int CONNECTED_IP6_BIT = BIT1;
 static bool s_wifi_connected = false;
+static SemaphoreHandle_t s_wait_ip_sem;
 static uint32_t s_wifi_disconnect_delay_ms = 0;
+static uint8_t s_reconnect_cnt = 0;
+#define MAX_WAIT_IP_TIME 5000
+#define MAX_RETRY_TIMES 5
+#define MAX_RECONNECT_TIMES 10
+static uint8_t IP_READY_FLAG;
+const uint8_t IPV4_READY = BIT(0);
+const uint8_t IPV6_READY = BIT(1);
 ESP_EVENT_DEFINE_BASE(WIFI_ADDRESS_EVENT);
 
 void esp_ot_wifi_netif_init(void)
@@ -40,22 +45,52 @@ void esp_ot_wifi_netif_init(void)
     assert(esp_netif);
 }
 
-static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+static void handler_ip_event(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        if (s_wifi_disconnect_delay_ms) {
-            vTaskDelay(s_wifi_disconnect_delay_ms / portTICK_PERIOD_MS);
-            s_wifi_disconnect_delay_ms = 0;
+    if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        IP_READY_FLAG |= IPV4_READY;
+    } else if (event_base == IP_EVENT && event_id == IP_EVENT_GOT_IP6) {
+        ip_event_got_ip6_t *event = (ip_event_got_ip6_t *)event_data;
+        if (esp_netif_get_handle_from_ifkey("WIFI_STA_DEF") != event->esp_netif) {
+            return;
         }
+        ESP_LOGI(OT_EXT_CLI_TAG, "Got IPv6 event: Interface \"%s\" address: " IPV6STR,
+                 esp_netif_get_desc(event->esp_netif), IPV62STR(event->ip6_info.ip));
+        IP_READY_FLAG |= IPV6_READY;
+    }
+
+    if (!!(IP_READY_FLAG & IPV4_READY) && !!(IP_READY_FLAG & IPV6_READY)) {
+        if (s_wifi_connected) {
+            // Wifi connected from state reconnection, only clear the count of reconnection.
+            s_reconnect_cnt = 0;
+        } else {
+            // Wifi connected from state disconnection, notify the OT task.
+            xSemaphoreGive(s_wait_ip_sem);
+        }
+    }
+}
+
+static void handler_on_wifi_disconnect(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    if (s_wifi_disconnect_delay_ms) {
+        vTaskDelay(s_wifi_disconnect_delay_ms / portTICK_PERIOD_MS);
+        s_wifi_disconnect_delay_ms = 0;
+    }
+    if (s_reconnect_cnt < MAX_RECONNECT_TIMES) {
         esp_wifi_connect();
         otCliOutputFormat("wifi reconnecting...\n");
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        xEventGroupSetBits(wifi_event_group, CONNECTED_IP4_BIT);
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
-        esp_netif_create_ip6_linklocal(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"));
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_GOT_IP6) {
-        xEventGroupSetBits(wifi_event_group, CONNECTED_IP6_BIT);
+    } else {
+        IP_READY_FLAG = 0;
+        s_wifi_connected = false;
+        esp_wifi_stop();
+        ESP_LOGW(OT_EXT_CLI_TAG, "Reconnection time out.");
+        otCliOutputFormat("wifi sta disconnect\n");
     }
+}
+
+static void handler_on_wifi_connect(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    esp_netif_create_ip6_linklocal(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"));
 }
 
 void handle_wifi_addr_init(void)
@@ -77,9 +112,12 @@ void handle_wifi_addr_init(void)
 static void wifi_join(const char *ssid, const char *psk)
 {
     static bool s_initialized = false;
+    static uint8_t retry_cnt = 0;
     if (!s_initialized) {
-        wifi_event_group = xEventGroupCreate();
         wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+        if (!s_wait_ip_sem) {
+            s_wait_ip_sem = xSemaphoreCreateBinary();
+        }
         esp_wifi_init(&cfg);
         handle_wifi_addr_init();
 
@@ -89,10 +127,12 @@ static void wifi_join(const char *ssid, const char *psk)
 #else
         ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 #endif
-        ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &event_handler, NULL));
-        ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
-        ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_CONNECTED, &event_handler, NULL));
-        ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_GOT_IP6, &event_handler, NULL));
+        ESP_ERROR_CHECK(
+            esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &handler_on_wifi_disconnect, NULL));
+        ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &handler_ip_event, NULL));
+        ESP_ERROR_CHECK(
+            esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_CONNECTED, &handler_on_wifi_connect, NULL));
+        ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_GOT_IP6, &handler_ip_event, NULL));
         esp_wifi_set_storage(WIFI_STORAGE_RAM);
         esp_wifi_set_mode(WIFI_MODE_NULL);
         s_initialized = true;
@@ -106,25 +146,29 @@ static void wifi_join(const char *ssid, const char *psk)
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-    esp_wifi_connect();
+    while (retry_cnt < MAX_RETRY_TIMES) {
+        esp_wifi_connect();
 
-    int bits = xEventGroupWaitBits(wifi_event_group, CONNECTED_IP4_BIT | CONNECTED_IP6_BIT, pdFALSE, pdTRUE,
-                                   10000 / portTICK_PERIOD_MS);
-
-    if (((bits & CONNECTED_IP4_BIT) != 0) && ((bits & CONNECTED_IP6_BIT) != 0)) {
-        s_wifi_connected = true;
-        xEventGroupClearBits(wifi_event_group, CONNECTED_IP4_BIT);
-        xEventGroupClearBits(wifi_event_group, CONNECTED_IP6_BIT);
-        esp_openthread_lock_acquire(portMAX_DELAY);
-        esp_openthread_border_router_init();
-        esp_openthread_lock_release();
-        otCliOutputFormat("wifi sta is connected successfully\n");
-    } else {
-        esp_wifi_disconnect();
-        esp_wifi_stop();
-        ESP_LOGW("", "Connection time out, please check your ssid & password, then retry.");
-        otCliOutputFormat("wifi sta connection is failed\n");
+        xSemaphoreTake(s_wait_ip_sem, MAX_WAIT_IP_TIME / portTICK_PERIOD_MS);
+        if (!!(IP_READY_FLAG & IPV4_READY) && !!(IP_READY_FLAG & IPV6_READY)) {
+            s_wifi_connected = true;
+            esp_openthread_lock_acquire(portMAX_DELAY);
+            esp_openthread_border_router_init();
+            esp_openthread_lock_release();
+            retry_cnt = 0;
+            otCliOutputFormat("wifi sta is connected successfully\n");
+            return;
+        } else {
+            IP_READY_FLAG = 0;
+            retry_cnt++;
+            esp_wifi_disconnect();
+            otCliOutputFormat("wifi reconnecting...\n");
+        }
     }
+
+    esp_wifi_stop();
+    ESP_LOGW(OT_EXT_CLI_TAG, "Connection time out, please check your ssid & password, then retry.");
+    otCliOutputFormat("wifi sta connection is failed\n");
 }
 
 otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs[])
