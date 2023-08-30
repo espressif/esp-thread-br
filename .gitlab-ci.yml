@@ -6,6 +6,7 @@ variables:
     CI_DOCKER_REGISTRY: "ciregistry.espressif.cn:8443"
     ESP_THREAD_BR_PATH: "$CI_PROJECT_DIR"
     CI_TOOLS_PATH: "$CI_PROJECT_DIR/tools/ci"
+    ESP_ENV_IMAGE: "$CI_DOCKER_REGISTRY/esp-env-v5.2:2"
 
 before_script:
   - mkdir -p ~/.ssh
@@ -23,6 +24,8 @@ pre_commit:
     - apt-get update && apt-get install -y clang-format-11
     - git fetch origin main
     - git diff-tree --no-commit-id --name-only -r HEAD origin/main | xargs pre-commit run --files
+  tags:
+    - host_test
 
 .submodule_update: &submodule_update
   - cd $ESP_THREAD_BR_PATH
@@ -45,6 +48,17 @@ pre_commit:
   - idf.py build
 
   - cd $ESP_THREAD_BR_PATH/examples/basic_thread_border_router
+  - idf.py build
+
+.build_local_components: &build_local_components
+  - cd $IDF_PATH/examples/openthread/ot_rcp
+  - idf.py --preview set-target esp32h2
+  - git rev-parse HEAD
+  - idf.py build
+
+  - cd $ESP_THREAD_BR_PATH/examples/basic_thread_border_router
+  - rm -rf main/idf_component.yml
+  - cp ${CI_TOOLS_PATH}/idf_component_local.yml main/idf_component.yml
   - idf.py build
 
 .build_idf_example_ot_br: &build_idf_example_ot_br
@@ -91,30 +105,48 @@ build_examples:
     script:
         - *submodule_update
         - *build_basic_thread_border_router
+    tags:
+        - build
+
+build_examples_local_components:
+    stage: build
+    image: $ESP_ENV_IMAGE
+    script:
+        - *submodule_update
+        - *setup_idf
+        - *build_local_components
+    tags:
+        - build
 
 build_idf_otbr_examples:
     stage: build
-    image: espressif/idf:latest
+    image: $ESP_ENV_IMAGE
     allow_failure: true
     script:
         - *setup_idf
         - *build_idf_example_ot_br
+    tags:
+        - build
 
 build_idf_otbr_autostart_examples:
     stage: build
-    image: espressif/idf:latest
+    image: $ESP_ENV_IMAGE
     allow_failure: true
     script:
         - *setup_idf
         - *build_idf_example_ot_br_autostart
+    tags:
+        - build
 
 build_idf_otcli_examples:
     stage: build
-    image: espressif/idf:latest
+    image: $ESP_ENV_IMAGE
     allow_failure: true
     script:
         - *setup_idf
         - *build_idf_example_ot_cli
+    tags:
+        - build
 
 build_docs:
     stage: docs
@@ -131,6 +163,8 @@ build_docs:
         - cd docs
         - pip install -r requirements.txt
         - build-docs -t esp32 esp32s2 esp32s3 esp32c3 -l en
+    tags:
+        - build_docs
 
 .deploy_docs_template:
     stage: docs
@@ -145,6 +179,8 @@ build_docs:
         - export GIT_VER=$(git describe --always)
         - pip install -r ${CI_PROJECT_DIR}/docs/requirements.txt
         - deploy-docs
+    tags:
+        - deploy
 
 deploy_docs_preview:
     extends:

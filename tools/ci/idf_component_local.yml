@@ -1,10 +1,13 @@
 ## IDF Component Manager Manifest File
 dependencies:
   espressif/mdns: "^1.0.0"
-  espressif/esp_ot_cli_extension: "~0.5.0"
-  espressif/esp_rcp_update: "~0.3.0"
+  espressif/esp_ot_cli_extension:
+    path: "$ESP_THREAD_BR_PATH/components/esp_ot_cli_extension"
+  espressif/esp_rcp_update:
+    path: "$ESP_THREAD_BR_PATH/components/esp_rcp_update"
   espressif/esp-serial-flasher: "~0.0.0"
   ## Required IDF version
   idf:
     version: ">=4.1.0"
   # # Put list of dependencies here
+

@@ -7,8 +7,11 @@
 #include "esp_ot_heap_diag.h"
 #include "esp_check.h"
 #include "esp_heap_caps.h"
+#if CONFIG_HEAP_TRACING
 #include "esp_heap_trace.h"
+#endif
 #include "esp_log.h"
+#include "esp_ot_cli_extension.h"
 #include "string.h"
 #include "openthread/cli.h"
 
