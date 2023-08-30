@@ -46,4 +46,9 @@ menu "OpenThread Extension CLI"
         depends on OPENTHREAD_CLI_ESP_EXTENSION
         default y
 
+    config OPENTHREAD_CLI_HEAP_DIAG
+        bool "Enable heapdiag command"
+        depends on OPENTHREAD_CLI_ESP_EXTENSION
+        default y
+
 endmenu

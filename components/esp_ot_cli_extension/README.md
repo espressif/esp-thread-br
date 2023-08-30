@@ -19,6 +19,8 @@ To enable OpenThread extension commands, the following Kconfig option needs to b
 * [ota](#ota)
 * [dns64server](#dns64server)
 * [curl](#curl)
+* [heapdiag](#heapdiag)
+* [loglevel](#loglevel)
 
 ### ip
 
@@ -509,3 +511,63 @@ Done
 </body>
 </html>
 ```
+
+### heapdiag
+
+Used for heap diagnostics.
+
+To get the current heap usage:
+
+```
+> heapdiag print
+        Description     Internal        SPIRAM
+Current Free Memory     246680          0
+Largest Free Block      180224          0
+Min. Ever Free Size     246072          0
+Done
+```
+
+To start or stop the daemon task that prints the heap usage periodically:
+
+```
+heapdiag daemon on <period_ms>
+heapdiag daemon off
+```
+
+To reset the heap trace baseline if the menuconfig option `HEAP_TRACING_STANDALONE` is selected:
+
+```
+> heapdiag tracereset
+```
+
+To dump the heap trace record if the menuconfig option `HEAP_TRACING_STANDALONE` is selected:
+
+```
+> heapdiag tracedump
+```
+
+To dump heap usage of each task of the menuconfig option `HEAP_TASK_TRACKING` is selected:
+
+```
+> heapdiag tracetask
+```
+
+### loglevel
+
+Used for setting the log level for various log tag
+
+To set log level of all the tags to INFO
+
+```
+> loglevel set * 3
+```
+
+To set log level of OpenThread to None
+
+```
+> loglevel set OPENTHREAD 0
+```
+
+Notes:
+- Support 6 levels : 0(NONE), 1(ERROR), 2(WARN), 3(INFO), 4(DEBUG), 5(VERBOSE)
+- The log level of the tags cannot be bigger than the maximum log level. The maximum log level is determined by the menuconfig option `LOG_MAXIMUM_LEVEL`.
