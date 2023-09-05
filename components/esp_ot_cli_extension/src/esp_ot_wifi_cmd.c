@@ -112,7 +112,7 @@ void handle_wifi_addr_init(void)
 static void wifi_join(const char *ssid, const char *psk)
 {
     static bool s_initialized = false;
-    static uint8_t retry_cnt = 0;
+    uint8_t retry_cnt = 0;
     if (!s_initialized) {
         wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
         if (!s_wait_ip_sem) {
