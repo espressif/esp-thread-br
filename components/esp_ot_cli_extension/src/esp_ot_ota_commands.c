@@ -42,7 +42,11 @@ otError esp_openthread_process_ota_command(void *aContext, uint8_t aArgsLength, 
         esp_restart();
     } else if (strcmp(aArgs[0], "rcpupdate") == 0) {
         esp_openthread_rcp_deinit();
-        esp_rcp_update();
+        if (esp_rcp_update() == ESP_OK) {
+            esp_rcp_mark_image_verified(true);
+        } else {
+            esp_rcp_mark_image_verified(false);
+        }
         esp_restart();
     } else {
         print_help();
