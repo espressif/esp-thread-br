@@ -5,6 +5,7 @@
  */
 
 #include "esp_ot_curl.h"
+#include "esp_crt_bundle.h"
 #include "esp_http_client.h"
 #include "esp_log.h"
 #include "esp_openthread.h"
@@ -75,6 +76,13 @@ static void curl_task(void *pvParameters)
         .event_handler = NULL,
         .keep_alive_enable = true,
     };
+
+    if (strncmp(s_arg_buf, "https", 5) == 0) {
+        config.crt_bundle_attach = esp_crt_bundle_attach;
+        config.transport_type = HTTP_TRANSPORT_OVER_SSL;
+        config.skip_cert_common_name_check = false;
+    }
+
     esp_http_client_handle_t http_client = esp_http_client_init(&config);
 
     if (http_client == NULL) {
