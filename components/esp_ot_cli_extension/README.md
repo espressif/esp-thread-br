@@ -398,17 +398,20 @@ Used for creating a udp server.
 ```bash
 > udpsockserver
 ---udpsockserver parameter---
-status                           :     get UDP server status
-open                             :     open UDP server function
-bind <port>                      :     create a UDP server with binding the port
-send <ipaddr> <port> <message>   :     send a message to the UDP client
-close                            :     close UDP server
+status                                   :     get UDP server status
+open                                     :     open UDP server function
+bind <port>                              :     create a UDP server with binding the port
+send <ipaddr> <port> <message>           :     send a message to the UDP client
+send <ipaddr> <port> <message> <if>      :     send a message to the UDP client via <if>
+close                                    :     close UDP server
 ---example---
-get UDP server status            :     udpsockserver status
-open UDP server function         :     udpsockserver open
-create a UDP server              :     udpsockserver bind 12345
-send a message                   :     udpsockserver send FDDE:AD00:BEEF:CAFE:FD14:30B6:CDA:8A95 12346 hello
-close UDP server                 :     udpsockserver close
+get UDP server status                    :     udpsockserver status
+open UDP server function                 :     udpsockserver open
+create a UDP server                      :     udpsockserver bind 12345
+send a message                           :     udpsockserver send FDDE:AD00:BEEF:CAFE:FD14:30B6:CDA:8A95 51876 hello
+send a message via Wi-Fi interface       :     udpsockserver send FDDE:AD00:BEEF:CAFE:FD14:30B6:CDA:8A95 51876 hello st
+send a message via OpenThread interface  :     udpsockserver send FDDE:AD00:BEEF:CAFE:FD14:30B6:CDA:8A95 51876 hello ot
+close UDP server                         :     udpsockserver close
 Done
 ```
 
@@ -472,16 +475,19 @@ Used for creating a udp client.
 ```bash
 > udpsockclient
 ---udpsockclient parameter---
-status                               :     get UDP client status
-open <port>                          :     open UDP client function, create a UDP client and bind a local port(optional)
-send <ipaddr> <port> <message>       :     send a message to the UDP server
-close                                :     close UDP client
+status                                   :     get UDP client status
+open <port>                              :     open UDP client function, create a UDP client and bind a local port(optional)
+send <ipaddr> <port> <message>           :     send a message to the UDP server
+send <ipaddr> <port> <message> <if>      :     send a message to the UDP server via <if>
+close                                    :     close UDP client
 ---example---
-get UDP client status                :     udpsockclient status
-create a UDP client without binding  :     udpsockclient open
-create a UDP client with binding     :     udpsockclient open 12345
-send a message                       :     udpsockclient send FDDE:AD00:BEEF:CAFE:FD14:30B6:CDA:8A95 12346 hello
-close UDP client                     :     udpsockclient close
+get UDP client status                    :     udpsockclient status
+create a UDP client without binding      :     udpsockclient open
+create a UDP client with binding         :     udpsockclient open 12345
+send a message                           :     udpsockclient send FDDE:AD00:BEEF:CAFE:FD14:30B6:CDA:8A95 51876 hello
+send a message via Wi-Fi interface       :     udpsockclient send FDDE:AD00:BEEF:CAFE:FD14:30B6:CDA:8A95 51876 hello st
+send a message via OpenThread interface  :     udpsockclient send FDDE:AD00:BEEF:CAFE:FD14:30B6:CDA:8A95 51876 hello ot
+close UDP client                         :     udpsockclient close
 Done
 ```
 

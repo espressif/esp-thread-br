@@ -13,6 +13,7 @@
 #include "esp_netif.h"
 #include "esp_netif_net_stack.h"
 #include "esp_openthread_lock.h"
+#include "esp_openthread_netif_glue.h"
 #include "esp_ot_cli_extension.h"
 #include <sys/unistd.h>
 #include "freertos/FreeRTOS.h"
@@ -116,6 +117,8 @@ static void udp_server_send(UDP_SERVER *udp_server_member)
     ESP_LOGI(OT_EXT_CLI_TAG, "Sending to %s : %d", udp_server_member->messagesend.ipaddr,
              udp_server_member->messagesend.port);
 
+    esp_err_t err = socket_bind_interface(udp_server_member->sock, &(udp_server_member->ifr));
+    ESP_RETURN_ON_FALSE(err == ESP_OK, , OT_EXT_CLI_TAG, "Stop sending message");
     len = sendto(udp_server_member->sock, udp_server_member->messagesend.message,
                  strlen(udp_server_member->messagesend.message), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
     if (len < 0) {
@@ -160,22 +163,27 @@ static void udp_socket_server_task(void *pvParameters)
 otError esp_ot_process_udp_server(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
     static TaskHandle_t udp_server_handle = NULL;
-    static UDP_SERVER udp_server_member = {0, -1, -1, "", {-1, "", ""}};
+    static UDP_SERVER udp_server_member = {0, -1, -1, "", {""}, {-1, "", ""}};
 
     if (aArgsLength == 0) {
         otCliOutputFormat("---udpsockserver parameter---\n");
-        otCliOutputFormat("status                           :     get UDP server status\n");
-        otCliOutputFormat("open                             :     open UDP server function\n");
-        otCliOutputFormat("bind <port>                      :     create a UDP server with binding the port\n");
-        otCliOutputFormat("send <ipaddr> <port> <message>   :     send a message to the UDP client\n");
-        otCliOutputFormat("close                            :     close UDP server\n");
+        otCliOutputFormat("status                                   :     get UDP server status\n");
+        otCliOutputFormat("open                                     :     open UDP server function\n");
+        otCliOutputFormat("bind <port>                              :     create a UDP server with binding the port\n");
+        otCliOutputFormat("send <ipaddr> <port> <message>           :     send a message to the UDP client\n");
+        otCliOutputFormat("send <ipaddr> <port> <message> <if>      :     send a message to the UDP client via <if>\n");
+        otCliOutputFormat("close                                    :     close UDP server\n");
         otCliOutputFormat("---example---\n");
-        otCliOutputFormat("get UDP server status            :     udpsockserver status\n");
-        otCliOutputFormat("open UDP server function         :     udpsockserver open\n");
-        otCliOutputFormat("create a UDP server              :     udpsockserver bind 12345\n");
-        otCliOutputFormat("send a message                   :     udpsockserver send "
+        otCliOutputFormat("get UDP server status                    :     udpsockserver status\n");
+        otCliOutputFormat("open UDP server function                 :     udpsockserver open\n");
+        otCliOutputFormat("create a UDP server                      :     udpsockserver bind 12345\n");
+        otCliOutputFormat("send a message                           :     udpsockserver send "
                           "FDDE:AD00:BEEF:CAFE:FD14:30B6:CDA:8A95 51876 hello\n");
-        otCliOutputFormat("close UDP server                 :     udpsockserver close\n");
+        otCliOutputFormat("send a message via Wi-Fi interface       :     udpsockserver send "
+                          "FDDE:AD00:BEEF:CAFE:FD14:30B6:CDA:8A95 51876 hello st\n");
+        otCliOutputFormat("send a message via OpenThread interface  :     udpsockserver send "
+                          "FDDE:AD00:BEEF:CAFE:FD14:30B6:CDA:8A95 51876 hello ot\n");
+        otCliOutputFormat("close UDP server                         :     udpsockserver close\n");
     } else if (strcmp(aArgs[0], "status") == 0) {
         if (udp_server_handle == NULL) {
             otCliOutputFormat("UDP server is not open\n");
@@ -229,13 +237,18 @@ otError esp_ot_process_udp_server(void *aContext, uint8_t aArgsLength, char *aAr
             otCliOutputFormat("UDP server is not binded!\n");
             return OT_ERROR_NONE;
         }
-        if (aArgsLength != 4) {
+        if (aArgsLength != 4 && aArgsLength != 5) {
             ESP_LOGE(OT_EXT_CLI_TAG, "Invalid arguments.");
             return OT_ERROR_INVALID_ARGS;
         }
         strncpy(udp_server_member.messagesend.ipaddr, aArgs[1], sizeof(udp_server_member.messagesend.ipaddr));
         udp_server_member.messagesend.port = atoi(aArgs[2]);
         strncpy(udp_server_member.messagesend.message, aArgs[3], sizeof(udp_server_member.messagesend.message));
+        strcpy(udp_server_member.ifr.ifr_name, "");
+        if (aArgsLength == 5 && socket_get_netif_impl_name(aArgs[4], &(udp_server_member.ifr)) != ESP_OK) {
+            otCliOutputFormat("invalid commands\n");
+            return OT_ERROR_INVALID_ARGS;
+        }
         xEventGroupSetBits(udp_server_event_group, UDP_SERVER_SEND_BIT);
     } else if (strcmp(aArgs[0], "close") == 0) {
         if (udp_server_handle == NULL) {
@@ -292,7 +305,8 @@ static void udp_client_send(UDP_CLIENT *udp_client_member)
     dest_addr.sin6_port = htons(udp_client_member->messagesend.port);
     ESP_LOGI(OT_EXT_CLI_TAG, "Sending to %s : %d", udp_client_member->messagesend.ipaddr,
              udp_client_member->messagesend.port);
-
+    esp_err_t err = socket_bind_interface(udp_client_member->sock, &(udp_client_member->ifr));
+    ESP_RETURN_ON_FALSE(err == ESP_OK, , OT_EXT_CLI_TAG, "Stop sending message");
     len = sendto(udp_client_member->sock, udp_client_member->messagesend.message,
                  strlen(udp_client_member->messagesend.message), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
     if (len < 0) {
@@ -377,22 +391,27 @@ exit:
 otError esp_ot_process_udp_client(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
     static TaskHandle_t udp_client_handle = NULL;
-    static UDP_CLIENT udp_client_member = {0, -1, -1, "::", {-1, "", ""}};
+    static UDP_CLIENT udp_client_member = {0, -1, -1, "::", {""}, {-1, "", ""}};
 
     if (aArgsLength == 0) {
         otCliOutputFormat("---udpsockclient parameter---\n");
-        otCliOutputFormat("status                               :     get UDP client status\n");
-        otCliOutputFormat("open <port>                          :     open UDP client function, create a UDP client "
-                          "and bind a local port(optional)\n");
-        otCliOutputFormat("send <ipaddr> <port> <message>       :     send a message to the UDP server\n");
-        otCliOutputFormat("close                                :     close UDP client\n");
+        otCliOutputFormat("status                                   :     get UDP client status\n");
+        otCliOutputFormat("open <port>                              :     open UDP client function, create a UDP "
+                          "client and bind a local port(optional)\n");
+        otCliOutputFormat("send <ipaddr> <port> <message>           :     send a message to the UDP server\n");
+        otCliOutputFormat("send <ipaddr> <port> <message> <if>      :     send a message to the UDP server via <if>\n");
+        otCliOutputFormat("close                                    :     close UDP client\n");
         otCliOutputFormat("---example---\n");
-        otCliOutputFormat("get UDP client status                :     udpsockclient status\n");
-        otCliOutputFormat("create a UDP client without binding  :     udpsockclient open\n");
-        otCliOutputFormat("create a UDP client with binding     :     udpsockclient open 12345\n");
-        otCliOutputFormat("send a message                       :     udpsockclient send "
+        otCliOutputFormat("get UDP client status                    :     udpsockclient status\n");
+        otCliOutputFormat("create a UDP client without binding      :     udpsockclient open\n");
+        otCliOutputFormat("create a UDP client with binding         :     udpsockclient open 12345\n");
+        otCliOutputFormat("send a message                           :     udpsockclient send "
                           "FDDE:AD00:BEEF:CAFE:FD14:30B6:CDA:8A95 51876 hello\n");
-        otCliOutputFormat("close UDP client                     :     udpsockclient close\n");
+        otCliOutputFormat("send a message via Wi-Fi interface       :     udpsockclient send "
+                          "FDDE:AD00:BEEF:CAFE:FD14:30B6:CDA:8A95 51876 hello st\n");
+        otCliOutputFormat("send a message via OpenThread interface  :     udpsockclient send "
+                          "FDDE:AD00:BEEF:CAFE:FD14:30B6:CDA:8A95 51876 hello ot\n");
+        otCliOutputFormat("close UDP client                         :     udpsockclient close\n");
     } else if (strcmp(aArgs[0], "status") == 0) {
         if (udp_client_handle == NULL) {
             otCliOutputFormat("UDP client is not open\n");
@@ -453,13 +472,18 @@ otError esp_ot_process_udp_client(void *aContext, uint8_t aArgsLength, char *aAr
             otCliOutputFormat("UDP client is not binded!\n");
             return OT_ERROR_NONE;
         }
-        if (aArgsLength != 4) {
+        if (aArgsLength != 4 && aArgsLength != 5) {
             ESP_LOGE(OT_EXT_CLI_TAG, "Invalid arguments.");
             return OT_ERROR_INVALID_ARGS;
         }
         strncpy(udp_client_member.messagesend.ipaddr, aArgs[1], sizeof(udp_client_member.messagesend.ipaddr));
         udp_client_member.messagesend.port = atoi(aArgs[2]);
         strncpy(udp_client_member.messagesend.message, aArgs[3], sizeof(udp_client_member.messagesend.message));
+        strcpy(udp_client_member.ifr.ifr_name, "");
+        if (aArgsLength == 5 && socket_get_netif_impl_name(aArgs[4], &(udp_client_member.ifr)) != ESP_OK) {
+            otCliOutputFormat("invalid commands\n");
+            return OT_ERROR_INVALID_ARGS;
+        }
         xEventGroupSetBits(udp_client_event_group, UDP_CLIENT_SEND_BIT);
     } else if (strcmp(aArgs[0], "close") == 0) {
         if (udp_client_handle == NULL) {
@@ -511,4 +535,27 @@ otError esp_ot_process_mcast_group(void *aContext, uint8_t aArgsLength, char *aA
     }
     esp_openthread_task_switching_lock_acquire(portMAX_DELAY);
     return ret;
+}
+
+esp_err_t socket_get_netif_impl_name(char *name_input, struct ifreq *ifr)
+{
+    char if_key[32] = "";
+    if (strcmp(name_input, "st") == 0) {
+        strcpy(if_key, _g_esp_netif_inherent_sta_config.if_key);
+    } else if (strcmp(name_input, "ot") == 0) {
+        strcpy(if_key, g_esp_netif_inherent_openthread_config.if_key);
+    } else {
+        return ESP_FAIL;
+    }
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey(if_key);
+    return esp_netif_get_netif_impl_name(netif, ifr->ifr_name);
+}
+
+esp_err_t socket_bind_interface(int sock, struct ifreq *ifr)
+{
+    ESP_RETURN_ON_FALSE(setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, ifr, sizeof(struct ifreq)) == 0, ESP_FAIL,
+                        OT_EXT_CLI_TAG, "Failed to bind to interface");
+    const char *log = (strlen(ifr->ifr_name) == 0) ? "Automatically select interface" : "Send from interface: ";
+    ESP_LOGI(OT_EXT_CLI_TAG, "%s%s", log, ifr->ifr_name);
+    return ESP_OK;
 }
