@@ -1,7 +1,6 @@
 from esp_docs.conf_docs import *  # noqa: F403,F401
 
 languages = ['en']
-idf_targets = ['esp32', 'esp32s2', 'esp32s3', 'esp32c3']
 
 extensions += ['sphinx_copybutton',
         # Needed as a trigger for running doxygen

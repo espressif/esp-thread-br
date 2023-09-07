@@ -11,7 +11,7 @@ Clone the `esp-idf <https://github.com/espressif/esp-idf>`_ and the `esp-thread-
 
 .. code-block:: bash
 
-   git clone --recursive https://github.com/espressif/esp-idf.git
+   git clone -b v5.1.1 --recursive https://github.com/espressif/esp-idf.git
    
 .. code-block:: bash
 
@@ -34,26 +34,24 @@ Clone the `esp-idf <https://github.com/espressif/esp-idf>`_ and the `esp-thread-
    git clone --recursive https://github.com/espressif/esp-thread-br.git
 
 
-Follow the `ESP-IDF getting started guide <https://idf.espressif.com/>`_ to set up the IDF development environment.
+If you are new to ESP-IDF, please follow the `ESP-IDF getting started guide <https://idf.espressif.com/>`_ to set up the IDF development environment and get familiar with the IDF development tools.
 
 2.1.2. Build the RCP Image
 --------------------------
 
-Build the ``esp-idf/examples/openthread/ot-rcp`` example. The firmware doesn't need to be explicitly flashed to a device. It will be included in the Border Router firmware and flashed to the ESP32-H2 chip upon first boot.
+Build the ``esp-idf/examples/openthread/ot_rcp`` example. The firmware doesn't need to be explicitly flashed to a device. It will be included in the Border Router firmware and flashed to the ESP32-H2 chip upon first boot.
 
 .. code-block:: bash
 
-   cd $IDF_PATH/examples/openthread/ot-rcp
+   cd $IDF_PATH/examples/openthread/ot_rcp
 
 Select the ESP32-H2 as the RCP.
 
 .. code-block:: bash
 
-   idf.py --preview set-target esp32h2
+   idf.py set-target esp32h2
 
-The default communication interface of ESP32H2 is UART0 with 460800 baudrate, which can be configured in `esp_ot_config.h <https://github.com/espressif/esp-idf/blob/master/examples/openthread/ot_rcp/main/esp_ot_config.h>`_.
-
-In order to use the SPI interface instead, the ``OPENTHREAD_RCP_SPI`` and ``OPENTHREAD_RADIO_SPINEL_SPI`` options should be enabled in ``ot_rcp`` and ``basic_thread_border_router`` example configurations, respectively.
+The default communication interface on the ESP Thread Border Router board is UART0 with 460800 baudrate, which can be configured in `esp_ot_config.h <https://github.com/espressif/esp-idf/blob/master/examples/openthread/ot_rcp/main/esp_ot_config.h>`_.
 
 .. code-block:: bash
 
@@ -73,24 +71,32 @@ Go to the ``basic_thread_border_router`` example folder.
 
    cd esp-thread-br/examples/basic_thread_border_router
 
-The default configuration works as is on ESP Thread Border Router board.
+The default configuration works as is on ESP Thread Border Router board, the default SoC target is ESP32-S3.
 
-For any customized settings, you can configure the project in menuconfig.
+To run the example on other SoCs, please configure the SoC target using command:
+
+.. code-block:: bash
+
+   idf.py set-target <chip_name>
+
+For any other customized settings, you can configure the project in menuconfig.
 
 .. code-block:: bash
 
    idf.py menuconfig
-
-Set ``PIN_TO_RESET``, ``PIN_TO_BOOT``, ``PIN_TO_RX``, ``PIN_TO_TX`` to corresponding GPIO numbers that connect to RCP.
-
-The Thread network parameters could be pre-configured with ``OPENTHREAD_NETWORK_xx`` options.
 
 2.1.3.1. Wi-Fi based Thread Border Router
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 By default, it is configured as Wi-Fi based Thread Border Router.
 
-If the ``OPENTHREAD_BR_AUTO_START`` option is enabled, the device will connect to the configured Wi-Fi and form Thread network automatically then act as the border router. The Wi-Fi SSID and password must be set in menuconfig. The corresponding options are ``Example Connection Configuration -> WiFi SSID`` and ``Example Connection Configuration -> WiFi Password``.
+The Wi-Fi SSID and password must be set in menuconfig. The corresponding options are ``Example Connection Configuration -> WiFi SSID`` and ``Example Connection Configuration -> WiFi Password``.
+
+The auto start mode is enabled by default, the device will connect to the configured Wi-Fi and form Thread network automatically, and then act as the border router.
+
+.. note::
+
+   The following configuration options are all optional, jump to `2.1.4. Build and Run the Thread Border Router`_ if you don't need any customized settings.
 
 2.1.3.2. Ethernet based Thread Border Router
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -151,8 +157,45 @@ The configuration result would look like this.
    [*] Obtain IPv6 address
         Preferred IPv6 Type (Local Link Address)  --->
 
-2.1.4. Build and Run the ESP Thread Border Router
--------------------------------------------------
+2.1.3.3. Thread Network Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Thread network parameters could be pre-configured with ``OPENTHREAD_NETWORK_xx`` options.
+
+2.1.3.4. Communication Interface
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The default communication interface between host SoC and RCP is UART.
+
+In order to use the SPI interface instead, the ``OPENTHREAD_RCP_SPI`` and ``OPENTHREAD_RADIO_SPINEL_SPI`` options should be enabled in ``ot_rcp`` and ``basic_thread_border_router`` example configurations, respectively. And set corresponding GPIO numbers in `esp_ot_config.h`.
+
+2.1.3.5. Manual Mode
+~~~~~~~~~~~~~~~~~~~~
+
+Disable ``OPENTHREAD_BR_AUTO_START`` option if you want to setup the network manually. Then the following CLI commands can be used to connect Wi-Fi and form a Thread network:
+
+.. code-block::
+
+   wifi connect -s <ssid> -p <psk>
+
+.. code-block::
+
+   dataset init new
+
+.. code-block::
+
+   dataset commit active
+
+.. code-block::
+
+   ifconfig up
+
+.. code-block::
+
+   thread start
+
+2.1.4. Build and Run the Thread Border Router
+---------------------------------------------
 
 Build and Flash the example to the host SoC.
 
@@ -216,12 +259,12 @@ Ethernet Border Router:
 2.1.5. Build and Run the Thread CLI Device
 ------------------------------------------
 
-Build the ``esp-idf/examples/openthread/ot-cli`` example and flash the firmware to another ESP32-H2 devkit.
+Build the ``esp-idf/examples/openthread/ot_cli`` example and flash the firmware to another ESP32-H2 devkit.
 
 
 .. code-block:: bash
 
-   cd $IDF_PATH/examples/openthread/ot-cli
+   cd $IDF_PATH/examples/openthread/ot_cli
 
 
 .. code-block:: bash
@@ -294,4 +337,3 @@ The CLI device will become a child or a router in the Thread network:
    I(1669590) OPENTHREAD:[N] Mle-----------: Attempt to attach - attempt 1, AnyPartition
    I(1670590) OPENTHREAD:[N] Mle-----------: RLOC16 fffe -> 6c01
    I(1670590) OPENTHREAD:[N] Mle-----------: Role detached -> child
-
