@@ -162,7 +162,7 @@ build_docs:
     script:
         - cd docs
         - pip install -r requirements.txt
-        - build-docs -t esp32 esp32s2 esp32s3 esp32c3 -l en
+        - build-docs -l en
     tags:
         - build_docs
 
