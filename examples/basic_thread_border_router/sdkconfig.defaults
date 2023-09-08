@@ -24,6 +24,16 @@ CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
+# Compiler options
+#
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+
+#
+# Newlib
+#
+CONFIG_NEWLIB_NANO_FORMAT=y
+
+#
 # mbedTLS
 #
 

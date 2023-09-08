@@ -31,6 +31,9 @@ Now the image can be downloaded on the Border Router:
 
     ota download https://${HOST_URL}:8070/br_ota_image
 
+- Tips 1: For optimizing the firmware of border router, `CONFIG_COMPILER_OPTIMIZATION_SIZE` and `CONFIG_NEWLIB_NANO_FORMAT` are enabled by default.
+- Tips 2: If the OTA function is enabled, it is recommended to optimize the ot_rcp firmware size before building the OTA image. Please refer to `ot_rcp README <https://github.com/espressif/esp-idf/blob/master/examples/openthread/ot_rcp/README.md>`_ for detailed steps.
+
 After downloading the Border Router will reboot and update itself with the new firmware. The RCP will also be updated if the firmware version changes.
 
 
