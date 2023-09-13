@@ -28,6 +28,7 @@ extern "C" {
 #define ESP_OT_REST_API_NODE_LEADERDATA_PATH "/node/leader-data"
 #define ESP_OT_REST_API_NODE_NUMBEROFROUTER_PATH "/node/num-of-router"
 #define ESP_OT_REST_API_NODE_EXTPANID_PATH "/node/ext-panid"
+#define ESP_OT_REST_API_NODE_BORDERAGENTID_PATH "/node/border-agent-id"
 #define ESP_OT_REST_API_NODE_ACTIVE_DATASET_TLVS_PATH "/node/active-dataset-tlvs"
 #define ESP_OT_REST_API_PROPERTIES_PATH "/get_properties"
 #define ESP_OT_REST_API_AVAILABLE_NETWORK_PATH "/available_network"
@@ -117,6 +118,13 @@ cJSON *handle_ot_resource_node_numofrouter_request(void);
  * @return The cJSON object of Thread extended panid
  */
 cJSON *handle_ot_resource_node_extpanid_request(void);
+
+/**
+ * @brief Provide an entry ot get border agent id of Thread
+ *
+ * @return The cJSON object of border agent id
+ */
+cJSON *handle_ot_resource_node_baid_request(void);
 
 /**
  * @brief Provide an entry ot get active dataset tlv of Thread

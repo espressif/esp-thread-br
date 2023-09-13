@@ -88,6 +88,7 @@ static esp_err_t esp_otbr_network_node_network_name_get_handler(httpd_req_t *req
 static esp_err_t esp_otbr_network_node_leader_data_get_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_number_of_router_get_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_extpanid_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_baid_get_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_active_dataset_tlv_get_handler(httpd_req_t *req);
 
 static httpd_uri_t s_resource_handlers[] = {
@@ -149,6 +150,12 @@ static httpd_uri_t s_resource_handlers[] = {
         .uri = ESP_OT_REST_API_NODE_EXTPANID_PATH,
         .method = HTTP_GET,
         .handler = esp_otbr_network_node_extpanid_get_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_BORDERAGENTID_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_network_node_baid_get_handler,
         .user_ctx = NULL,
     },
     {
@@ -426,6 +433,16 @@ static esp_err_t esp_otbr_network_node_extpanid_get_handler(httpd_req_t *req)
 {
     esp_err_t ret = ESP_OK;
     cJSON *response = handle_ot_resource_node_extpanid_request();
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
+    cJSON_Delete(response);
+    return ret;
+}
+
+static esp_err_t esp_otbr_network_node_baid_get_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *response = handle_ot_resource_node_baid_request();
     ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
 exit:
     cJSON_Delete(response);

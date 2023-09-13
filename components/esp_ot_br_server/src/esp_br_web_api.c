@@ -25,6 +25,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/portmacro.h"
 #include "freertos/semphr.h"
+#include "openthread/border_agent.h"
 #include "openthread/border_router.h"
 #include "openthread/commissioner.h"
 #include "openthread/dataset.h"
@@ -155,6 +156,19 @@ cJSON *handle_ot_resource_node_extpanid_request()
     esp_openthread_lock_release();
     ESP_RETURN_ON_FALSE(!hex_to_string(extpanid->m8, format, OT_EXT_ADDRESS_SIZE), NULL, API_TAG,
                         "Failed to convert thread extended panid");
+    return cJSON_CreateString(format);
+}
+
+cJSON *handle_ot_resource_node_baid_request()
+{
+    char format[OT_BORDER_AGENT_ID_LENGTH * 2 + 1];
+    otBorderAgentId id;
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    otError err = otBorderAgentGetId(esp_openthread_get_instance(), &id);
+    esp_openthread_lock_release();
+    ESP_RETURN_ON_FALSE(err == OT_ERROR_NONE, NULL, API_TAG, "Failed to get border agent id");
+    ESP_RETURN_ON_FALSE(!hex_to_string(id.mId, format, OT_BORDER_AGENT_ID_LENGTH), NULL, API_TAG,
+                        "Failed to convert border agent id");
     return cJSON_CreateString(format);
 }
 
