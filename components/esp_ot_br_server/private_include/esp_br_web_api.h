@@ -28,7 +28,7 @@ extern "C" {
 #define ESP_OT_REST_API_NODE_LEADERDATA_PATH "/node/leader-data"
 #define ESP_OT_REST_API_NODE_NUMBEROFROUTER_PATH "/node/num-of-router"
 #define ESP_OT_REST_API_NODE_EXTPANID_PATH "/node/ext-panid"
-#define ESP_OT_REST_API_NODE_BORDERAGENTID_PATH "/node/border-agent-id"
+#define ESP_OT_REST_API_NODE_BORDERAGENTID_PATH "/node/ba-id"
 #define ESP_OT_REST_API_NODE_ACTIVE_DATASET_TLVS_PATH "/node/active-dataset-tlvs"
 #define ESP_OT_REST_API_PROPERTIES_PATH "/get_properties"
 #define ESP_OT_REST_API_AVAILABLE_NETWORK_PATH "/available_network"

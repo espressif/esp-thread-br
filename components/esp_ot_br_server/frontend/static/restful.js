@@ -314,6 +314,8 @@ function decode_thread_status_package(package) {
       package.result["Network:PartitionID"];
   document.getElementById("network-xpanid").innerHTML =
       package.result["Network:XPANID"];
+  document.getElementById("network-baid").innerHTML =
+      package.result["Network:BorderAgentID"];
 
   document.getElementById("openthread-version").innerHTML =
       package.result["OpenThread:Version"];
@@ -352,6 +354,8 @@ function decode_thread_status_package(package) {
       package.result["Network:PartitionID"];
   document.getElementById("t-network-xpanid").innerHTML =
       package.result["Network:XPANID"];
+  document.getElementById("t-network-baid").innerHTML =
+      package.result["Network:BorderAgentID"];
 
   document.getElementById("t-openthread-version").innerHTML =
       package.result["OpenThread:Version"];

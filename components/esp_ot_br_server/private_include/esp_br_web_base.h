@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "openthread/border_agent.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -63,6 +64,7 @@ typedef struct thread_network_status {
     otPanId panid;
     uint32_t partition_id;
     otExtendedPanId xpanid;
+    otBorderAgentId baid;
 } thread_network_status_t;
 
 typedef struct thread_information_status {

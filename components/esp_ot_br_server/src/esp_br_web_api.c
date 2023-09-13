@@ -212,6 +212,7 @@ static esp_err_t get_openthread_network_properties(otInstance *ins, thread_netwo
     network->panid = otLinkGetPanId(ins);                                             /* 2. PANID */
     network->partition_id = otThreadGetPartitionId(ins);                              /* 3. paritionID */
     memcpy(&network->xpanid, otThreadGetExtendedPanId(ins), sizeof(otExtendedPanId)); /* 4. XPANID */
+    otBorderAgentGetId(ins, &network->baid);                                          /* 5. border agent id*/
     return ESP_OK;
 }
 
