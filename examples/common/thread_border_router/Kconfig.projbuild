@@ -65,4 +65,34 @@ menu "ESP Thread Border Router Example"
         help
             If enabled, a web server will be provided to configure and query Thread network via a Web GUI. 
 
+    menu "External coexist wire type and pin config"
+        config EXTERNAL_COEX_WIRE_TYPE
+            int "The wire_type of external coexist"
+            depends on ESP_COEX_EXTERNAL_COEXIST_ENABLE
+            default 3
+            range 0 3
+            help
+                Select wire_type for external coexist, the wire_type define in external_coex_wire_t.
+
+        config EXTERNAL_COEX_REQUEST_PIN
+            int "The number of external coexist request pin"
+            depends on ESP_COEX_EXTERNAL_COEXIST_ENABLE && (EXTERNAL_COEX_WIRE_TYPE >= 0)
+            default 12
+
+        config EXTERNAL_COEX_GRANT_PIN
+            int "The number of external coexist grant pin"
+            depends on ESP_COEX_EXTERNAL_COEXIST_ENABLE && (EXTERNAL_COEX_WIRE_TYPE >= 1)
+            default 13
+
+        config EXTERNAL_COEX_PRIORITY_PIN
+            int "The number of external coexist priority pin"
+            depends on ESP_COEX_EXTERNAL_COEXIST_ENABLE && (EXTERNAL_COEX_WIRE_TYPE >= 2)
+            default 10
+
+        config EXTERNAL_COEX_TX_LINE_PIN
+            int "The number of external coexist tx_line pin"
+            depends on ESP_COEX_EXTERNAL_COEXIST_ENABLE && (EXTERNAL_COEX_WIRE_TYPE = 3)
+            default 11
+    endmenu # External coexist wire type and pin config
+
 endmenu

@@ -194,6 +194,15 @@ Disable ``OPENTHREAD_BR_AUTO_START`` option if you want to setup the network man
 
    thread start
 
+2.1.3.6. RF External coexistence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Enable ``EXTERNAL_COEX_ENABLE`` option if you want to enable the RF External coexistence.
+
+.. note::
+
+   To enable external coexistence of the Thread Border Router, enable the ``EXTERNAL_COEX_ENABLE`` option of ``$IDF_PATH/examples/openthread/ot_rcp`` before building the RCP Image.
+
 2.1.4. Build and Run the Thread Border Router
 ---------------------------------------------
 
