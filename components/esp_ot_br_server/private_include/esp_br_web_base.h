@@ -35,6 +35,19 @@ extern "C" {
 #define DIAGSET_NODE_MAX_TIMEOUT_SECOND 5
 #define RLOC_STRING_MAX_SIZE 7
 
+#define ESP_OT_REST_ACCEPT_HEADER "Accept"
+#define ESP_OT_REST_CONTENT_TYPE_HEADER "Content-Type"
+
+#define ESP_OT_REST_CONTENT_TYPE_JSON "application/json"
+#define ESP_OT_REST_CONTENT_TYPE_PLAIN "text/plain"
+
+#define ESP_OT_REST_DATASET_TYPE "DatasetType"
+#define ESP_OT_DATASET_TYPE_ACTIVE "active"
+#define ESP_OT_DATASET_TYPE_PENDING "pending"
+
+#define HTTPD_201 "201 Created"
+#define HTTPD_409 "409 Conflict"
+
 /**
  * @brief When checking the otError, eixt.
  *
@@ -199,6 +212,20 @@ cJSON *dailnosticTlv_set_convert2_json(const thread_diagnosticTlv_set_t *set);
 
 void thread_node_information_reset(thread_node_informaiton_t *node);
 cJSON *thread_node_struct_convert2_json(thread_node_informaiton_t *node);
+
+cJSON *Timestamp2Json(const otTimestamp aTimestamp);
+cJSON *SecurityPolicy2Json(const otSecurityPolicy aSecurityPolicy);
+cJSON *ActiveDataset2Json(const otOperationalDataset aActiveDataset);
+cJSON *PendingDataset2Json(const otOperationalDataset aPendingDataset);
+
+esp_err_t Json2Timestamp(const cJSON *jsonTimestamp, otTimestamp *aTimestamp);
+esp_err_t Json2SecurityPolicy(const cJSON *jsonTimestamp, otSecurityPolicy *aSecurityPolicy);
+esp_err_t Json2ActiveDataset(const cJSON *jsonActiveDataset, otOperationalDataset *aActiveDataset);
+esp_err_t JsonString2ActiveDataset(const cJSON *JsonStringActiveDataset, otOperationalDataset *aActiveDataset);
+esp_err_t Json2PendingDataset(const cJSON *jsonPendingDataset, otOperationalDataset *aPendingDataset);
+
+void ot_br_web_response_code_get(uint16_t errcode, char *status_buf);
+esp_err_t convert_ot_err_to_response_code(otError errcode, char *status_buf);
 
 #ifdef __cplusplus
 }
