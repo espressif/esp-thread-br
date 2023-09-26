@@ -11,7 +11,7 @@ Clone the `esp-idf <https://github.com/espressif/esp-idf>`_ and the `esp-thread-
 
 .. code-block:: bash
 
-   git clone -b v5.1.1 --recursive https://github.com/espressif/esp-idf.git
+   git clone -b v5.1.2 --recursive https://github.com/espressif/esp-idf.git
    
 .. code-block:: bash
 
