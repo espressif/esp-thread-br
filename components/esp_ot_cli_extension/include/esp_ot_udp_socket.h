@@ -8,6 +8,7 @@
 
 #include <stdint.h>
 #include <openthread/error.h>
+#include "lwip/sockets.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -48,6 +49,7 @@ typedef struct udp_server {
     int sock;
     int local_port;
     char local_ipaddr[128];
+    struct ifreq ifr;
     SEND_MESSAGE messagesend;
 } UDP_SERVER;
 
@@ -56,8 +58,32 @@ typedef struct udp_client {
     int sock;
     int local_port;
     char local_ipaddr[128];
+    struct ifreq ifr;
     SEND_MESSAGE messagesend;
 } UDP_CLIENT;
+
+/**
+ * @brief Get the Interface name struct.
+ *
+ * @param[in] name_input    The name of Interface.
+ * @param[out] ifr          Interface name struct.
+ *
+ * @return
+ *      - ESP_OK on success in getting the Interface name struct.
+ */
+esp_err_t socket_get_netif_impl_name(char *name_input, struct ifreq *ifr);
+
+/**
+ * @brief Bind the socket to Interface.
+ *
+ * @param[in] sock  The socket.
+ * @param[in] ifr   Interface name struct.
+ *
+ * @return
+ *      - ESP_OK on success in binding the socket to the Interface.
+ *      - ESP_FAIL on failure in binding the socket to the Interface.
+ */
+esp_err_t socket_bind_interface(int sock, struct ifreq *ifr);
 
 #ifdef __cplusplus
 }
