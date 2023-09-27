@@ -67,10 +67,7 @@ These features are currently provided by the SDK:
 * **NAT64**: The devices can access the IPv4 Internet via the border router.
 * **RCP Update**: The built border router image will contain an updatable RCP image and can automatically update the RCP on version mismatch or RCP failure.
 * **Web GUI**: The border router will enable a web server and provide some practical functions including Thread network discovery, network formation and status query. 
-
-In the future releases, the following features will be added:
-
-* RF Coexistence
+* **RF Coexistence**: The border router supports optional external coexistence, a feature that enhances the transmission performance when there are channel conflicts between the Wi-Fi and Thread networks.
 
 # Resources
 

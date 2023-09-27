@@ -29,6 +29,10 @@
 #include "border_router_launch.h"
 #include "esp_br_web.h"
 
+#if CONFIG_EXTERNAL_COEX_ENABLE
+#include "esp_coexist.h"
+#endif
+
 #define TAG "esp_ot_br"
 
 extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
@@ -48,6 +52,15 @@ static esp_err_t init_spiffs(void)
 #endif
     return ESP_OK;
 }
+
+#if CONFIG_EXTERNAL_COEX_ENABLE
+static void ot_br_external_coexist_init(void)
+{
+    esp_external_coex_gpio_set_t gpio_pin = ESP_OPENTHREAD_DEFAULT_EXTERNAL_COEX_CONFIG();
+    esp_external_coex_set_work_mode(EXTERNAL_COEX_LEADER_ROLE);
+    ESP_ERROR_CHECK(esp_enable_extern_coex_gpio_pin(CONFIG_EXTERNAL_COEX_WIRE_TYPE, gpio_pin));
+}
+#endif /* CONFIG_EXTERNAL_COEX_ENABLE */
 
 void app_main(void)
 {
@@ -88,6 +101,10 @@ void app_main(void)
 #else
 #error No backbone netif!
 #endif // CONFIG_EXAMPLE_CONNECT_WIFI
+
+#if CONFIG_EXTERNAL_COEX_ENABLE
+    ot_br_external_coexist_init();
+#endif // CONFIG_EXTERNAL_COEX_ENABLE
 
     ESP_ERROR_CHECK(mdns_init());
     ESP_ERROR_CHECK(mdns_hostname_set("esp-ot-br"));
