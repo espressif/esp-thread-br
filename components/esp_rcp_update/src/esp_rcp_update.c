@@ -124,7 +124,7 @@ static esp_loader_error_t flash_binary(FILE *firmware, size_t size, size_t addre
     size_t binary_size = size;
     size_t written = 0;
 
-    ESP_LOGI(TAG, "binary_size %zu", binary_size);
+    ESP_LOGI(TAG, "binary_size %u", binary_size);
     while (size > 0) {
         size_t to_read = size < sizeof(payload) ? size : sizeof(payload);
         fread(payload, 1, to_read, firmware);
@@ -137,7 +137,7 @@ static esp_loader_error_t flash_binary(FILE *firmware, size_t size, size_t addre
 
         size -= to_read;
         written += to_read;
-        ESP_LOGI(TAG, "left size %zu, written %zu", size, written);
+        ESP_LOGI(TAG, "left size %u, written %u", size, written);
 
         int progress = (int)(((float)written / binary_size) * 100);
         ESP_LOGI(TAG, "Progress: %d %%", progress);
