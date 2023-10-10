@@ -15,6 +15,7 @@
 #include "stdlib.h"
 #include "string.h"
 #include <stdlib.h>
+#include "openthread/border_agent.h"
 #include "openthread/dataset.h"
 #include "openthread/error.h"
 #include "openthread/platform/radio.h"
@@ -117,6 +118,8 @@ cJSON *otbr_properties_struct_convert2_json(openthread_properties_t *properties)
     cJSON_AddStringToObject(root, "Network:PartitionID", format);
     hex_to_string(properties->network.xpanid.m8, format, sizeof(otExtendedPanId));
     cJSON_AddStringToObject(root, "Network:XPANID", format);
+    hex_to_string(properties->network.baid.mId, format, sizeof(otBorderAgentId));
+    cJSON_AddStringToObject(root, "Network:BorderAgentID", format);
 
     cJSON_AddStringToObject(root, "OpenThread:Version", properties->information.version);
     sprintf(format, "%d", properties->information.version_api);

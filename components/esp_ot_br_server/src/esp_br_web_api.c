@@ -25,6 +25,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/portmacro.h"
 #include "freertos/semphr.h"
+#include "openthread/border_agent.h"
 #include "openthread/border_router.h"
 #include "openthread/commissioner.h"
 #include "openthread/dataset.h"
@@ -158,6 +159,19 @@ cJSON *handle_ot_resource_node_extpanid_request()
     return cJSON_CreateString(format);
 }
 
+cJSON *handle_ot_resource_node_baid_request()
+{
+    char format[OT_BORDER_AGENT_ID_LENGTH * 2 + 1];
+    otBorderAgentId id;
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    otError err = otBorderAgentGetId(esp_openthread_get_instance(), &id);
+    esp_openthread_lock_release();
+    ESP_RETURN_ON_FALSE(err == OT_ERROR_NONE, NULL, API_TAG, "Failed to get border agent id");
+    ESP_RETURN_ON_FALSE(!hex_to_string(id.mId, format, OT_BORDER_AGENT_ID_LENGTH), NULL, API_TAG,
+                        "Failed to convert border agent id");
+    return cJSON_CreateString(format);
+}
+
 cJSON *handle_ot_resource_node_active_dataset_tlv_request()
 {
     char format[256];
@@ -198,6 +212,7 @@ static esp_err_t get_openthread_network_properties(otInstance *ins, thread_netwo
     network->panid = otLinkGetPanId(ins);                                             /* 2. PANID */
     network->partition_id = otThreadGetPartitionId(ins);                              /* 3. paritionID */
     memcpy(&network->xpanid, otThreadGetExtendedPanId(ins), sizeof(otExtendedPanId)); /* 4. XPANID */
+    otBorderAgentGetId(ins, &network->baid);                                          /* 5. border agent id*/
     return ESP_OK;
 }
 
