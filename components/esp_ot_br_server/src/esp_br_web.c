@@ -80,6 +80,7 @@ typedef struct request_url {
 -----------------------------------------------------*/
 static esp_err_t esp_otbr_network_diagnostics_get_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_delete_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_rloc_get_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_rloc16_get_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_state_get_handler(httpd_req_t *req);
@@ -102,6 +103,12 @@ static httpd_uri_t s_resource_handlers[] = {
         .uri = ESP_OT_REST_API_NODE_PATH,
         .method = HTTP_GET,
         .handler = esp_otbr_network_node_get_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_PATH,
+        .method = HTTP_DELETE,
+        .handler = esp_otbr_network_node_delete_handler,
         .user_ctx = NULL,
     },
     {
@@ -356,6 +363,23 @@ static esp_err_t esp_otbr_network_node_get_handler(httpd_req_t *req)
     ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
 exit:
     cJSON_Delete(response);
+    return ret;
+}
+
+static esp_err_t esp_otbr_network_node_delete_handler(httpd_req_t *req)
+{
+    ESP_RETURN_ON_FALSE(req, ESP_FAIL, WEB_TAG, "Failed to parse the node information of http request");
+    esp_err_t ret = ESP_OK;
+    otError error = handle_ot_resource_node_delete_information_request();
+    if (error == OT_ERROR_NONE) {
+        httpd_resp_set_status(req, HTTPD_200);
+    } else if (error == OT_ERROR_INVALID_STATE) {
+        httpd_resp_set_status(req, "409 Conflict");
+    } else {
+        httpd_resp_set_status(req, HTTPD_500);
+    }
+    ESP_GOTO_ON_ERROR(httpd_resp_send(req, NULL, 0), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
     return ret;
 }
 

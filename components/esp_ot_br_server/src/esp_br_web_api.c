@@ -797,6 +797,19 @@ cJSON *handle_ot_resource_node_information_request()
     return thread_node_struct_convert2_json(&node);
 }
 
+otError handle_ot_resource_node_delete_information_request(void)
+{
+    otError ret = OT_ERROR_NONE;
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    otInstance *ins = esp_openthread_get_instance();
+    ERROR_EXIT(otThreadSetEnabled(ins, false), exit, API_TAG, "Failed to stop Thread");
+    ERROR_EXIT(otIp6SetEnabled(ins, false), exit, API_TAG, "Failed to execute config down");
+    ERROR_EXIT(otInstanceErasePersistentInfo(ins), exit, API_TAG, "Failed to delete node information");
+exit:
+    esp_openthread_lock_release();
+    return ret;
+}
+
 cJSON *handle_ot_resource_network_diagnostics_request()
 {
     destroy_thread_diagnosticTlv_set(s_diagnosticTlv_set);

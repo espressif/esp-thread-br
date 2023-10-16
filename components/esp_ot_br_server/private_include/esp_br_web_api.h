@@ -57,6 +57,15 @@ extern "C" {
 cJSON *handle_ot_resource_node_information_request(void);
 
 /**
+ * @brief Provides an entry to delete the Thread device's node information
+ *
+ * @return
+ *      -   OT_ERROR_NONE   :   On success.
+ *      -   Other           :   Fail to delete the node information .
+ */
+otError handle_ot_resource_node_delete_information_request(void);
+
+/**
  * @brief Provide a entry to collect the Thread network topology message.
  *
  * @return The cJSON object of diagnostics
