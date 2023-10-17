@@ -3,9 +3,10 @@ idf_component_register(SRCS "esp_ot_br.c"
                        EMBED_TXTFILES ${project_dir}/server_certs/ca_cert.pem
                        )
 
+idf_build_get_property(python PYTHON)
 if(CONFIG_OPENTHREAD_BR_AUTO_UPDATE_RCP)
     add_custom_target(rcp_image_generation ALL
-        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../create_ota_image.py
+        COMMAND ${python} ${CMAKE_CURRENT_SOURCE_DIR}/../create_ota_image.py
         --rcp-build-dir $ENV{IDF_PATH}/examples/openthread/ot_rcp/build
         --target-file ${CMAKE_CURRENT_BINARY_DIR}/spiffs_image/ot_rcp_0/rcp_image
         )
@@ -17,7 +18,7 @@ endif()
 
 if(CONFIG_OPENTHREAD_BR_CREATE_OTA_IMAGE)
     add_custom_command(OUTPUT ${build_dir}/br_ota_image
-        COMMAND  ${CMAKE_CURRENT_SOURCE_DIR}/../create_ota_image.py
+        COMMAND ${python} ${CMAKE_CURRENT_SOURCE_DIR}/../create_ota_image.py
         --rcp-build-dir $ENV{IDF_PATH}/examples/openthread/ot_rcp/build
         --target-file ${build_dir}/br_ota_image
         --br-firmware "${build_dir}/${elf_name}.bin"
