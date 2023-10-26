@@ -186,6 +186,26 @@ cJSON *handle_ot_resource_node_active_dataset_tlv_request()
     return cJSON_CreateString(format);
 }
 
+char *handle_ot_resource_node_active_dataset_tlv_request_plain_text()
+{
+    char format[256];
+    otOperationalDatasetTlvs dataset;
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    ESP_RETURN_ON_FALSE(!otDatasetGetActiveTlvs(esp_openthread_get_instance(), &dataset), NULL, API_TAG,
+                        "Failed to get thread dataset tlv");
+    esp_openthread_lock_release();
+    ESP_RETURN_ON_FALSE(sizeof(format) >= (dataset.mLength * 2), NULL, API_TAG, "Invalid Size");
+    ESP_RETURN_ON_FALSE(!hex_to_string(dataset.mTlvs, format, dataset.mLength), NULL, API_TAG,
+                        "Failed to convert thread dataset tlv");
+    char *str = malloc(256 * sizeof(char));
+    if(str == NULL) return NULL;
+    for (size_t i = 0; i < 256; i++)
+    {
+        str[i] = format[i];
+    }
+    
+    return str;
+}
 /*----------------------------------------------------------------------
                                 thread status
 ----------------------------------------------------------------------*/

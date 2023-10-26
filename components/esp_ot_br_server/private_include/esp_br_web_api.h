@@ -30,6 +30,7 @@ extern "C" {
 #define ESP_OT_REST_API_NODE_EXTPANID_PATH "/node/ext-panid"
 #define ESP_OT_REST_API_NODE_BORDERAGENTID_PATH "/node/ba-id"
 #define ESP_OT_REST_API_NODE_ACTIVE_DATASET_TLVS_PATH "/node/active-dataset-tlvs"
+#define ESP_OT_REST_API_NODE_DATASET_ACTIVE_PATH "/node/dataset/active"
 #define ESP_OT_REST_API_PROPERTIES_PATH "/get_properties"
 #define ESP_OT_REST_API_AVAILABLE_NETWORK_PATH "/available_network"
 #define ESP_OT_REST_API_NODE_INFORMATION_PATH "/node_information"
@@ -141,6 +142,13 @@ cJSON *handle_ot_resource_node_baid_request(void);
  * @return The cJSON object of Thread active dataset tlv
  */
 cJSON *handle_ot_resource_node_active_dataset_tlv_request(void);
+
+/**
+ * @brief Provide an entry ot get active dataset tlv of Thread
+ *
+ * @return The char array object of Thread active dataset tlv
+ */
+char *handle_ot_resource_node_active_dataset_tlv_request_plain_text(void);
 
 /**
  * @brief Handle the Thread network formation @param request and provide @param log

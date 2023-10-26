@@ -91,6 +91,7 @@ static esp_err_t esp_otbr_network_node_number_of_router_get_handler(httpd_req_t 
 static esp_err_t esp_otbr_network_node_extpanid_get_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_baid_get_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_active_dataset_tlv_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_dataset_active_get_handler(httpd_req_t *req);
 
 static httpd_uri_t s_resource_handlers[] = {
     {
@@ -169,6 +170,12 @@ static httpd_uri_t s_resource_handlers[] = {
         .uri = ESP_OT_REST_API_NODE_ACTIVE_DATASET_TLVS_PATH,
         .method = HTTP_GET,
         .handler = esp_otbr_network_node_active_dataset_tlv_get_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_DATASET_ACTIVE_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_network_node_dataset_active_get_handler,
         .user_ctx = NULL,
     },
 };
@@ -314,15 +321,29 @@ static cJSON *httpd_request_convert2_json(httpd_req_t *req)
 static esp_err_t httpd_send_packet(httpd_req_t *req, cJSON *root)
 {
     esp_err_t ret = ESP_OK;
-    ESP_RETURN_ON_FALSE(root, ESP_FAIL, WEB_TAG, "Invalid Arguement");
+    ESP_RETURN_ON_FALSE(root, ESP_FAIL, WEB_TAG, "Invalid Argument");
     char *packet = cJSON_Print(root);
     ESP_RETURN_ON_FALSE(packet, ESP_FAIL, WEB_TAG, "Invalid Packet");
     ESP_LOGD(WEB_TAG, "Properties: %s\r\n", packet);
-    ESP_RETURN_ON_FALSE(packet, ESP_FAIL, WEB_TAG, "Invalid Pesponse");
+    ESP_RETURN_ON_FALSE(packet, ESP_FAIL, WEB_TAG, "Invalid Response");
     ESP_GOTO_ON_ERROR(httpd_resp_set_type(req, "application/json"), exit, WEB_TAG, "Failed to set http type");
     ESP_GOTO_ON_ERROR(httpd_resp_sendstr(req, packet), exit, WEB_TAG, "Failed to send http respond");
 exit:
     cJSON_free(packet);
+    return ret;
+}
+
+static esp_err_t httpd_send_plain_text_packet(httpd_req_t *req, char *packet)
+{
+    esp_err_t ret = ESP_OK;
+    ESP_RETURN_ON_FALSE(packet, ESP_FAIL, WEB_TAG, "Invalid Argument");
+    ESP_RETURN_ON_FALSE(packet, ESP_FAIL, WEB_TAG, "Invalid Packet");
+    ESP_LOGD(WEB_TAG, "Properties: %s\r\n", packet);
+    ESP_RETURN_ON_FALSE(packet, ESP_FAIL, WEB_TAG, "Invalid Response");
+    ESP_GOTO_ON_ERROR(httpd_resp_set_type(req, "text/plain"), exit, WEB_TAG, "Failed to set http type");
+    ESP_GOTO_ON_ERROR(httpd_resp_sendstr(req, packet), exit, WEB_TAG, "Failed to send http respond");
+exit:
+    free(packet);
     return ret;
 }
 
@@ -483,6 +504,14 @@ exit:
     return ret;
 }
 
+static esp_err_t esp_otbr_network_node_dataset_active_get_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    char *response = handle_ot_resource_node_active_dataset_tlv_request_plain_text();
+    ESP_GOTO_ON_ERROR(httpd_send_plain_text_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
+    return ret;
+}
 /*-----------------------------------------------------
  Note：Openthread WEB GUI API implement
 -----------------------------------------------------*/

@@ -45,7 +45,7 @@ Thread REST APIs
 
 The ESP Thread Border Router server provides the REST APIs that are compatible with `ot-br-posix <https://github.com/openthread/ot-br-posix>`_
 
-The Thread REST APIs field include ``/diagnostics``, ``/node``, ``/node/rloc``, ``/node/rloc16``, ``/node/ext-address``, ``/node/state``, ``/node/network-name``, ``/node/leader-data``, ``/node/num-of-router``, ``/node/ext-panid``, ``/node/ba-id`` and ``/node/active-dataset-tlvs``.
+The Thread REST APIs field include ``/diagnostics``, ``/node``, ``/node/rloc``, ``/node/rloc16``, ``/node/ext-address``, ``/node/state``, ``/node/network-name``, ``/node/leader-data``, ``/node/num-of-router``, ``/node/ext-panid``, ``/node/ba-id``, ``/node/active-dataset-tlvs`` and ``/node/dataset/active``.
 
 Entering this link to the browser of Linux machine:
 
