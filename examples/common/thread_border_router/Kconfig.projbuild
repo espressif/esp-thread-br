@@ -51,7 +51,7 @@ menu "ESP Thread Border Router Example"
 
         config PIN_TO_RCP_MOSI
             depends on OPENTHREAD_RADIO_SPINEL_SPI
-            int "Pin to RCP SPI MISO"
+            int "Pin to RCP SPI MOSI"
             default "11"
     endmenu
 
