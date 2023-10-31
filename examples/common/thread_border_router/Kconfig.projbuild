@@ -33,6 +33,26 @@ menu "ESP Thread Border Router Example"
         config PIN_TO_RCP_RX
             int "Pin to RCP RX"
             default "18"
+
+        config PIN_TO_RCP_CS
+            depends on OPENTHREAD_RADIO_SPINEL_SPI
+            int "Pin to RCP SPI CS"
+            default "10"
+
+        config PIN_TO_RCP_SCLK
+            depends on OPENTHREAD_RADIO_SPINEL_SPI
+            int "Pin to RCP SPI SCLK"
+            default "12"
+
+        config PIN_TO_RCP_MISO
+            depends on OPENTHREAD_RADIO_SPINEL_SPI
+            int "Pin to RCP SPI MISO"
+            default "13"
+
+        config PIN_TO_RCP_MOSI
+            depends on OPENTHREAD_RADIO_SPINEL_SPI
+            int "Pin to RCP SPI MOSI"
+            default "11"
     endmenu
 
     config OPENTHREAD_BR_AUTO_UPDATE_RCP
