@@ -8,6 +8,7 @@
 #include "cJSON.h"
 #include "esp_check.h"
 #include "esp_err.h"
+#include "esp_http_server.h"
 #include "esp_log.h"
 #include "malloc.h"
 #include "stdint.h"
@@ -752,4 +753,350 @@ cJSON *thread_node_struct_convert2_json(thread_node_informaiton_t *node)
     cJSON_AddNumberToObject(root, "NumOfRouter", node->router_number);
 
     return root;
+}
+
+/*----------------------------------------------------------------------
+                       Get Thread dataset
+-----------------------------------------------------------------------*/
+cJSON *Timestamp2Json(const otTimestamp aTimestamp)
+{
+    cJSON *timestamp = cJSON_CreateObject();
+
+    cJSON_AddItemToObject(timestamp, "Seconds", cJSON_CreateNumber(aTimestamp.mSeconds));
+    cJSON_AddItemToObject(timestamp, "Ticks", cJSON_CreateNumber(aTimestamp.mTicks));
+    cJSON_AddItemToObject(timestamp, "Authoritative", cJSON_CreateBool(aTimestamp.mAuthoritative));
+
+    return timestamp;
+}
+
+cJSON *SecurityPolicy2Json(const otSecurityPolicy aSecurityPolicy)
+{
+    cJSON *securityPolicy = cJSON_CreateObject();
+
+    cJSON_AddItemToObject(securityPolicy, "RotationTime", cJSON_CreateNumber(aSecurityPolicy.mRotationTime));
+    cJSON_AddItemToObject(securityPolicy, "ObtainNetworkKey",
+                          cJSON_CreateBool(aSecurityPolicy.mObtainNetworkKeyEnabled));
+    cJSON_AddItemToObject(securityPolicy, "NativeCommissioning",
+                          cJSON_CreateBool(aSecurityPolicy.mNativeCommissioningEnabled));
+    cJSON_AddItemToObject(securityPolicy, "Routers", cJSON_CreateBool(aSecurityPolicy.mRoutersEnabled));
+    cJSON_AddItemToObject(securityPolicy, "ExternalCommissioning",
+                          cJSON_CreateBool(aSecurityPolicy.mExternalCommissioningEnabled));
+    cJSON_AddItemToObject(securityPolicy, "CommercialCommissioning",
+                          cJSON_CreateBool(aSecurityPolicy.mCommercialCommissioningEnabled));
+    cJSON_AddItemToObject(securityPolicy, "AutonomousEnrollment",
+                          cJSON_CreateBool(aSecurityPolicy.mAutonomousEnrollmentEnabled));
+    cJSON_AddItemToObject(securityPolicy, "NetworkKeyProvisioning",
+                          cJSON_CreateBool(aSecurityPolicy.mNetworkKeyProvisioningEnabled));
+    cJSON_AddItemToObject(securityPolicy, "TobleLink", cJSON_CreateBool(aSecurityPolicy.mTobleLinkEnabled));
+    cJSON_AddItemToObject(securityPolicy, "NonCcmRouters", cJSON_CreateBool(aSecurityPolicy.mNonCcmRoutersEnabled));
+
+    return securityPolicy;
+}
+
+cJSON *ActiveDataset2Json(const otOperationalDataset aActiveDataset)
+{
+    cJSON *ActiveDataset = cJSON_CreateObject();
+    char format[64];
+
+    if (aActiveDataset.mComponents.mIsActiveTimestampPresent) {
+        cJSON_AddItemToObject(ActiveDataset, "ActiveTimestamp", Timestamp2Json(aActiveDataset.mActiveTimestamp));
+    }
+    if (aActiveDataset.mComponents.mIsNetworkKeyPresent) {
+        hex_to_string(aActiveDataset.mNetworkKey.m8, format, OT_NETWORK_KEY_SIZE);
+        cJSON_AddStringToObject(ActiveDataset, "NetworkKey", format);
+    }
+    if (aActiveDataset.mComponents.mIsNetworkNamePresent) {
+        cJSON_AddItemToObject(ActiveDataset, "NetworkName", cJSON_CreateString(aActiveDataset.mNetworkName.m8));
+    }
+    if (aActiveDataset.mComponents.mIsExtendedPanIdPresent) {
+        hex_to_string(aActiveDataset.mExtendedPanId.m8, format, OT_EXT_PAN_ID_SIZE);
+        cJSON_AddStringToObject(ActiveDataset, "ExtPanId", format);
+    }
+    if (aActiveDataset.mComponents.mIsMeshLocalPrefixPresent) {
+        otIp6Prefix prefix;
+        memcpy(prefix.mPrefix.mFields.m8, aActiveDataset.mMeshLocalPrefix.m8, OT_IP6_PREFIX_SIZE);
+        prefix.mLength = OT_IP6_PREFIX_SIZE * 8;
+        otIp6PrefixToString((const otIp6Prefix *)(&prefix), format, OT_IP6_PREFIX_STRING_SIZE);
+        cJSON_AddStringToObject(ActiveDataset, "MeshLocalPrefix", format);
+    }
+    if (aActiveDataset.mComponents.mIsPanIdPresent) {
+        cJSON_AddItemToObject(ActiveDataset, "PanId", cJSON_CreateNumber(aActiveDataset.mPanId));
+    }
+    if (aActiveDataset.mComponents.mIsChannelPresent) {
+        cJSON_AddItemToObject(ActiveDataset, "Channel", cJSON_CreateNumber(aActiveDataset.mChannel));
+    }
+    if (aActiveDataset.mComponents.mIsPskcPresent) {
+        hex_to_string(aActiveDataset.mPskc.m8, format, OT_PSKC_MAX_SIZE);
+        cJSON_AddStringToObject(ActiveDataset, "PSKc", format);
+    }
+    if (aActiveDataset.mComponents.mIsSecurityPolicyPresent) {
+        cJSON_AddItemToObject(ActiveDataset, "SecurityPolicy", SecurityPolicy2Json(aActiveDataset.mSecurityPolicy));
+    }
+    if (aActiveDataset.mComponents.mIsChannelMaskPresent) {
+        cJSON_AddItemToObject(ActiveDataset, "ChannelMask", cJSON_CreateNumber(aActiveDataset.mChannelMask));
+    }
+    return ActiveDataset;
+}
+
+cJSON *PendingDataset2Json(const otOperationalDataset aPendingDataset)
+{
+    cJSON *PendingDataset = cJSON_CreateObject();
+    cJSON_AddItemToObject(PendingDataset, "ActiveDataset", ActiveDataset2Json(aPendingDataset));
+    if (aPendingDataset.mComponents.mIsPendingTimestampPresent) {
+        cJSON_AddItemToObject(PendingDataset, "PendingTimestamp", Timestamp2Json(aPendingDataset.mPendingTimestamp));
+    }
+    if (aPendingDataset.mComponents.mIsDelayPresent) {
+        cJSON_AddItemToObject(PendingDataset, "Delay", cJSON_CreateNumber(aPendingDataset.mDelay));
+    }
+    return PendingDataset;
+}
+
+/*----------------------------------------------------------------------
+                       Set Thread dataset
+-----------------------------------------------------------------------*/
+esp_err_t Json2Timestamp(const cJSON *jsonTimestamp, otTimestamp *aTimestamp)
+{
+    cJSON *value;
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonTimestamp, "Seconds");
+    if (cJSON_IsNumber(value)) {
+        aTimestamp->mSeconds = (uint64_t)cJSON_GetNumberValue(value);
+    }
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonTimestamp, "Ticks");
+    if (cJSON_IsNumber(value)) {
+        aTimestamp->mTicks = (uint16_t)cJSON_GetNumberValue(value);
+    }
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonTimestamp, "Authoritative");
+    if (cJSON_IsBool(value)) {
+        aTimestamp->mAuthoritative = (bool)cJSON_GetNumberValue(value);
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t Json2SecurityPolicy(const cJSON *jsonSecurityPolicy, otSecurityPolicy *aSecurityPolicy)
+{
+    cJSON *value = NULL;
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonSecurityPolicy, "RotationTime");
+    if (cJSON_IsNumber(value)) {
+        aSecurityPolicy->mRotationTime = (uint16_t)cJSON_GetNumberValue(value);
+    }
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonSecurityPolicy, "ObtainNetworkKey");
+    if (cJSON_IsBool(value)) {
+        aSecurityPolicy->mObtainNetworkKeyEnabled = (bool)cJSON_GetNumberValue(value);
+    }
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonSecurityPolicy, "NativeCommissioning");
+    if (cJSON_IsBool(value)) {
+        aSecurityPolicy->mNativeCommissioningEnabled = (bool)cJSON_GetNumberValue(value);
+    }
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonSecurityPolicy, "Routers");
+    if (cJSON_IsBool(value)) {
+        aSecurityPolicy->mRoutersEnabled = (bool)cJSON_GetNumberValue(value);
+    }
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonSecurityPolicy, "ExternalCommissioning");
+    if (cJSON_IsBool(value)) {
+        aSecurityPolicy->mExternalCommissioningEnabled = (bool)cJSON_GetNumberValue(value);
+    }
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonSecurityPolicy, "CommercialCommissioning");
+    if (cJSON_IsBool(value)) {
+        aSecurityPolicy->mCommercialCommissioningEnabled = (bool)cJSON_GetNumberValue(value);
+    }
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonSecurityPolicy, "AutonomousEnrollment");
+    if (cJSON_IsBool(value)) {
+        aSecurityPolicy->mAutonomousEnrollmentEnabled = (bool)cJSON_GetNumberValue(value);
+    }
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonSecurityPolicy, "NetworkKeyProvisioning");
+    if (cJSON_IsBool(value)) {
+        aSecurityPolicy->mNetworkKeyProvisioningEnabled = (bool)cJSON_GetNumberValue(value);
+    }
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonSecurityPolicy, "TobleLink");
+    if (cJSON_IsBool(value)) {
+        aSecurityPolicy->mTobleLinkEnabled = (bool)cJSON_GetNumberValue(value);
+    }
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonSecurityPolicy, "NonCcmRouters");
+    if (cJSON_IsBool(value)) {
+        aSecurityPolicy->mNonCcmRoutersEnabled = (bool)cJSON_GetNumberValue(value);
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t Json2ActiveDataset(const cJSON *jsonActiveDataset, otOperationalDataset *aActiveDataset)
+{
+    cJSON *value = NULL;
+    char *str = NULL;
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonActiveDataset, "ActiveTimestamp");
+    if (cJSON_IsObject(value)) {
+        ESP_RETURN_ON_ERROR(Json2Timestamp(value, &(aActiveDataset->mActiveTimestamp)), BASE_TAG,
+                            "Invalid ActiveTimestamp");
+        aActiveDataset->mComponents.mIsActiveTimestampPresent = true;
+    }
+
+    str = cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(jsonActiveDataset, "NetworkKey"));
+    if (str != NULL) {
+        ESP_RETURN_ON_ERROR(string_to_hex(str, aActiveDataset->mNetworkKey.m8, OT_NETWORK_KEY_SIZE), BASE_TAG,
+                            "Invalid Networkkey");
+        aActiveDataset->mComponents.mIsNetworkKeyPresent = true;
+    }
+
+    str = cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(jsonActiveDataset, "NetworkName"));
+    if (str != NULL) {
+        ESP_RETURN_ON_FALSE(strlen(str) <= OT_NETWORK_NAME_MAX_SIZE, ESP_ERR_INVALID_ARG, BASE_TAG,
+                            "Invalid NetworkName");
+        memcpy(aActiveDataset->mNetworkName.m8, str, OT_NETWORK_NAME_MAX_SIZE);
+        aActiveDataset->mNetworkName.m8[strlen(str)] = '\0';
+        aActiveDataset->mComponents.mIsNetworkNamePresent = true;
+    }
+
+    str = cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(jsonActiveDataset, "ExtPanId"));
+    if (str != NULL) {
+        ESP_RETURN_ON_ERROR(string_to_hex(str, aActiveDataset->mExtendedPanId.m8, OT_EXT_PAN_ID_SIZE), BASE_TAG,
+                            "Invalid Extended PanId");
+        aActiveDataset->mComponents.mIsExtendedPanIdPresent = true;
+    }
+
+    str = cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(jsonActiveDataset, "MeshLocalPrefix"));
+    otIp6Prefix prefix;
+    if (str != NULL) {
+        ESP_RETURN_ON_FALSE(otIp6PrefixFromString(str, &prefix) == OT_ERROR_NONE, ESP_ERR_INVALID_ARG, BASE_TAG,
+                            "Invalid MeshLocal Prefix");
+        memcpy(aActiveDataset->mMeshLocalPrefix.m8, prefix.mPrefix.mFields.m8, OT_IP6_PREFIX_SIZE);
+        aActiveDataset->mComponents.mIsMeshLocalPrefixPresent = true;
+    }
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonActiveDataset, "PanId");
+    if (cJSON_IsNumber(value)) {
+        aActiveDataset->mPanId = (otPanId)cJSON_GetNumberValue(value);
+        aActiveDataset->mComponents.mIsPanIdPresent = true;
+    }
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonActiveDataset, "Channel");
+    if (cJSON_IsNumber(value)) {
+        uint16_t channel = (uint16_t)cJSON_GetNumberValue(value);
+        ESP_RETURN_ON_FALSE(channel >= 11 && channel <= 26, ESP_ERR_INVALID_ARG, BASE_TAG, "Invalid Channel");
+        aActiveDataset->mChannel = channel;
+        aActiveDataset->mComponents.mIsChannelPresent = true;
+    }
+
+    str = cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(jsonActiveDataset, "PSKc"));
+    if (str != NULL) {
+        ESP_RETURN_ON_ERROR(string_to_hex(str, aActiveDataset->mPskc.m8, OT_PSKC_MAX_SIZE), BASE_TAG, "Invalid PSKc");
+        aActiveDataset->mComponents.mIsPskcPresent = true;
+    }
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonActiveDataset, "SecurityPolicy");
+    if (cJSON_IsObject(value)) {
+        ESP_RETURN_ON_ERROR(Json2SecurityPolicy(value, &(aActiveDataset->mSecurityPolicy)), BASE_TAG,
+                            "Invalid SecurityPolicy");
+        aActiveDataset->mComponents.mIsSecurityPolicyPresent = true;
+    }
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonActiveDataset, "ChannelMask");
+    if (cJSON_IsNumber(value)) {
+        aActiveDataset->mChannelMask = (otChannelMask)cJSON_GetNumberValue(value);
+        aActiveDataset->mComponents.mIsChannelMaskPresent = true;
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t JsonString2ActiveDataset(const cJSON *JsonStringActiveDataset, otOperationalDataset *aActiveDataset)
+{
+    otOperationalDatasetTlvs datasetUpdateTlvs;
+    char *datasetTlvsStr = cJSON_GetStringValue(JsonStringActiveDataset);
+    ESP_RETURN_ON_FALSE(strlen(datasetTlvsStr) <= OT_OPERATIONAL_DATASET_MAX_LENGTH * 2, ESP_ERR_INVALID_ARG, BASE_TAG,
+                        "Invalid DatasetTlvs");
+    ESP_RETURN_ON_ERROR(string_to_hex(datasetTlvsStr, datasetUpdateTlvs.mTlvs, strlen(datasetTlvsStr) / 2), BASE_TAG,
+                        "Invalid DatasetTlvs");
+    datasetUpdateTlvs.mLength = strlen(datasetTlvsStr) / 2;
+    ESP_RETURN_ON_FALSE(otDatasetParseTlvs(&datasetUpdateTlvs, aActiveDataset) == OT_ERROR_NONE, ESP_ERR_INVALID_ARG,
+                        BASE_TAG, "Cannot parse DatasetTlvs");
+    return ESP_OK;
+}
+
+esp_err_t Json2PendingDataset(const cJSON *jsonPendingDataset, otOperationalDataset *aPendingDataset)
+{
+    cJSON *value = NULL;
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonPendingDataset, "ActiveDataset");
+    if (cJSON_IsObject(value)) {
+        ESP_RETURN_ON_ERROR(Json2ActiveDataset(value, aPendingDataset), BASE_TAG, "Invalid ActiveDataset");
+    } else if (cJSON_IsString(value)) {
+        ESP_RETURN_ON_ERROR(JsonString2ActiveDataset(value, aPendingDataset), BASE_TAG, "Invalid ActiveDataset");
+    }
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonPendingDataset, "PendingTimestamp");
+    if (cJSON_IsObject(value)) {
+        ESP_RETURN_ON_ERROR(Json2Timestamp(value, &(aPendingDataset->mPendingTimestamp)), BASE_TAG,
+                            "Invalid PendingTimestamp");
+        aPendingDataset->mComponents.mIsPendingTimestampPresent = true;
+    }
+
+    value = cJSON_GetObjectItemCaseSensitive(jsonPendingDataset, "Delay");
+    if (cJSON_IsNumber(value)) {
+        aPendingDataset->mDelay = (uint32_t)cJSON_GetNumberValue(value);
+        aPendingDataset->mComponents.mIsDelayPresent = true;
+    }
+    return ESP_OK;
+}
+
+void ot_br_web_response_code_get(uint16_t errcode, char *status_buf)
+{
+    switch (errcode) {
+    case 200:
+        strcpy(status_buf, HTTPD_200);
+        break;
+    case 201:
+        strcpy(status_buf, HTTPD_201);
+        break;
+    case 204:
+        strcpy(status_buf, HTTPD_204);
+        break;
+    case 400:
+        strcpy(status_buf, HTTPD_400);
+        break;
+    case 404:
+        strcpy(status_buf, HTTPD_404);
+        break;
+    case 409:
+        strcpy(status_buf, HTTPD_409);
+        break;
+    default:
+        strcpy(status_buf, HTTPD_500);
+        break;
+    }
+}
+
+esp_err_t convert_ot_err_to_response_code(otError errcode, char *status_buf)
+{
+    esp_err_t err = ESP_OK;
+    switch (errcode) {
+    case OT_ERROR_NONE:
+        strcpy(status_buf, HTTPD_200);
+        break;
+    case OT_ERROR_INVALID_ARGS:
+        strcpy(status_buf, HTTPD_400);
+        break;
+    case OT_ERROR_INVALID_STATE:
+        strcpy(status_buf, HTTPD_409);
+        break;
+    default:
+        ESP_LOGW(BASE_TAG, "None matched http response code, openthread error: %d", errcode);
+        err = ESP_ERR_NOT_FOUND;
+        break;
+    }
+    return err;
 }

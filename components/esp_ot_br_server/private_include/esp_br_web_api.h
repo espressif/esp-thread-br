@@ -12,6 +12,7 @@ extern "C" {
 
 #include "cJSON.h"
 #include "esp_br_web_base.h"
+#include "esp_http_server.h"
 #include "openthread/error.h"
 
 /*---------------------------------------------------------------------
@@ -29,7 +30,8 @@ extern "C" {
 #define ESP_OT_REST_API_NODE_NUMBEROFROUTER_PATH "/node/num-of-router"
 #define ESP_OT_REST_API_NODE_EXTPANID_PATH "/node/ext-panid"
 #define ESP_OT_REST_API_NODE_BORDERAGENTID_PATH "/node/ba-id"
-#define ESP_OT_REST_API_NODE_ACTIVE_DATASET_TLVS_PATH "/node/active-dataset-tlvs"
+#define ESP_OT_REST_API_NODE_DATASET_ACTIVE_PATH "/node/dataset/active"
+#define ESP_OT_REST_API_NODE_DATASET_PENDING_PATH "/node/dataset/pending"
 #define ESP_OT_REST_API_PROPERTIES_PATH "/get_properties"
 #define ESP_OT_REST_API_AVAILABLE_NETWORK_PATH "/available_network"
 #define ESP_OT_REST_API_NODE_INFORMATION_PATH "/node_information"
@@ -73,80 +75,104 @@ otError handle_ot_resource_node_delete_information_request(void);
 cJSON *handle_ot_resource_network_diagnostics_request(void);
 
 /**
- * @brief Provide an entry ot get current Thread node rloc
+ * @brief Provide an entry to get current Thread node rloc
  *
  * @return The cJSON object of Thread node rloc
  */
 cJSON *handle_ot_resource_node_rloc_request(void);
 
 /**
- * @brief Provide an entry ot get current Thread node rloc16
+ * @brief Provide an entry to get current Thread node rloc16
  *
  * @return The cJSON object of Thread node rloc16
  */
 cJSON *handle_ot_resource_node_rloc16_request(void);
 
 /**
- * @brief Provide an entry ot get current Thread node state
+ * @brief Provide an entry to get current Thread node state
  *
  * @return The cJSON object of Thread node state
  */
 cJSON *handle_ot_resource_node_state_request(void);
 
 /**
- * @brief Provide an entry ot get current Thread node extended address
+ * @brief Provide an entry to get current Thread node extended address
  *
  * @return The cJSON object of Thread node extended address
  */
 cJSON *handle_ot_resource_node_extaddress_request(void);
 
 /**
- * @brief Provide an entry ot get current Thread network name
+ * @brief Provide an entry to get current Thread network name
  *
  * @return The cJSON object of Thread node network name
  */
 cJSON *handle_ot_resource_node_network_name_request(void);
 
 /**
- * @brief Provide an entry ot get current Thread leader data
+ * @brief Provide an entry to get current Thread leader data
  *
  * @return The cJSON object of Thread node leader data
  */
 cJSON *handle_ot_resource_node_leader_data_request(void);
 
 /**
- * @brief Provide an entry ot get number of router of Thread
+ * @brief Provide an entry to get Thread router number
  *
  * @return The cJSON object of Thread  number of router
  */
 cJSON *handle_ot_resource_node_numofrouter_request(void);
 
 /**
- * @brief Provide an entry ot get extended panid of Thread
+ * @brief Provide an entry to get Thread extended panid
  *
  * @return The cJSON object of Thread extended panid
  */
 cJSON *handle_ot_resource_node_extpanid_request(void);
 
 /**
- * @brief Provide an entry ot get border agent id of Thread
+ * @brief Provide an entry to get Thread border agent id
  *
  * @return The cJSON object of border agent id
  */
 cJSON *handle_ot_resource_node_baid_request(void);
 
 /**
- * @brief Provide an entry ot get active dataset tlv of Thread
+ * @brief Handle the Thread dataset get @param request and provide @param log
  *
- * @return The cJSON object of Thread active dataset tlv
+ * @param [in] request  A cJSON format from http request for getting dataset.
+ * @param [out] log     A cJSON String type to record the result of getting dataset.
+ *
+ * @return              The cJSON object of Thread dataset
  */
-cJSON *handle_ot_resource_node_active_dataset_tlv_request(void);
+cJSON *handle_ot_resource_node_get_dataset_request(const cJSON *request, cJSON *log);
+
+/**
+ * @brief Handle the Thread state configuration @param request
+ *
+ * @param [in] request  A cJSON format from http request for state configuration.
+ *
+ * @return
+ *      -   OT_ERROR_NONE           :   On success.
+ *      -   OT_ERROR_INVALID_ARGS   :   The @param request is invalid.
+ *      -   OT_ERROR_INVALID_STATE  :   Current device status does not allow state configuration.
+ */
+otError handle_ot_resource_node_state_put_request(cJSON *request);
+
+/**
+ * @brief Handle the Thread dataset set @param request and provide @param log
+ *
+ * @param [in] request  A cJSON format from http request for setting dataset.
+ * @param [out] log     A cJSON String type to record the result of setting dataset.
+ *
+ */
+void handle_ot_resource_node_set_dataset_request(const cJSON *request, cJSON *log);
 
 /**
  * @brief Handle the Thread network formation @param request and provide @param log
  *
  * @param [in] request  A cJSON format from http request for forming network.
- * @param [out] log     A cJSON String type to record the problem of network formation.
+ * @param [out] log     A cJSON String type to record the result of network formation.
  *
  * @return
  *      -   OT_ERROR_NONE           :   On success.

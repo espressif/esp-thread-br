@@ -84,13 +84,16 @@ static esp_err_t esp_otbr_network_node_delete_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_rloc_get_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_rloc16_get_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_state_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_state_put_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_extaddress_get_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_network_name_get_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_leader_data_get_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_number_of_router_get_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_extpanid_get_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_baid_get_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_active_dataset_tlv_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_dataset_active_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_dataset_pending_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_dataset_handler(httpd_req_t *req, const char *dataset_type);
 
 static httpd_uri_t s_resource_handlers[] = {
     {
@@ -130,6 +133,12 @@ static httpd_uri_t s_resource_handlers[] = {
         .user_ctx = NULL,
     },
     {
+        .uri = ESP_OT_REST_API_NODE_STATE_PATH,
+        .method = HTTP_PUT,
+        .handler = esp_otbr_network_node_state_put_handler,
+        .user_ctx = &s_server.data,
+    },
+    {
         .uri = ESP_OT_REST_API_NODE_EXTADDRESS_PATH,
         .method = HTTP_GET,
         .handler = esp_otbr_network_node_extaddress_get_handler,
@@ -166,10 +175,28 @@ static httpd_uri_t s_resource_handlers[] = {
         .user_ctx = NULL,
     },
     {
-        .uri = ESP_OT_REST_API_NODE_ACTIVE_DATASET_TLVS_PATH,
+        .uri = ESP_OT_REST_API_NODE_DATASET_ACTIVE_PATH,
         .method = HTTP_GET,
-        .handler = esp_otbr_network_node_active_dataset_tlv_get_handler,
+        .handler = esp_otbr_network_node_dataset_active_handler,
         .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_DATASET_ACTIVE_PATH,
+        .method = HTTP_PUT,
+        .handler = esp_otbr_network_node_dataset_active_handler,
+        .user_ctx = &s_server.data,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_DATASET_PENDING_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_network_node_dataset_pending_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_DATASET_PENDING_PATH,
+        .method = HTTP_PUT,
+        .handler = esp_otbr_network_node_dataset_pending_handler,
+        .user_ctx = &s_server.data,
     },
 };
 
@@ -286,18 +313,27 @@ static esp_err_t httpd_server_register_http_uri(const http_server_t *server, htt
     return ESP_OK;
 }
 
-static cJSON *httpd_request_convert2_json(httpd_req_t *req)
+static cJSON *httpd_request_convert2_json(httpd_req_t *req, int type)
 {
-    int total_len = req->content_len;
-    int cur_len = 0;
     char *buf = ((http_server_data_t *)(req->user_ctx))->scratch;
     int received = 0;
+    int cur_len = 0;
+    int total_len = req->content_len;
+    int end_len = total_len;
+    if (type == cJSON_String) {
+        cur_len = 1;
+        total_len += 2;
+        buf[0] = '\"';
+        buf[total_len - 1] = '\"';
+        end_len = total_len - 1;
+    }
+
     if (total_len >= SCRATCH_BUFSIZE) /* Respond with 500 Internal Server Error */
     {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "The content of packet is too long");
         return NULL;
     }
-    while (cur_len < total_len) {
+    while (cur_len < end_len) {
         received = httpd_req_recv(req, buf + cur_len, total_len);
         if (received <= 0) /* Respond with 500 Internal Server Error */
         {
@@ -319,10 +355,23 @@ static esp_err_t httpd_send_packet(httpd_req_t *req, cJSON *root)
     ESP_RETURN_ON_FALSE(packet, ESP_FAIL, WEB_TAG, "Invalid Packet");
     ESP_LOGD(WEB_TAG, "Properties: %s\r\n", packet);
     ESP_RETURN_ON_FALSE(packet, ESP_FAIL, WEB_TAG, "Invalid Pesponse");
-    ESP_GOTO_ON_ERROR(httpd_resp_set_type(req, "application/json"), exit, WEB_TAG, "Failed to set http type");
+    ESP_GOTO_ON_ERROR(httpd_resp_set_type(req, ESP_OT_REST_CONTENT_TYPE_JSON), exit, WEB_TAG,
+                      "Failed to set http type");
     ESP_GOTO_ON_ERROR(httpd_resp_sendstr(req, packet), exit, WEB_TAG, "Failed to send http respond");
 exit:
     cJSON_free(packet);
+    return ret;
+}
+
+static esp_err_t httpd_send_plain_text(httpd_req_t *req, char *str)
+{
+    esp_err_t ret = ESP_OK;
+    ESP_RETURN_ON_FALSE(str, ESP_FAIL, WEB_TAG, "Invalid plain text");
+    ESP_LOGD(WEB_TAG, "Properties: %s\r\n", str);
+    ESP_GOTO_ON_ERROR(httpd_resp_set_type(req, ESP_OT_REST_CONTENT_TYPE_PLAIN), exit, WEB_TAG,
+                      "Failed to set http type");
+    ESP_GOTO_ON_ERROR(httpd_resp_sendstr(req, str), exit, WEB_TAG, "Failed to send http respond");
+exit:
     return ret;
 }
 
@@ -374,7 +423,7 @@ static esp_err_t esp_otbr_network_node_delete_handler(httpd_req_t *req)
     if (error == OT_ERROR_NONE) {
         httpd_resp_set_status(req, HTTPD_200);
     } else if (error == OT_ERROR_INVALID_STATE) {
-        httpd_resp_set_status(req, "409 Conflict");
+        httpd_resp_set_status(req, HTTPD_409);
     } else {
         httpd_resp_set_status(req, HTTPD_500);
     }
@@ -410,6 +459,29 @@ static esp_err_t esp_otbr_network_node_state_get_handler(httpd_req_t *req)
     ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
 exit:
     cJSON_Delete(response);
+    return ret;
+}
+
+static esp_err_t esp_otbr_network_node_state_put_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    otError err = OT_ERROR_NONE;
+    cJSON *state = httpd_request_convert2_json(req, cJSON_Object);
+    if (cJSON_IsString(state)) {
+        err = handle_ot_resource_node_state_put_request(state);
+    } else {
+        ESP_LOGE(WEB_TAG, "Invalid args");
+        err = OT_ERROR_INVALID_ARGS;
+    }
+
+    char http_return_status[64];
+    if (convert_ot_err_to_response_code(err, http_return_status) != ESP_OK) {
+        strcpy(http_return_status, HTTPD_500);
+    }
+    httpd_resp_set_status(req, http_return_status);
+    ESP_GOTO_ON_ERROR(httpd_resp_send(req, NULL, 0), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
+    cJSON_Delete(state);
     return ret;
 }
 
@@ -473,13 +545,86 @@ exit:
     return ret;
 }
 
-static esp_err_t esp_otbr_network_node_active_dataset_tlv_get_handler(httpd_req_t *req)
+static esp_err_t esp_otbr_network_node_dataset_active_handler(httpd_req_t *req)
+{
+    return esp_otbr_network_node_dataset_handler(req, ESP_OT_DATASET_TYPE_ACTIVE);
+}
+
+static esp_err_t esp_otbr_network_node_dataset_pending_handler(httpd_req_t *req)
+{
+    return esp_otbr_network_node_dataset_handler(req, ESP_OT_DATASET_TYPE_PENDING);
+}
+
+static esp_err_t esp_otbr_network_node_dataset_handler(httpd_req_t *req, const char *dataset_type)
 {
     esp_err_t ret = ESP_OK;
-    cJSON *response = handle_ot_resource_node_active_dataset_tlv_request();
-    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+    cJSON *request = cJSON_CreateObject();
+    cJSON *response = NULL;
+    cJSON *log = cJSON_CreateObject();
+    cJSON_AddItemToObject(request, ESP_OT_REST_DATASET_TYPE, cJSON_CreateString(dataset_type));
+    char format[256];
+    uint16_t errcode = 0;
+
+    if (req->method == HTTP_GET) {
+        if (httpd_req_get_hdr_value_str(req, ESP_OT_REST_ACCEPT_HEADER, format, sizeof(format)) == ESP_OK &&
+            strcmp(format, ESP_OT_REST_CONTENT_TYPE_PLAIN) == 0) {
+            cJSON_AddItemToObject(request, ESP_OT_REST_ACCEPT_HEADER,
+                                  cJSON_CreateString(ESP_OT_REST_CONTENT_TYPE_PLAIN));
+        } else {
+            cJSON_AddItemToObject(request, ESP_OT_REST_ACCEPT_HEADER,
+                                  cJSON_CreateString(ESP_OT_REST_CONTENT_TYPE_JSON));
+        }
+        response = handle_ot_resource_node_get_dataset_request(request, log);
+    } else if (req->method == HTTP_PUT) {
+        cJSON *value = NULL;
+        if (httpd_req_get_hdr_value_str(req, ESP_OT_REST_CONTENT_TYPE_HEADER, format, sizeof(format)) == ESP_OK &&
+            strcmp(format, ESP_OT_REST_CONTENT_TYPE_PLAIN) == 0) {
+            cJSON_AddItemToObject(request, ESP_OT_REST_CONTENT_TYPE_HEADER,
+                                  cJSON_CreateString(ESP_OT_REST_CONTENT_TYPE_PLAIN));
+            value = httpd_request_convert2_json(req, cJSON_String);
+            if (!cJSON_IsString(value)) {
+                errcode = 400;
+            }
+        } else {
+            cJSON_AddItemToObject(request, ESP_OT_REST_CONTENT_TYPE_HEADER,
+                                  cJSON_CreateString(ESP_OT_REST_CONTENT_TYPE_JSON));
+            value = httpd_request_convert2_json(req, cJSON_Object);
+            if (!cJSON_IsObject(value)) {
+                errcode = 400;
+            }
+        }
+
+        if (errcode == 0) {
+            cJSON_AddItemToObject(request, "DatasetData", value);
+            handle_ot_resource_node_set_dataset_request(request, log);
+        } else if (errcode == 400) {
+            ESP_LOGE(WEB_TAG, "Invalid args");
+        }
+    }
+
+    cJSON *value = cJSON_GetObjectItemCaseSensitive(log, "ErrorCode");
+    if (cJSON_IsNumber(value)) {
+        errcode = (uint16_t)cJSON_GetNumberValue(value);
+    }
+
+    char http_return_status[64];
+    ot_br_web_response_code_get(errcode, http_return_status);
+    httpd_resp_set_status(req, http_return_status);
+    if (response) {
+        if (cJSON_IsString(response)) {
+            ESP_GOTO_ON_ERROR(httpd_send_plain_text(req, cJSON_GetStringValue(response)), exit, WEB_TAG,
+                              "Failed to response %s", req->uri);
+        } else {
+            ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+        }
+    } else {
+        ESP_GOTO_ON_ERROR(httpd_resp_send(req, NULL, 0), exit, WEB_TAG, "Failed to response %s", req->uri);
+    }
+
 exit:
+    cJSON_Delete(request);
     cJSON_Delete(response);
+    cJSON_Delete(log);
     return ret;
 }
 
@@ -557,7 +702,7 @@ exit:
 static esp_err_t esp_otbr_network_join_post_handler(httpd_req_t *req)
 {
     esp_err_t ret = ESP_OK;
-    cJSON *request = httpd_request_convert2_json(req);
+    cJSON *request = httpd_request_convert2_json(req, cJSON_Object);
     ESP_RETURN_ON_FALSE(request, ESP_FAIL, WEB_TAG, "Failed to parse the JOIN package");
 
     cJSON *join_log = cJSON_CreateString("Known");
@@ -591,7 +736,7 @@ exit:
 static esp_err_t esp_otbr_network_form_post_handler(httpd_req_t *req)
 {
     esp_err_t ret = ESP_OK;
-    cJSON *request = httpd_request_convert2_json(req);
+    cJSON *request = httpd_request_convert2_json(req, cJSON_Object);
     ESP_RETURN_ON_FALSE(request, ESP_FAIL, WEB_TAG, "Failed to parse the FORM package");
 
     cJSON *form_log = cJSON_CreateString("Known");
@@ -625,7 +770,7 @@ exit:
 static esp_err_t esp_otbr_add_network_prefix_post_handler(httpd_req_t *req)
 {
     esp_err_t ret = ESP_OK;
-    cJSON *request = httpd_request_convert2_json(req);
+    cJSON *request = httpd_request_convert2_json(req, cJSON_Object);
     ESP_RETURN_ON_FALSE(request, ESP_FAIL, WEB_TAG, "Failed to parse the add prefix package");
     otError err = handle_openthread_add_network_prefix_request(request);
     cJSON *error = cJSON_CreateNumber((double)err);
@@ -658,7 +803,7 @@ exit:
 static esp_err_t esp_otbr_delete_network_prefix_post_handler(httpd_req_t *req)
 {
     esp_err_t ret = ESP_OK;
-    cJSON *request = httpd_request_convert2_json(req);
+    cJSON *request = httpd_request_convert2_json(req, cJSON_Object);
     ESP_RETURN_ON_FALSE(request, ESP_FAIL, WEB_TAG, "Failed to parse the delete prefix package");
 
     otError err = handle_openthread_delete_network_prefix_request(request);
@@ -681,7 +826,7 @@ exit:
 static esp_err_t esp_otbr_network_commission_post_handler(httpd_req_t *req)
 {
     esp_err_t ret = ESP_OK;
-    cJSON *request = httpd_request_convert2_json(req);
+    cJSON *request = httpd_request_convert2_json(req, cJSON_Object);
     ESP_RETURN_ON_FALSE(request, ESP_FAIL, WEB_TAG, "Failed to parse the add prefix package");
 
     otError err = handle_openthread_network_commission_request(request);

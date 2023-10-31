@@ -39,6 +39,8 @@
 
 #define API_TAG "web_api"
 
+static const char s_ot_state[5][10] = {"disabled", "detached", "child", "router", "leader"};
+
 /*----------------------------------------------------------------------
                             tools
 ----------------------------------------------------------------------*/
@@ -88,11 +90,40 @@ cJSON *handle_ot_resource_node_rloc16_request()
 
 cJSON *handle_ot_resource_node_state_request()
 {
-    uint16_t state = 0;
+    otDeviceRole state = 0;
     esp_openthread_lock_acquire(portMAX_DELAY);
     state = otThreadGetDeviceRole(esp_openthread_get_instance());
+    char state_str[10];
+    strcpy(state_str, s_ot_state[state]);
     esp_openthread_lock_release();
-    return cJSON_CreateNumber(state);
+    return cJSON_CreateString(state_str);
+}
+
+otError handle_ot_resource_node_state_put_request(cJSON *request)
+{
+    otError ret = OT_ERROR_NONE;
+
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    otInstance *ins = esp_openthread_get_instance();
+    if (cJSON_IsString(request)) {
+        const char *state = cJSON_GetStringValue(request);
+        if (strcmp(state, "enable") == 0) {
+            if (!otIp6IsEnabled(ins)) {
+                ERROR_EXIT(otIp6SetEnabled(ins, true), exit, API_TAG, "Invalid State");
+            }
+            ERROR_EXIT(otThreadSetEnabled(ins, true), exit, API_TAG, "Invalid State");
+        } else if (strcmp(state, "disable") == 0) {
+            ERROR_EXIT(otThreadSetEnabled(ins, false), exit, API_TAG, "Invalid State");
+            ERROR_EXIT(otIp6SetEnabled(ins, false), exit, API_TAG, "Invalid State");
+        } else {
+            ret = OT_ERROR_INVALID_ARGS;
+        }
+    } else {
+        ret = OT_ERROR_INVALID_ARGS;
+    }
+exit:
+    esp_openthread_lock_release();
+    return ret;
 }
 
 cJSON *handle_ot_resource_node_extaddress_request()
@@ -120,15 +151,16 @@ cJSON *handle_ot_resource_node_leader_data_request()
     cJSON *root = NULL;
     otLeaderData data;
     esp_openthread_lock_acquire(portMAX_DELAY);
-    ESP_RETURN_ON_FALSE(!otThreadGetLeaderData(esp_openthread_get_instance(), &data), NULL, API_TAG,
-                        "Failed to get thread leader data");
-    root = cJSON_CreateObject();
-    cJSON_AddItemToObject(root, "PartitionId", cJSON_CreateNumber(data.mPartitionId));
-    cJSON_AddItemToObject(root, "Weighting", cJSON_CreateNumber(data.mWeighting));
-    cJSON_AddItemToObject(root, "DataVersion", cJSON_CreateNumber(data.mDataVersion));
-    cJSON_AddItemToObject(root, "StableDataVersion", cJSON_CreateNumber(data.mStableDataVersion));
-    cJSON_AddItemToObject(root, "LeaderRouterId", cJSON_CreateNumber(data.mLeaderRouterId));
-
+    if (otThreadGetLeaderData(esp_openthread_get_instance(), &data) == OT_ERROR_NONE) {
+        root = cJSON_CreateObject();
+        cJSON_AddItemToObject(root, "PartitionId", cJSON_CreateNumber(data.mPartitionId));
+        cJSON_AddItemToObject(root, "Weighting", cJSON_CreateNumber(data.mWeighting));
+        cJSON_AddItemToObject(root, "DataVersion", cJSON_CreateNumber(data.mDataVersion));
+        cJSON_AddItemToObject(root, "StableDataVersion", cJSON_CreateNumber(data.mStableDataVersion));
+        cJSON_AddItemToObject(root, "LeaderRouterId", cJSON_CreateNumber(data.mLeaderRouterId));
+    } else {
+        ESP_LOGE(API_TAG, "Failed to get thread leader data");
+    }
     esp_openthread_lock_release();
     return root;
 }
@@ -172,18 +204,139 @@ cJSON *handle_ot_resource_node_baid_request()
     return cJSON_CreateString(format);
 }
 
-cJSON *handle_ot_resource_node_active_dataset_tlv_request()
+cJSON *handle_ot_resource_node_get_dataset_request(const cJSON *request, cJSON *log)
 {
-    char format[256];
-    otOperationalDatasetTlvs dataset;
+    uint16_t errcode = 200;
+    cJSON *response = NULL;
+    char format[255] = "";
+    otOperationalDataset dataset;
+    otOperationalDatasetTlvs datasetTlvs;
+    otError ret = OT_ERROR_NONE;
+    const char *accept_format =
+        cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(request, ESP_OT_REST_ACCEPT_HEADER));
+    const char *dataset_type =
+        cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(request, ESP_OT_REST_DATASET_TYPE));
+
     esp_openthread_lock_acquire(portMAX_DELAY);
-    ESP_RETURN_ON_FALSE(!otDatasetGetActiveTlvs(esp_openthread_get_instance(), &dataset), NULL, API_TAG,
-                        "Failed to get thread dataset tlv");
+    otInstance *ins = esp_openthread_get_instance();
+    if (strcmp(accept_format, ESP_OT_REST_CONTENT_TYPE_PLAIN) == 0) {
+        if (strcmp(dataset_type, ESP_OT_DATASET_TYPE_ACTIVE) == 0) {
+            ERROR_EXIT(otDatasetGetActiveTlvs(ins, &datasetTlvs), exit, API_TAG,
+                       "Failed to get Thread active dataset tlv");
+        } else if (strcmp(dataset_type, ESP_OT_DATASET_TYPE_PENDING) == 0) {
+            ERROR_EXIT(otDatasetGetPendingTlvs(ins, &datasetTlvs), exit, API_TAG,
+                       "Failed to get Thread pending dataset tlv");
+        } else {
+            ESP_GOTO_ON_FALSE(false, OT_ERROR_FAILED, exit, API_TAG, "Invalid DatasetTlv Type");
+        }
+        ESP_GOTO_ON_FALSE(sizeof(format) >= (datasetTlvs.mLength * 2), OT_ERROR_FAILED, exit, API_TAG, "Invalid Size");
+        ESP_GOTO_ON_FALSE(hex_to_string(datasetTlvs.mTlvs, format, datasetTlvs.mLength) == ESP_OK, OT_ERROR_FAILED,
+                          exit, API_TAG, "Failed to convert Thread dataset tlv");
+        response = cJSON_CreateString(format);
+    } else {
+        if (strcmp(dataset_type, ESP_OT_DATASET_TYPE_ACTIVE) == 0) {
+            ERROR_EXIT(otDatasetGetActive(ins, &dataset), exit, API_TAG, "Failed to get Thread active dataset");
+            response = ActiveDataset2Json(dataset);
+        } else if (strcmp(dataset_type, ESP_OT_DATASET_TYPE_PENDING) == 0) {
+            ERROR_EXIT(otDatasetGetPending(ins, &dataset), exit, API_TAG, "Failed to get Thread pending dataset");
+            response = PendingDataset2Json(dataset);
+        } else {
+            ESP_GOTO_ON_FALSE(false, OT_ERROR_FAILED, exit, API_TAG, "Invalid Dataset Type");
+        }
+    }
+exit:
     esp_openthread_lock_release();
-    ESP_RETURN_ON_FALSE(sizeof(format) >= (dataset.mLength * 2), NULL, API_TAG, "Invalid Size");
-    ESP_RETURN_ON_FALSE(!hex_to_string(dataset.mTlvs, format, dataset.mLength), NULL, API_TAG,
-                        "Failed to convert thread dataset tlv");
-    return cJSON_CreateString(format);
+    if (ret != OT_ERROR_NONE) {
+        errcode = 204;
+    }
+    cJSON_AddItemToObject(log, "ErrorCode", cJSON_CreateNumber(errcode));
+    return response;
+}
+
+void handle_ot_resource_node_set_dataset_request(const cJSON *request, cJSON *log)
+{
+    uint16_t errcode = 200;
+    otOperationalDataset dataset;
+    otOperationalDatasetTlvs datasetTlvs;
+    otOperationalDatasetTlvs datasetUpdateTlvs;
+    otError ret = OT_ERROR_NONE;
+    const char *content_format =
+        cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(request, ESP_OT_REST_CONTENT_TYPE_HEADER));
+    const char *dataset_type =
+        cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(request, ESP_OT_REST_DATASET_TYPE));
+
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    otInstance *ins = esp_openthread_get_instance();
+
+    if (strcmp(dataset_type, ESP_OT_DATASET_TYPE_ACTIVE) == 0) {
+        ESP_GOTO_ON_FALSE(otThreadGetDeviceRole(ins) == OT_DEVICE_ROLE_DISABLED, OT_ERROR_INVALID_STATE, exit, API_TAG,
+                          "Invalid State");
+        ret = otDatasetGetActiveTlvs(ins, &datasetTlvs);
+    } else if (strcmp(dataset_type, ESP_OT_DATASET_TYPE_PENDING) == 0) {
+        ret = otDatasetGetPendingTlvs(ins, &datasetTlvs);
+    } else {
+        ESP_GOTO_ON_FALSE(false, OT_ERROR_FAILED, exit, API_TAG, "Invalid Dataset Type");
+    }
+
+    if (ret == OT_ERROR_NOT_FOUND) {
+        ESP_GOTO_ON_FALSE(otDatasetCreateNewNetwork(ins, &dataset) == OT_ERROR_NONE, OT_ERROR_FAILED, exit, API_TAG,
+                          "Cannot create a new dataset");
+        ESP_GOTO_ON_FALSE(otDatasetConvertToTlvs(&dataset, &datasetTlvs) == OT_ERROR_NONE, OT_ERROR_FAILED, exit,
+                          API_TAG, "Cannot convert the dataset");
+        errcode = 201;
+        ret = OT_ERROR_NONE;
+    }
+
+    bool isTlv = (strcmp(content_format, ESP_OT_REST_CONTENT_TYPE_PLAIN) == 0);
+
+    if (isTlv) {
+        char *datasetTlvsStr = cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(request, "DatasetData"));
+        ESP_GOTO_ON_FALSE(datasetTlvsStr && strlen(datasetTlvsStr) <= OT_OPERATIONAL_DATASET_MAX_LENGTH * 2,
+                          OT_ERROR_INVALID_ARGS, exit, API_TAG, "Invalid DatasetTlvs");
+        ESP_GOTO_ON_FALSE(string_to_hex(datasetTlvsStr, datasetUpdateTlvs.mTlvs, strlen(datasetTlvsStr) / 2) == ESP_OK,
+                          OT_ERROR_INVALID_ARGS, exit, API_TAG, "Invalid DatasetTlvs");
+        datasetUpdateTlvs.mLength = strlen(datasetTlvsStr) / 2;
+        ERROR_EXIT(otDatasetParseTlvs(&datasetUpdateTlvs, &dataset), exit, API_TAG, "Invalid DatasetTlvs");
+        ERROR_EXIT(otDatasetUpdateTlvs(&dataset, &datasetTlvs), exit, API_TAG, "Cannot update DatasetTlvs");
+    } else {
+        cJSON *datasetJson = cJSON_GetObjectItemCaseSensitive(request, "DatasetData");
+        if (strcmp(dataset_type, ESP_OT_DATASET_TYPE_ACTIVE) == 0) {
+            ESP_GOTO_ON_FALSE(Json2ActiveDataset(datasetJson, &dataset) == ESP_OK, OT_ERROR_INVALID_ARGS, exit, API_TAG,
+                              "Invalid Active Dataset");
+        } else if (strcmp(dataset_type, ESP_OT_DATASET_TYPE_PENDING) == 0) {
+            ESP_GOTO_ON_FALSE(Json2PendingDataset(datasetJson, &dataset) == ESP_OK, OT_ERROR_INVALID_ARGS, exit,
+                              API_TAG, "Invalid Pending Dataset");
+        } else {
+            ESP_GOTO_ON_FALSE(false, OT_ERROR_FAILED, exit, API_TAG, "Invalid Dataset Type");
+        }
+        ERROR_EXIT(otDatasetUpdateTlvs(&dataset, &datasetTlvs), exit, API_TAG, "Cannot update DatasetTlvs");
+    }
+
+    if (strcmp(dataset_type, ESP_OT_DATASET_TYPE_ACTIVE) == 0) {
+        ERROR_EXIT(otDatasetSetActiveTlvs(ins, &datasetTlvs), exit, API_TAG, "Cannot set Active DatasetTlvs");
+    } else if (strcmp(dataset_type, ESP_OT_DATASET_TYPE_PENDING) == 0) {
+        ERROR_EXIT(otDatasetSetPendingTlvs(ins, &datasetTlvs), exit, API_TAG, "Cannot set Pending DatasetTlvs");
+    } else {
+        ESP_GOTO_ON_FALSE(false, OT_ERROR_FAILED, exit, API_TAG, "Invalid Dataset Type");
+    }
+
+exit:
+    esp_openthread_lock_release();
+
+    if (ret != OT_ERROR_NONE) {
+        switch (ret) {
+        case OT_ERROR_INVALID_ARGS:
+            errcode = 400;
+            break;
+        case OT_ERROR_INVALID_STATE:
+            errcode = 409;
+            break;
+        default:
+            errcode = 500;
+            break;
+        }
+    }
+    cJSON_AddItemToObject(log, "ErrorCode", cJSON_CreateNumber(errcode));
 }
 
 /*----------------------------------------------------------------------
@@ -256,24 +409,26 @@ static esp_err_t get_openthread_wpan_properties(otInstance *ins, thread_wpan_sta
 
 static esp_err_t get_openthread_properties(openthread_properties_t *properties)
 {
+    esp_err_t ret = ESP_OK;
     esp_openthread_lock_acquire(portMAX_DELAY);
     otInstance *ins = esp_openthread_get_instance(); /* get the api of openthread */
-    ESP_RETURN_ON_FALSE(ins, ESP_FAIL, API_TAG, "Failed to get openthread instance");
+    ESP_GOTO_ON_FALSE(ins, ESP_FAIL, exit, API_TAG, "Failed to get openthread instance");
 
     /* get openthread border router information */
-    ESP_RETURN_ON_ERROR(get_openthread_ipv6_properties(ins, &properties->ipv6), API_TAG,
-                        "Failed to get status of ipv6"); /* ipv6 */
-    ESP_RETURN_ON_ERROR(get_openthread_network_properties(ins, &properties->network), API_TAG,
-                        "Failed to get status of network"); /* network */
-    ESP_RETURN_ON_ERROR(get_openthread_information_properties(ins, &properties->information), API_TAG,
-                        "Failed to get status of information"); /* ot information */
-    ESP_RETURN_ON_ERROR(get_openthread_rcp_properties(ins, &properties->rcp), API_TAG,
-                        "Failed to get status of rcp"); /* rcp */
-    ESP_RETURN_ON_ERROR(get_openthread_wpan_properties(ins, &properties->wpan), API_TAG,
-                        "Failed to get status of wpan"); /* wpan */
+    ESP_GOTO_ON_ERROR(get_openthread_ipv6_properties(ins, &properties->ipv6), exit, API_TAG,
+                      "Failed to get status of ipv6"); /* ipv6 */
+    ESP_GOTO_ON_ERROR(get_openthread_network_properties(ins, &properties->network), exit, API_TAG,
+                      "Failed to get status of network"); /* network */
+    ESP_GOTO_ON_ERROR(get_openthread_information_properties(ins, &properties->information), exit, API_TAG,
+                      "Failed to get status of information"); /* ot information */
+    ESP_GOTO_ON_ERROR(get_openthread_rcp_properties(ins, &properties->rcp), exit, API_TAG,
+                      "Failed to get status of rcp"); /* rcp */
+    ESP_GOTO_ON_ERROR(get_openthread_wpan_properties(ins, &properties->wpan), exit, API_TAG,
+                      "Failed to get status of wpan"); /* wpan */
 
+exit:
     esp_openthread_lock_release();
-    return ESP_OK;
+    return ret;
 }
 
 cJSON *handle_openthread_network_properties_request()
@@ -746,22 +901,22 @@ static void diagnosticTlv_result_handler(otError aError, otMessage *aMessage, co
  */
 static esp_err_t build_thread_network_topology()
 {
-    otError error = OT_ERROR_NONE;
+    esp_err_t ret = ESP_OK;
     otInstance *ins = esp_openthread_get_instance();
     esp_openthread_lock_acquire(portMAX_DELAY);
     otIp6Address rloc16address = *otThreadGetRloc(ins);
     otIp6Address multicastAddress;
-    ESP_RETURN_ON_ERROR(error = otThreadSendDiagnosticGet(ins, &rloc16address, kAllTlvTypes, sizeof(kAllTlvTypes),
-                                                          &diagnosticTlv_result_handler, NULL),
-                        API_TAG, "Fail to send diagnostic rloc16address.");
-    ESP_RETURN_ON_ERROR(error = otIp6AddressFromString(kMulticastAddrAllRouters, &multicastAddress), API_TAG,
-                        "Fail to convert ipv6 to string.");
-
-    ESP_RETURN_ON_ERROR(error = otThreadSendDiagnosticGet(ins, &multicastAddress, kAllTlvTypes, sizeof(kAllTlvTypes),
-                                                          &diagnosticTlv_result_handler, NULL),
-                        API_TAG, "Fail to send diagnostic multicastAddress.");
+    ESP_GOTO_ON_FALSE(otThreadSendDiagnosticGet(ins, &rloc16address, kAllTlvTypes, sizeof(kAllTlvTypes),
+                                                &diagnosticTlv_result_handler, NULL) == OT_ERROR_NONE,
+                      ESP_FAIL, exit, API_TAG, "Fail to send diagnostic rloc16address.");
+    ESP_GOTO_ON_FALSE(otIp6AddressFromString(kMulticastAddrAllRouters, &multicastAddress) == OT_ERROR_NONE, ESP_FAIL,
+                      exit, API_TAG, "Fail to convert ipv6 to string.");
+    ESP_GOTO_ON_FALSE(otThreadSendDiagnosticGet(ins, &multicastAddress, kAllTlvTypes, sizeof(kAllTlvTypes),
+                                                &diagnosticTlv_result_handler, NULL) == OT_ERROR_NONE,
+                      ESP_FAIL, exit, API_TAG, "Fail to send diagnostic multicastAddress.");
+exit:
     esp_openthread_lock_release();
-    return ESP_OK;
+    return ret;
 }
 
 static thread_node_informaiton_t get_openthread_node_information(otInstance *ins)
@@ -829,4 +984,12 @@ cJSON *handle_ot_resource_network_diagnostics_request()
 
     return dailnosticTlv_set_convert2_json(s_diagnosticTlv_set);
     ;
+}
+
+/*----------------------------------------------------------------------
++                       Set Thread dataset
++-----------------------------------------------------------------------*/
+otError handle_openthread_set_dataset_request(const cJSON *request)
+{
+    return OT_ERROR_NONE;
 }
