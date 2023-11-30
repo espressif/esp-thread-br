@@ -54,6 +54,8 @@
                     .mosi_io_num = CONFIG_PIN_TO_RCP_MOSI, \
                     .miso_io_num = CONFIG_PIN_TO_RCP_MISO, \
                     .sclk_io_num = CONFIG_PIN_TO_RCP_SCLK, \
+                    .quadwp_io_num = -1,                   \
+                    .quadhd_io_num = -1,                   \
                 },                                         \
             .spi_device =                                  \
                 {                                          \
