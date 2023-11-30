@@ -12,6 +12,7 @@
 #include "esp_ot_ip.h"
 #include "esp_ot_iperf.h"
 #include "esp_ot_loglevel.h"
+#include "esp_ot_nvs_diag.h"
 #include "esp_ot_ota_commands.h"
 #include "esp_ot_tcp_socket.h"
 #include "esp_ot_udp_socket.h"
@@ -31,6 +32,9 @@ static const otCliCommand kCommands[] = {
     {"iperf", esp_ot_process_iperf},
     {"loglevel", esp_ot_process_logset},
     {"mcast", esp_ot_process_mcast_group},
+#if CONFIG_OPENTHREAD_NVS_DIAG
+    {"nvsdiag", esp_ot_process_nvs_diag},
+#endif // CONFIG_OPENTHREAD_NVS_DIAG
 #if CONFIG_OPENTHREAD_CLI_OTA
     {"ota", esp_openthread_process_ota_command},
 #endif // CONFIG_OPENTHREAD_CLI_OTA

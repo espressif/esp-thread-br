@@ -17,4 +17,9 @@ menu "OpenThread Extension CLI"
         depends on OPENTHREAD_CLI_ESP_EXTENSION && OPENTHREAD_BORDER_ROUTER
         default n
 
+    config OPENTHREAD_NVS_DIAG
+        bool "Enable nvs diag"
+        depends on OPENTHREAD_CLI_ESP_EXTENSION
+        default n
+
 endmenu
