@@ -12,7 +12,7 @@ Clone the `esp-idf <https://github.com/espressif/esp-idf>`_ and the `esp-thread-
 .. code-block:: bash
 
    git clone -b v5.1.2 --recursive https://github.com/espressif/esp-idf.git
-   
+
 .. code-block:: bash
 
    cd esp-idf
@@ -194,14 +194,18 @@ Disable ``OPENTHREAD_BR_AUTO_START`` option if you want to setup the network man
 
    thread start
 
-2.1.3.6. RF External coexistence
+2.1.3.6. RF External Coexistence
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Enable ``EXTERNAL_COEX_ENABLE`` option if you want to enable the RF External coexistence.
+The SDK incorporates an external coexistence feature that improves transmission performance when there is RF signal interference between Wi-Fi (ESP32-S3) and 802.15.4 (ESP32-H2).
+
+Please refer to `external_coexistence_design_en.pdf <https://www.espressif.com.cn/sites/default/files/documentation/external_coexistence_design_en.pdf>`_ for the external coexistence design. In addition to the 3-wire mode (use request signal, grant signal and priority signal), a 4th wire tx signal is used to indicate whether the Wi-Fi SoC is under transmission state or not, it helps to enable the scenario that 802.15.4 could transmit when Wi-Fi is receiving.
 
 .. note::
 
-   To enable external coexistence of the Thread Border Router, enable the ``EXTERNAL_COEX_ENABLE`` option of ``$IDF_PATH/examples/openthread/ot_rcp`` before building the RCP Image.
+   The external coexistence feature only helps when Wi-Fi and 802.15.4 operate on close channel frequency, in which case the interference is significant. Otherwise, the feature is unnecessary.
+
+To enable the external coexistence feature, check the ``EXTERNAL_COEX_ENABLE`` option in both ``basic_thread_border_router`` and ``ot_rcp`` examples.
 
 2.1.4. Build and Run the Thread Border Router
 ---------------------------------------------
