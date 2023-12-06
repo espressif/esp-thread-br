@@ -16,6 +16,7 @@ To enable OpenThread extension commands, the following Kconfig option needs to b
 * [iperf](#iperf)
 * [loglevel](#loglevel)
 * [mcast](#mcast)
+* [nvsdiag](#nvsdiag)
 * [ota](#ota)
 * [tcpsockclient](#tcpsockclient)
 * [tcpsockserver](#tcpsockserver)
@@ -216,6 +217,87 @@ Use this command to join or leave a multicast group.
 Done
 > mcast leave ff04::123
 
+Done
+```
+
+### nvsdiag
+
+Use this command to debug the Non-volatile storage (NVS).
+
+* General Options
+
+```bash
+> nvsdiag
+---nvsdiag parameter---
+status                                   :     print the status of nvs
+detail                                   :     print detailed usage information of nvs
+deamon                                   :     print the status of nvs deamon task
+deamon start <interval>                  :     create the daemon task, print nvs status every <interval> milliseconds
+deamon stop                              :     delete the daemon task
+---example---
+print the status of nvs                  :     nvsdiag status
+print detailed usage information of nvs  :     nvsdiag detail
+print the status of nvs deamon task      :     nvsdiag deamon
+create a daemon task (interval=1s)       :     nvsdiag deamon start 1000
+delete the daemon task                   :     nvsdiag deamon stop
+Done
+```
+
+* Typical usage
+
+Print the basic status of NVS:
+```bash
+> nvsdiag status
+namespace count: 1
+total entries: 756
+available entries: 629
+used entries: 1
+free entries: 755
+Done
+```
+
+Print detailed usage information of NVS:
+```bash
+> nvsdiag detail
+namespace count: 1
+total entries: 756
+available entries: 629
+used entries: 1
+free entries: 755
+state=fffffffe (ACTIVE) addr=0 seq=0
+firstUsed=0 nextFree=1 used=1 erased=0
+  0: W ns= 0 type= 1 span=  1 key="openthread" chunkIdx=255 len=-1
+  1: E
+  2: E
+  3: E
+  4: E
+  5: E
+  6: E
+  7: E
+  ...
+  ...
+124: E
+125: E
+Done
+```
+
+Print the status of nvs deamon task:
+```bash
+> nvsdiag deamon
+nvs daemon task: disabled
+Done
+```
+
+Create a daemon task with a printing interval of 5s:
+```bash
+> nvsdiag deamon start 5000
+Done
+```
+Then the basic status of NVS will be printed by deamon task every 5s.
+
+Stop the daemon task:
+```bash
+> nvsdiag deamon stop
 Done
 ```
 
