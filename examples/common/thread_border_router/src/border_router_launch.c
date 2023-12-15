@@ -124,8 +124,8 @@ static void ot_task_worker(void *ctx)
 
     // Clean up
     esp_netif_destroy(openthread_netif);
-    esp_openthread_netif_glue_deinit();
     esp_vfs_eventfd_unregister();
+    esp_openthread_netif_glue_deinit();
     esp_rcp_update_deinit();
     vTaskDelete(NULL);
 }
