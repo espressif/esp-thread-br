@@ -182,18 +182,34 @@ build_docs:
     tags:
         - deploy
 
+deploy_docs_preview:
+    extends:
+        - .deploy_docs_template
+    except:
+        - main
+        - /^release\/v/
+        - /^v\d+\.\d+/
+    variables:
+        TYPE: "preview"
+        DOCS_BUILD_DIR: "${CI_PROJECT_DIR}/docs/_build/"
+        DOCS_DEPLOY_PATH: "$DOCS_PREVIEW_PATH"
+        DOCS_DEPLOY_PRIVATEKEY: "$DOCS_PREVIEW_DEPLOY_KEY"
+        DOCS_DEPLOY_SERVER: "$DOCS_PREVIEW_SERVER"
+        DOCS_DEPLOY_SERVER_USER: "$DOCS_PREVIEW_SERVER_USER"
+        DOCS_DEPLOY_URL_BASE: "https://$DOCS_PREVIEW_SERVER/projects/esp-thread-br"
+
 deploy_docs_production:
+    extends:
+        - .deploy_docs_template
     only:
         - main
         - /^release\/v/
         - /^v\d+\.\d+/
-    extends:
-        - .deploy_docs_template
     variables:
         TYPE: "preview"
         DOCS_BUILD_DIR: "${CI_PROJECT_DIR}/docs/_build/"
+        DOCS_DEPLOY_PATH: "$DOCS_PROD_PATH"
         DOCS_DEPLOY_PRIVATEKEY: "$DOCS_PROD_DEPLOY_KEY"
         DOCS_DEPLOY_SERVER: "$DOCS_PROD_SERVER"
         DOCS_DEPLOY_SERVER_USER: "$DOCS_PROD_SERVER_USER"
-        DOCS_DEPLOY_PATH: "$DOCS_PROD_PATH"
         DOCS_DEPLOY_URL_BASE: "https://docs.espressif.com/projects/esp-thread-br"
