@@ -90,9 +90,9 @@ For any other customized settings, you can configure the project in menuconfig.
 
 By default, it is configured as Wi-Fi based Thread Border Router.
 
-The Wi-Fi SSID and password must be set in menuconfig. The corresponding options are ``Example Connection Configuration -> WiFi SSID`` and ``Example Connection Configuration -> WiFi Password``.
+The auto start mode is disabled by default, if you want the device connects to the configured Wi-Fi and form Thread network automatically, and then act as the border router, you need to enable the menuconfig ``ESP Thread Border Router Example -> Enable the automatic start mode in Thread Border``.
 
-The auto start mode is enabled by default, the device will connect to the configured Wi-Fi and form Thread network automatically, and then act as the border router.
+When automatic start mode is enabled, the Thread dataset, Wi-Fi SSID and password must be set in menuconfig. The corresponding options are ``Component config -> OpenThread -> Thread Operational Dataset``, ``Example Connection Configuration -> WiFi SSID`` and ``Example Connection Configuration -> WiFi Password``.
 
 .. note::
 
@@ -169,32 +169,7 @@ The default communication interface between host SoC and RCP is UART.
 
 In order to use the SPI interface instead, the ``OPENTHREAD_RCP_SPI`` and ``OPENTHREAD_RADIO_SPINEL_SPI`` options should be enabled in ``ot_rcp`` and ``basic_thread_border_router`` example configurations, respectively. And set corresponding GPIO numbers in `esp_ot_config.h`.
 
-2.1.3.5. Manual Mode
-~~~~~~~~~~~~~~~~~~~~
-
-Disable ``OPENTHREAD_BR_AUTO_START`` option if you want to setup the network manually. Then the following CLI commands can be used to connect Wi-Fi and form a Thread network:
-
-.. code-block::
-
-   wifi connect -s <ssid> -p <psk>
-
-.. code-block::
-
-   dataset init new
-
-.. code-block::
-
-   dataset commit active
-
-.. code-block::
-
-   ifconfig up
-
-.. code-block::
-
-   thread start
-
-2.1.3.6. RF External Coexistence
+2.1.3.5. RF External Coexistence
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The SDK incorporates an external coexistence feature that improves transmission performance when there is RF signal interference between Wi-Fi (ESP32-S3) and 802.15.4 (ESP32-H2).
@@ -267,6 +242,105 @@ Ethernet Border Router:
    I(4144) OPENTHREAD:[I] Settings------: Read NetworkInfo {rloc:0x4400, extaddr:129f848762f1c578, role:leader, mode:0x0f, version:4, keyseq:0x0, ...
    I(4154) OPENTHREAD:[I] Settings------: ... pid:0x18954426, mlecntr:0x7da7, maccntr:0x7d1c, mliid:2874d9fa90dc8093}
    I (4194) OPENTHREAD: OpenThread attached to netif
+
+2.1.4.1. Connect the Wi-Fi and Form the Thread Network
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If enable ``OPENTHREAD_BR_AUTO_START`` option, just skip this step.
+
+If disable ``OPENTHREAD_BR_AUTO_START`` option, you need to setup the network manually. The following CLI commands can be used to connect Wi-Fi and form a Thread network:
+
+.. code-block::
+
+   wifi connect -s <ssid> -p <psk>
+
+.. code-block::
+
+   dataset init new
+
+.. code-block::
+
+   dataset commit active
+
+.. code-block::
+
+   ifconfig up
+
+.. code-block::
+
+   thread start
+
+
+The BR device will connect to the Wi-Fi and then form a Thread network.
+
+.. code-block::
+
+   > wifi connect -s mywifi -p espressif
+     ssid: mywifi
+     psk: espressif
+     I (5241) pp: pp rom version: e7ae62f
+     I (5241) net80211: net80211 rom version: e7ae62f
+     I (5251) wifi:wifi driver task: 3fcbe1a0, prio:23, stack:6144, core=0
+     I (5251) wifi:wifi firmware version: 0016c4d
+     I (5251) wifi:wifi certification version: v7.0
+     I (5251) wifi:config NVS flash: enabled
+     I (5251) wifi:config nano formating: enabled
+     I (5251) wifi:Init data frame dynamic rx buffer num: 32
+     I (5251) wifi:Init static rx mgmt buffer num: 5
+     I (5251) wifi:Init management short buffer num: 32
+     I (5251) wifi:Init dynamic tx buffer num: 32
+     I (5251) wifi:Init static tx FG buffer num: 2
+     I (5251) wifi:Init static rx buffer size: 1600
+     I (5251) wifi:Init static rx buffer num: 10
+     I (5251) wifi:Init dynamic rx buffer num: 32
+     I (5251) wifi_init: rx ba win: 6
+     I (5251) wifi_init: tcpip mbox: 32
+     I (5251) wifi_init: udp mbox: 6
+     I (5251) wifi_init: tcp mbox: 6
+     I (5251) wifi_init: tcp tx win: 5760
+     I (5251) wifi_init: tcp rx win: 5760
+     I (5251) wifi_init: tcp mss: 1440
+     I (5251) wifi_init: WiFi IRAM OP enabled
+     I (5251) wifi_init: WiFi RX IRAM OP enabled
+     I (5261) wifi:Set ps type: 0, coexist: 0
+     I (5261) phy_init: phy_version 640,cd64a1a,Jan 24 2024,17:28:12
+     I (5351) wifi:mode : null
+     I (5351) wifi:mode : sta (48:27:e2:14:4d:3c)
+     I (5351) wifi:enable tsf
+     I (6571) wifi:new:<11,2>, old:<1,1>, ap:<255,255>, sta:<11,2>, prof:1
+     I (7051) wifi:state: init -> auth (b0)
+     I (7051) wifi:state: auth -> assoc (0)
+     I (7071) wifi:state: assoc -> run (10)
+     I (7351) wifi:connected with mywifi, aid = 2, channel 11, 40D, bssid = 94:d9:b3:1d:d4:37
+     I (7351) wifi:security: WPA2-PSK, phy: bgn, rssi: -26
+     I (7351) wifi:pm start, type: 0
+     I (7361) wifi:dp: 1, bi: 102400, li: 3, scale listen interval from 307200 us to 307200 us
+     I (7361) wifi:set rx beacon pti, rx_bcn_pti: 0, bcn_timeout: 25000, mt_pti: 0, mt_time: 10000
+     I (7411) wifi:<ba-add>idx:0 (ifx:0, 94:d9:b3:1d:d4:37), tid:0, ssn:3, winSize:64
+     I (7441) wifi:AP's beacon interval = 102400 us, DTIM period = 1
+     I (8361) esp_netif_handlers: sta ip: 192.168.1.100, mask: 255.255.255.0, gw: 192.168.1.1
+     I (8501) ot_ext_cli: Got IPv6 event: Interface "sta" address: fe80:0000:0000:0000:4a27:e2ff:fe14:4d3c
+     I(8501) OPENTHREAD:[N] RoutingManager: No valid /48 BR ULA prefix found in settings, generating new one
+     I(8511) OPENTHREAD:[N] RoutingManager: BR ULA prefix: fd8f:e9a2:bfcc::/48 (generated)
+     I(8511) OPENTHREAD:[N] RoutingManager: Local on-link prefix: fdde:ad00:beef:cafe::/64
+     wifi sta is connected successfully
+     Done
+     > dataset init new
+     Done
+     > dataset commit active
+     Done                                                                                                                                                                  I (12401) OPENTHREAD: NAT64 ready
+     > ifconfig up
+     I (15451) OPENTHREAD: Platform UDP bound to port 49153
+     Done
+     I (15451) OT_STATE: netif up
+     > thread start
+     I(18201) OPENTHREAD:[N] Mle-----------: Role disabled -> detached
+     Done
+     > I(18521) OPENTHREAD:[N] Mle-----------: Attach attempt 1, AnyPartition reattaching with Active Dataset
+     I(25141) OPENTHREAD:[N] RouterTable---: Allocate router id 11
+     I(25141) OPENTHREAD:[N] Mle-----------: RLOC16 fffe -> 6c00
+     I(25151) OPENTHREAD:[N] Mle-----------: Role detached -> leader
+     I(25151) OPENTHREAD:[N] Mle-----------: Partition ID 0x82de096
+     I (25161) OPENTHREAD: Platform UDP bound to port 49154
 
 
 2.1.5. Build and Run the Thread CLI Device
