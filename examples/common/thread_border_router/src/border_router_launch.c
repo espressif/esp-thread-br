@@ -37,6 +37,11 @@
 #include "openthread/tasklet.h"
 #include "openthread/thread_ftd.h"
 
+#if CONFIG_OPENTHREAD_BR_AUTO_START
+#include "esp_wifi.h"
+#include "protocol_examples_common.h"
+#endif
+
 #define TAG "esp_ot_br"
 #define RCP_VERSION_MAX_SIZE 100
 
@@ -111,6 +116,13 @@ static void ot_task_worker(void *ctx)
     ESP_ERROR_CHECK(esp_netif_set_default_netif(openthread_netif));
     esp_cli_custom_command_init();
 #if CONFIG_OPENTHREAD_BR_AUTO_START
+    esp_openthread_lock_release();
+    ESP_ERROR_CHECK(example_connect());
+#if CONFIG_EXAMPLE_CONNECT_WIFI
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+#endif
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    esp_openthread_set_backbone_netif(get_example_netif());
     ESP_ERROR_CHECK(esp_openthread_border_router_init());
     otOperationalDatasetTlvs dataset;
     otError error = otDatasetGetActiveTlvs(esp_openthread_get_instance(), &dataset);
