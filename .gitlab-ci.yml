@@ -20,19 +20,17 @@ pre_commit:
   stage: .pre
   image: "$CI_DOCKER_REGISTRY/esp-idf-pre-commit:1"
   script:
-    - cd ${ESP_THREAD_BR_PATH}
-    - apt-get update && apt-get install -y clang-format-11
-    - git fetch origin main
-
-    - echo "Merge request is from ${CI_COMMIT_REF_NAME} into ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
-    - git fetch origin ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME} ${CI_COMMIT_REF_NAME}
-    - export from_sha=$(git merge-base HEAD origin/${CI_MERGE_REQUEST_TARGET_BRANCH_NAME})
+    - echo "Merge request is from ${CI_COMMIT_REF_NAME} into main"
+    - git fetch origin main ${CI_COMMIT_REF_NAME}
+    - export from_sha=$(git merge-base HEAD origin/main)
     - echo "Checking changes from ${from_sha} to ${CI_COMMIT_SHA}:"
     - git log --oneline ${from_sha}..${CI_COMMIT_SHA}
     - echo "Modified files:"
     - git diff-tree --no-commit-id --name-only -r ${from_sha} ${CI_COMMIT_SHA}
     - echo "Running pre-commit:"
     - pre-commit run --from ${from_sha} --to ${CI_COMMIT_SHA}
+  except:
+    - main
   tags:
     - host_test
 
