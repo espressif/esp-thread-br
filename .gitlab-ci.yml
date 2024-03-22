@@ -114,6 +114,8 @@ build_examples:
         - *build_basic_thread_border_router
     tags:
         - build
+    # allow failure if esp_ot_cli_extension version updated but haven't publish to component registry yet
+    allow_failure: true
 
 build_examples_local_components:
     stage: build
