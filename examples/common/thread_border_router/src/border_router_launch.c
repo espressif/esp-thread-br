@@ -116,6 +116,9 @@ static void ot_task_worker(void *ctx)
     ESP_ERROR_CHECK(esp_netif_set_default_netif(openthread_netif));
     esp_cli_custom_command_init();
 #if CONFIG_OPENTHREAD_BR_AUTO_START
+#if !CONFIG_EXAMPLE_CONNECT_WIFI && !CONFIG_EXAMPLE_CONNECT_ETHERNET
+#error No backbone netif!
+#endif
     esp_openthread_lock_release();
     ESP_ERROR_CHECK(example_connect());
 #if CONFIG_EXAMPLE_CONNECT_WIFI

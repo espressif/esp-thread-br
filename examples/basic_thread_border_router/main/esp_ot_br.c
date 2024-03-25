@@ -84,14 +84,15 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-#if CONFIG_EXAMPLE_CONNECT_WIFI && !CONFIG_OPENTHREAD_BR_AUTO_START
+#if !CONFIG_OPENTHREAD_BR_AUTO_START
     esp_ot_wifi_netif_init();
     esp_openthread_set_backbone_netif(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"));
 #endif // CONFIG_OPENTHREAD_BR_AUTO_START
 
-#if !CONFIG_EXAMPLE_CONNECT_WIFI && !CONFIG_EXAMPLE_CONNECT_ETHERNET
-#error No backbone netif!
-#endif // CONFIG_EXAMPLE_CONNECT_WIFI
+#if !CONFIG_OPENTHREAD_BR_AUTO_START && CONFIG_EXAMPLE_CONNECT_ETHERNET
+// TODO: Add a menchanism for connecting ETH manually.
+#error Currently we do not support a manual way to connect ETH, if you want to use ETH, please enable OPENTHREAD_BR_AUTO_START.
+#endif
 
 #if CONFIG_EXTERNAL_COEX_ENABLE
     ot_br_external_coexist_init();
