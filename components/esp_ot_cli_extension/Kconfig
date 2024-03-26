@@ -22,4 +22,9 @@ menu "OpenThread Extension CLI"
         depends on OPENTHREAD_CLI_ESP_EXTENSION
         default n
 
+    config OPENTHREAD_RCP_COMMAND
+        bool "Enable rcp control command of border router"
+        depends on OPENTHREAD_CLI_ESP_EXTENSION && OPENTHREAD_BORDER_ROUTER
+        default n
+
 endmenu

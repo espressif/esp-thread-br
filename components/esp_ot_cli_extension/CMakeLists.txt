@@ -23,6 +23,10 @@ if(CONFIG_OPENTHREAD_NVS_DIAG)
     list(APPEND srcs   "src/esp_ot_nvs_diag.c")
 endif()
 
+if(CONFIG_OPENTHREAD_RCP_COMMAND)
+    list(APPEND srcs   "src/esp_ot_rcp_commands.c")
+endif()
+
 set(include "include")
 idf_component_register(SRCS "${srcs}"
                     INCLUDE_DIRS "${include}"

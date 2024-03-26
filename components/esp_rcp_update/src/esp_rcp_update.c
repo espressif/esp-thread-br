@@ -278,6 +278,7 @@ esp_err_t esp_rcp_update(void)
     }
     fclose(fp);
     esp_loader_reset_target();
+    loader_port_esp32_deinit();
 
 #if CONFIG_OPENTHREAD_RADIO_SPINEL_SPI
     ESP_RETURN_ON_ERROR(esp_rcp_boot_pin_mux(), TAG, "Failed to multiplex boot pin");
