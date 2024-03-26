@@ -230,3 +230,46 @@ To download the image from the server, run the following command on the border r
 ```
 
 After downloading the device will restart and update itself with the new firmware. The RCP will also be updated if the firmware version changes.
+
+## Updating the rcp without restarting the Host
+
+The border router provides a mechanism to manually update the rcp firmware without restarting the Host.
+
+Ensure that Thread is stopped and the interface is disabled.
+
+```bash
+(Optional)
+> thread stop
+
+I(20618) OPENTHREAD:[N] Mle-----------: Role leader -> detached
+I(20618) OPENTHREAD:[N] Mle-----------: Role detached -> disabled
+Done
+
+> ifconfig down
+
+Done
+I (24488) OT_STATE: netif u
+```
+
+Then update the rcp firmware with the command `otrcp update`.
+
+```bash
+> otrcp update
+...
+...
+Done
+```
+
+After updating, the interface can be enabled and the Thread can be started.
+
+```bash
+> ifconfig up
+
+I (576848) OPENTHREAD: Platform UDP bound to port 49155
+Done
+I (576848) OT_STATE: netif up
+> thread start
+
+I(579858) OPENTHREAD:[N] Mle-----------: Role disabled -> detached
+Done
+```

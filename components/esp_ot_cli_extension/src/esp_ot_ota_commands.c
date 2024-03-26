@@ -9,15 +9,16 @@
 #include <string.h>
 
 #include "esp_br_http_ota.h"
+#include "esp_check.h"
 #include "esp_openthread_border_router.h"
-#include "esp_rcp_update.h"
+#include "esp_ot_cli_extension.h"
 #include "openthread/cli.h"
 
 static const char *s_server_cert = NULL;
 
 static void print_help(void)
 {
-    otCliOutputFormat("rcp download ${server_url}");
+    otCliOutputFormat("rcp download ${server_url}\n");
 }
 
 otError esp_openthread_process_ota_command(void *aContext, uint8_t aArgsLength, char *aArgs[])
@@ -38,14 +39,6 @@ otError esp_openthread_process_ota_command(void *aContext, uint8_t aArgsLength, 
             if (esp_br_http_ota(&config) != ESP_OK) {
                 otCliOutputFormat("Failed to download image");
             }
-        }
-        esp_restart();
-    } else if (strcmp(aArgs[0], "rcpupdate") == 0) {
-        esp_openthread_rcp_deinit();
-        if (esp_rcp_update() == ESP_OK) {
-            esp_rcp_mark_image_verified(true);
-        } else {
-            esp_rcp_mark_image_verified(false);
         }
         esp_restart();
     } else {

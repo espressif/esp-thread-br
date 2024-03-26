@@ -11,7 +11,7 @@ Clone the `esp-idf <https://github.com/espressif/esp-idf>`_ and the `esp-thread-
 
 .. code-block:: bash
 
-   git clone -b v5.1.2 --recursive https://github.com/espressif/esp-idf.git
+   git clone -b v5.1.3 --recursive https://github.com/espressif/esp-idf.git
 
 .. code-block:: bash
 
@@ -181,6 +181,8 @@ Please refer to `external_coexistence_design_en.pdf <https://www.espressif.com.c
    The external coexistence feature only helps when Wi-Fi and 802.15.4 operate on close channel frequency, in which case the interference is significant. Otherwise, the feature is unnecessary.
 
 To enable the external coexistence feature, check the ``EXTERNAL_COEX_ENABLE`` option in both ``basic_thread_border_router`` and ``ot_rcp`` examples.
+
+The default pin configurations have been set for ESP Thread Border Router Board. The users can change the configurations through menuconfig ``ESP Thread Border Router Example → External coexist wire type and pin config`` if needed.
 
 2.1.4. Build and Run the Thread Border Router
 ---------------------------------------------

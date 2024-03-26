@@ -36,19 +36,6 @@ Now the image can be downloaded on the Border Router:
 
 After downloading the Border Router will reboot and update itself with the new firmware. The RCP will also be updated if the firmware version changes.
 
-
-The RCP Image Rollback Mechanism
----------------------------------
-
-The RCP image is stored in a configurable SPIFFS partition under a configurable prefix. Prefix `ot_rcp` will be used in as an example.
-
-Two folders `ot_rcp_0` and `ot_rcp_1` will be used to store the current and the backup RCP image. The RCP image will be stored in `ot_rcp_0` upon first boot. An extra key-value pair will be added in the nvs for storing the current RCP image index.
-
-When applying the RCP update, the RCP image with the current index will be downloaded. After the reboot, the Border Router will detect the status of the RCP. If the RCP fails to boot, the backup image will be flashed to the RCP to revert the change.
-
-When downloading the OTA image from the server, the current RCP image will be marked as the backup image and the previous backup image will be overridden. After the download completes, the current image index will be updated.
-
-
 The OTA Image File Structure
 -----------------------------
 

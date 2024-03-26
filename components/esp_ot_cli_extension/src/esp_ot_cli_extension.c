@@ -14,6 +14,7 @@
 #include "esp_ot_loglevel.h"
 #include "esp_ot_nvs_diag.h"
 #include "esp_ot_ota_commands.h"
+#include "esp_ot_rcp_commands.h"
 #include "esp_ot_tcp_socket.h"
 #include "esp_ot_udp_socket.h"
 #include "esp_ot_wifi_cmd.h"
@@ -38,6 +39,9 @@ static const otCliCommand kCommands[] = {
 #if CONFIG_OPENTHREAD_CLI_OTA
     {"ota", esp_openthread_process_ota_command},
 #endif // CONFIG_OPENTHREAD_CLI_OTA
+#if CONFIG_OPENTHREAD_RCP_COMMAND
+    {"otrcp", esp_openthread_process_rcp_command},
+#endif // CONFIG_OPENTHREAD_RCP_COMMAND
     {"tcpsockclient", esp_ot_process_tcp_client},
     {"tcpsockserver", esp_ot_process_tcp_server},
     {"udpsockclient", esp_ot_process_udp_client},
