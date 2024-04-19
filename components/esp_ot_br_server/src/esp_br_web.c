@@ -20,6 +20,7 @@
 #include "esp_vfs.h"
 #include "http_parser.h"
 #include "protocol_examples_common.h"
+#include "sdkconfig.h"
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -1104,6 +1105,18 @@ static esp_err_t default_urls_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+#if CONFIG_SPIRAM
+static void *ot_web_json_malloc(size_t size)
+{
+    return heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+}
+
+static void ot_web_json_free(void *ptr)
+{
+    heap_caps_free(ptr);
+}
+#endif
+
 /*-----------------------------------------------------
  Note：Server Start
 -----------------------------------------------------*/
@@ -1119,6 +1132,13 @@ static esp_err_t default_urls_get_handler(httpd_req_t *req)
 static httpd_handle_t *start_esp_br_http_server(const char *base_path, const char *host_ip)
 {
     ESP_RETURN_ON_FALSE(base_path, NULL, WEB_TAG, "Invalid http server path");
+
+#if CONFIG_SPIRAM
+    cJSON_Hooks hooks;
+    hooks.malloc_fn = ot_web_json_malloc;
+    hooks.free_fn = ot_web_json_free;
+    cJSON_InitHooks(&hooks);
+#endif
 
     strcpy(s_server.ip, host_ip);
     strlcpy(s_server.data.base_path, base_path, ESP_VFS_PATH_MAX + 1);
