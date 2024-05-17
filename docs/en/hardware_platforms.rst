@@ -86,5 +86,14 @@ For wholesale orders, please go to https://www.espressif.com/en/contact-us/sales
 1.4. Related Documents
 ----------------------
 
+1.4.1 Schematic
+^^^^^^^^^^^^^^^
+
 - `ESP Thread Border Router/Zigbee Gateway Board schematic <https://dl.espressif.com/dl/schematics/esp_thread_br_zigbee_gw_schematiccs_v1.2.pdf>`_ (PDF)
-- `ESP Thread Border Router/Zigbee Gateway Sub-Ethernet <https://dl.espressif.com/dl/schematics/esp_thread_br_zigbee_gw_sub_ethernet_schematiccs_v1.0.pdf>`_ (PDF)
+- `ESP Thread Border Router/Zigbee Gateway Sub-Ethernet schematic <https://dl.espressif.com/dl/schematics/esp_thread_br_zigbee_gw_sub_ethernet_schematiccs_v1.0.pdf>`_ (PDF)
+
+1.4.2 CAD
+^^^^^^^^^
+
+- `ESP Thread Border Router/Zigbee Gateway Board CAD <https://dl.espressif.com/dl/schematics/ESP-Thread%20BR&Zigbee%20GW_V1.zip>`_ (ZIP)
+- `ESP Thread Border Router/Zigbee Gateway Sub-Ethernet CAD <https://dl.espressif.com/dl/schematics/ESP-Thread%20BR&Zigbee%20GW_Sub_Ethernet_V1.zip>`_ (ZIP)
