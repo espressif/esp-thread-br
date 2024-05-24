@@ -1200,21 +1200,24 @@ void disconnect_handler(void *arg, esp_event_base_t event_base, int32_t event_id
     *server = NULL;
 }
 
-/*-----------------------------------------------------
- Note：FreeRTOS task
------------------------------------------------------*/
-static void ot_task_br_web(void *arg)
+static bool is_br_web_server_started = false;
+static void handler_got_ip_event(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
-    esp_netif_t *netif = esp_openthread_get_backbone_netif();
-    esp_netif_ip_info_t ip_info;
-    char ipv4_address[SERVER_IPV4_LEN];
-    esp_netif_get_ip_info(netif, &ip_info);
-    sprintf((char *)ipv4_address, IPSTR, IP2STR(&ip_info.ip));
-    start_esp_br_http_server((const char *)arg, (char *)ipv4_address);
-    vTaskDelete(NULL);
+    if (!is_br_web_server_started) {
+        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+        char ipv4_address[SERVER_IPV4_LEN];
+        sprintf((char *)ipv4_address, IPSTR, IP2STR(&event->ip_info.ip));
+        if (start_esp_br_http_server((const char *)arg, (char *)ipv4_address) != NULL) {
+            is_br_web_server_started = true;
+        } else {
+            ESP_LOGE(WEB_TAG, "Fail to start web server");
+        }
+    } else {
+        ESP_LOGW(WEB_TAG, "Web server had already been started");
+    }
 }
 
 void esp_br_web_start(char *base_path)
 {
-    xTaskCreate(ot_task_br_web, "ot_task_br_web", 4096, base_path, 4, NULL);
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &handler_got_ip_event, base_path));
 }

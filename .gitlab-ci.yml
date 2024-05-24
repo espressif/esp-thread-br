@@ -159,7 +159,7 @@ build_idf_otcli_examples:
 
 build_docs:
     stage: build
-    image: $CI_DOCKER_REGISTRY/esp-idf-doc-env-v5.0:2-3
+    image: $CI_DOCKER_REGISTRY/esp-idf-doc-env-v5.1:1-1
     variables:
         ESP_DOCS_LATEST_BRANCH_NAME: "main"
     artifacts:
@@ -177,7 +177,7 @@ build_docs:
 
 .deploy_docs_template:
     stage: docs
-    image: $CI_DOCKER_REGISTRY/esp-idf-doc-env-v5.0:2-3
+    image: $CI_DOCKER_REGISTRY/esp-idf-doc-env-v5.1:1-1
     needs:
         - build_docs
     variables:

@@ -101,9 +101,10 @@ void app_main(void)
     ESP_ERROR_CHECK(mdns_init());
     ESP_ERROR_CHECK(mdns_hostname_set("esp-ot-br"));
     esp_set_ota_server_cert((char *)server_cert_pem_start);
-    launch_openthread_border_router(&platform_config, &rcp_update_config);
 
 #if CONFIG_OPENTHREAD_BR_START_WEB
     esp_br_web_start("/spiffs");
 #endif
+
+    launch_openthread_border_router(&platform_config, &rcp_update_config);
 }
