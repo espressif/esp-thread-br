@@ -3,6 +3,14 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include "esp_ot_wifi_cmd.h"
+
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "sdkconfig.h"
 
 #include "esp_check.h"
 #include "esp_coexist.h"
@@ -17,83 +25,67 @@
 #include "esp_openthread_lock.h"
 #include "esp_ot_cli_extension.h"
 #include "esp_wifi.h"
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "example_common_private.h"
+#include "nvs.h"
+#include "protocol_examples_common.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/portmacro.h"
 #include "freertos/task.h"
 #include "openthread/cli.h"
 
-static bool s_wifi_connected = false;
-static SemaphoreHandle_t s_wait_ip_sem;
-static uint32_t s_wifi_disconnect_delay_ms = 0;
-static uint8_t s_reconnect_cnt = 0;
-#define MAX_WAIT_IP_TIME 5000
-#define MAX_RETRY_TIMES 5
-#define MAX_RECONNECT_TIMES 10
-static uint8_t IP_READY_FLAG;
-const uint8_t IPV4_READY = BIT(0);
-const uint8_t IPV6_READY = BIT(1);
+#ifndef EXAMPLE_WIFI_SCAN_METHOD
+#if CONFIG_EXAMPLE_WIFI_SCAN_METHOD_FAST
+#define EXAMPLE_WIFI_SCAN_METHOD WIFI_FAST_SCAN
+#elif CONFIG_EXAMPLE_WIFI_SCAN_METHOD_ALL_CHANNEL
+#define EXAMPLE_WIFI_SCAN_METHOD WIFI_ALL_CHANNEL_SCAN
+#endif
+#endif
+
+#ifndef EXAMPLE_WIFI_CONNECT_AP_SORT_METHOD
+#if CONFIG_EXAMPLE_WIFI_CONNECT_AP_BY_SIGNAL
+#define EXAMPLE_WIFI_CONNECT_AP_SORT_METHOD WIFI_CONNECT_AP_BY_SIGNAL
+#elif CONFIG_EXAMPLE_WIFI_CONNECT_AP_BY_SECURITY
+#define EXAMPLE_WIFI_CONNECT_AP_SORT_METHOD WIFI_CONNECT_AP_BY_SECURITY
+#endif
+#endif
+
+#ifndef EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD
+#if CONFIG_EXAMPLE_WIFI_AUTH_OPEN
+#define EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_OPEN
+#elif CONFIG_EXAMPLE_WIFI_AUTH_WEP
+#define EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WEP
+#elif CONFIG_EXAMPLE_WIFI_AUTH_WPA_PSK
+#define EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA_PSK
+#elif CONFIG_EXAMPLE_WIFI_AUTH_WPA2_PSK
+#define EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA2_PSK
+#elif CONFIG_EXAMPLE_WIFI_AUTH_WPA_WPA2_PSK
+#define EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA_WPA2_PSK
+#elif CONFIG_EXAMPLE_WIFI_AUTH_WPA2_ENTERPRISE
+#define EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA2_ENTERPRISE
+#elif CONFIG_EXAMPLE_WIFI_AUTH_WPA3_PSK
+#define EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA3_PSK
+#elif CONFIG_EXAMPLE_WIFI_AUTH_WPA2_WPA3_PSK
+#define EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA2_WPA3_PSK
+#elif CONFIG_EXAMPLE_WIFI_AUTH_WAPI_PSK
+#define EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WAPI_PSK
+#endif
+#endif
+
+static bool s_wifi_initialized = false;
+static esp_ot_wifi_state_t s_wifi_state = OT_WIFI_DISCONNECTED;
+static bool s_border_router_initialized = false;
+static bool s_wifi_handler_registered = false;
+static uint16_t wifi_conn_retry_nums = 0;
+const char wifi_state_string[3][20] = {"disconnected", "connected", "reconnecting"};
+static nvs_handle_t s_wifi_config_nvs_handle = 0;
+#define SSIDKEY "ssid"
+#define PASSWORDKEY "password"
+#define SSIDMAXLEN 32
+#define PASSWORDMAXLEN 64
 ESP_EVENT_DEFINE_BASE(WIFI_ADDRESS_EVENT);
 
-void esp_ot_wifi_netif_init(void)
-{
-    esp_netif_t *esp_netif = esp_netif_create_default_wifi_sta();
-    assert(esp_netif);
-}
-
-static void handler_ip_event(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
-    if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        IP_READY_FLAG |= IPV4_READY;
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_GOT_IP6) {
-        ip_event_got_ip6_t *event = (ip_event_got_ip6_t *)event_data;
-        if (esp_netif_get_handle_from_ifkey("WIFI_STA_DEF") != event->esp_netif) {
-            return;
-        }
-        ESP_LOGI(OT_EXT_CLI_TAG, "Got IPv6 event: Interface \"%s\" address: " IPV6STR,
-                 esp_netif_get_desc(event->esp_netif), IPV62STR(event->ip6_info.ip));
-        IP_READY_FLAG |= IPV6_READY;
-    }
-
-    if (!!(IP_READY_FLAG & IPV4_READY) && !!(IP_READY_FLAG & IPV6_READY)) {
-        if (s_wifi_connected) {
-            // Wifi connected from state reconnection, only clear the count of reconnection.
-            s_reconnect_cnt = 0;
-        } else {
-            // Wifi connected from state disconnection, notify the OT task.
-            xSemaphoreGive(s_wait_ip_sem);
-        }
-    }
-}
-
-static void handler_on_wifi_disconnect(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
-    if (s_wifi_disconnect_delay_ms) {
-        vTaskDelay(s_wifi_disconnect_delay_ms / portTICK_PERIOD_MS);
-        s_wifi_disconnect_delay_ms = 0;
-    }
-    if (s_reconnect_cnt < MAX_RECONNECT_TIMES) {
-        esp_wifi_connect();
-        otCliOutputFormat("wifi reconnecting...\n");
-    } else {
-        IP_READY_FLAG = 0;
-        s_wifi_connected = false;
-        esp_wifi_stop();
-        ESP_LOGW(OT_EXT_CLI_TAG, "Reconnection time out.");
-        otCliOutputFormat("wifi sta disconnect\n");
-    }
-}
-
-static void handler_on_wifi_connect(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
-    esp_netif_create_ip6_linklocal(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"));
-}
-
-void handle_wifi_addr_init(void)
+static void handle_wifi_addr_init(void)
 {
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_ADDRESS_EVENT, WIFI_ADDRESS_EVENT_ADD_IP6,
                                                esp_netif_action_add_ip6_address,
@@ -109,81 +101,146 @@ void handle_wifi_addr_init(void)
                                                esp_netif_get_handle_from_ifkey("WIFI_STA_DEF")));
 }
 
-static void wifi_join(const char *ssid, const char *psk)
+static void handler_on_wifi_disconnect(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
-    static bool s_initialized = false;
-    uint8_t retry_cnt = 0;
-    if (!s_initialized) {
-        wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-        if (!s_wait_ip_sem) {
-            s_wait_ip_sem = xSemaphoreCreateBinary();
+    wifi_conn_retry_nums++;
+    if (wifi_conn_retry_nums > CONFIG_EXAMPLE_WIFI_CONN_MAX_RETRY) {
+        wifi_conn_retry_nums = 0;
+        s_wifi_state = OT_WIFI_DISCONNECTED;
+    } else {
+        s_wifi_state = OT_WIFI_RECONNECTING;
+    }
+}
+
+static void handler_on_wifi_connect(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    wifi_conn_retry_nums = 0;
+    s_wifi_state = OT_WIFI_CONNECTED;
+}
+
+static esp_err_t wifi_join(const char *ssid, const char *password)
+{
+    ESP_LOGI(OT_EXT_CLI_TAG, "Start example_connect");
+
+    wifi_config_t wifi_config = {
+        .sta =
+            {
+                .ssid = "",
+                .password = "",
+                .scan_method = EXAMPLE_WIFI_SCAN_METHOD,
+                .sort_method = EXAMPLE_WIFI_CONNECT_AP_SORT_METHOD,
+                .threshold.rssi = CONFIG_EXAMPLE_WIFI_SCAN_RSSI_THRESHOLD,
+                .threshold.authmode = EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD,
+            },
+    };
+
+    uint8_t ssid_len = strnlen(ssid, SSIDMAXLEN);
+    uint8_t password_len = strnlen(password, PASSWORDMAXLEN);
+    if (ssid_len < SSIDMAXLEN && password_len < PASSWORDMAXLEN) {
+        memcpy(wifi_config.sta.ssid, (void *)ssid, ssid_len + 1);
+        memcpy(wifi_config.sta.password, (void *)password, password_len + 1);
+    } else {
+        ESP_LOGE(OT_EXT_CLI_TAG, "Invalid ssid or password");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    esp_err_t err = example_wifi_sta_do_connect(wifi_config, true);
+    return err;
+}
+
+static esp_err_t wifi_config_print(void)
+{
+    ESP_RETURN_ON_FALSE((s_wifi_config_nvs_handle != 0), ESP_FAIL, OT_EXT_CLI_TAG, "wifi_config NVS handle is invalid");
+    char ssid_str[SSIDMAXLEN] = {0};
+
+    if (esp_ot_wifi_config_get_ssid(ssid_str) != ESP_OK) {
+        otCliOutputFormat("None Wi-Fi configurations\n");
+        return ESP_FAIL;
+    } else {
+        otCliOutputFormat("Wi-Fi SSID: %s\n", ssid_str);
+        char password_str[PASSWORDMAXLEN] = {0};
+        esp_ot_wifi_config_get_password(password_str);
+        if (strlen(password_str) > 0) {
+            otCliOutputFormat("Wi-Fi password: %s\n", password_str);
+        } else {
+            otCliOutputFormat("None password\n", password_str);
         }
-        esp_wifi_init(&cfg);
-        handle_wifi_addr_init();
-        ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_MAX_MODEM));
+    }
+    return ESP_OK;
+}
+
+void esp_ot_wifi_border_router_init_flag_set(bool initialized)
+{
+    s_border_router_initialized = initialized;
+}
+
+esp_err_t esp_ot_wifi_connect(const char *ssid, const char *password)
+{
+    if (!s_wifi_initialized) {
+        example_wifi_start();
 #if CONFIG_ESP_COEX_SW_COEXIST_ENABLE && CONFIG_OPENTHREAD_RADIO_NATIVE
         ESP_ERROR_CHECK(esp_coex_wifi_i154_enable());
 #endif
+        ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_MAX_MODEM));
+        handle_wifi_addr_init();
+        s_wifi_initialized = true;
+    }
+
+    if (!s_wifi_handler_registered) {
         ESP_ERROR_CHECK(
             esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &handler_on_wifi_disconnect, NULL));
-        ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &handler_ip_event, NULL));
         ESP_ERROR_CHECK(
             esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_CONNECTED, &handler_on_wifi_connect, NULL));
-        ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_GOT_IP6, &handler_ip_event, NULL));
-        esp_wifi_set_storage(WIFI_STORAGE_RAM);
-        esp_wifi_set_mode(WIFI_MODE_NULL);
-        s_initialized = true;
-    }
-    esp_wifi_start();
-    wifi_config_t wifi_config = {0};
-    strncpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
-    if (psk) {
-        strncpy((char *)wifi_config.sta.password, psk, sizeof(wifi_config.sta.password));
+        s_wifi_handler_registered = true;
     }
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-    while (retry_cnt < MAX_RETRY_TIMES) {
-        esp_wifi_connect();
-
-        xSemaphoreTake(s_wait_ip_sem, MAX_WAIT_IP_TIME / portTICK_PERIOD_MS);
-        if (!!(IP_READY_FLAG & IPV4_READY) && !!(IP_READY_FLAG & IPV6_READY)) {
-            s_wifi_connected = true;
-            esp_openthread_lock_acquire(portMAX_DELAY);
-            esp_openthread_border_router_init();
-            esp_openthread_lock_release();
-            retry_cnt = 0;
-            otCliOutputFormat("wifi sta is connected successfully\n");
-            return;
-        } else {
-            IP_READY_FLAG = 0;
-            retry_cnt++;
-            esp_wifi_disconnect();
-            otCliOutputFormat("wifi reconnecting...\n");
+    esp_err_t err = wifi_join(ssid, password);
+    if (err == ESP_OK) {
+        char old_ssid[SSIDMAXLEN] = "";
+        char old_password[PASSWORDMAXLEN] = "";
+        esp_ot_wifi_config_get_ssid(old_ssid);
+        esp_ot_wifi_config_get_password(old_password);
+        if (strcmp(ssid, old_ssid) != 0 || strcmp(password, old_password) != 0) {
+            if (esp_ot_wifi_config_set_ssid(ssid) != ESP_OK || esp_ot_wifi_config_set_password(password) != ESP_OK) {
+                ESP_LOGE(OT_EXT_CLI_TAG, "Fail to save wifi ssid and password");
+                assert(0);
+            }
         }
     }
+    return err;
+}
 
-    esp_wifi_stop();
-    ESP_LOGW(OT_EXT_CLI_TAG, "Connection time out, please check your ssid & password, then retry.");
-    otCliOutputFormat("wifi sta connection is failed\n");
+esp_err_t esp_ot_wifi_disconnect(void)
+{
+    if (!s_wifi_initialized || s_wifi_state != OT_WIFI_CONNECTED) {
+        return ESP_FAIL;
+    }
+
+    ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &handler_on_wifi_disconnect));
+    ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT, WIFI_EVENT_STA_CONNECTED, &handler_on_wifi_connect));
+    s_wifi_handler_registered = false;
+    s_wifi_state = OT_WIFI_DISCONNECTED;
+    esp_err_t err = example_wifi_sta_do_disconnect();
+    return err;
 }
 
 otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
-    char ssid[100] = "";
-    char psk[100] = "";
+    char ssid[SSIDMAXLEN] = "";
+    char psk[PASSWORDMAXLEN] = "";
     (void)(aContext);
     if (aArgsLength == 0) {
         otCliOutputFormat("---wifi parameter---\n");
         otCliOutputFormat(
             "connect -s <ssid> -p <psk>               :       connect to a wifi network with an ssid and a psk\n");
         otCliOutputFormat("connect -s <ssid>                        :       connect to a wifi network with an ssid\n");
-        otCliOutputFormat("disconnect                               :       wifi disconnect once, only for test\n");
-        otCliOutputFormat("disconnect <delay>                       :       wifi disconnect, and reconnect after "
-                          "delay(ms), only for test\n");
-        otCliOutputFormat("state                                    :       get wifi state, disconnect or connect\n");
+        otCliOutputFormat("disconnect                               :       wifi disconnect\n");
+        otCliOutputFormat(
+            "state                                    :       get wifi state, disconnect, connect or reconnecting\n");
         otCliOutputFormat("mac <role>                               :       get mac address of wifi netif, <role> can "
                           "be 'sta' or 'ap'\n");
+        otCliOutputFormat("config                                   :       get stored wifi configurations\n");
+        otCliOutputFormat("config clear                             :       clear stored wifi configurations\n");
         otCliOutputFormat("---example---\n");
         otCliOutputFormat("join a wifi:\n");
         otCliOutputFormat("ssid: threadcertAP\n");
@@ -194,41 +251,71 @@ otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs
         otCliOutputFormat("does not have a psk                      :       wifi connect -s threadAP\n");
         otCliOutputFormat("get wifi state                           :       wifi state\n");
         otCliOutputFormat("wifi disconnect once                     :       wifi disconnect\n");
-        otCliOutputFormat("wifi disconnect, and reconnect after 2s  :       wifi disconnect 2000\n");
         otCliOutputFormat("get mac address of Wi-Fi station         :       wifi mac sta\n");
         otCliOutputFormat("get mac address of Wi-Fi soft-AP         :       wifi mac ap\n");
+        otCliOutputFormat("get stored wifi configurations           :       wifi config\n");
+        otCliOutputFormat("clear stored wifi configurations         :       wifi config clear\n");
     } else if (strcmp(aArgs[0], "connect") == 0) {
+        if (s_wifi_state != OT_WIFI_DISCONNECTED) {
+            if (s_wifi_state == OT_WIFI_CONNECTED) {
+                otCliOutputFormat("wifi has already connected!\n");
+            } else if (s_wifi_state == OT_WIFI_RECONNECTING) {
+                otCliOutputFormat("Command invalid because WiFi is reconnecting!\n");
+            } else {
+                otCliOutputFormat("Invalid wifi state\n");
+            }
+            return OT_ERROR_NONE;
+        }
+
         for (int i = 1; i < aArgsLength; i++) {
             if (strcmp(aArgs[i], "-s") == 0) {
                 i++;
-                strcpy(ssid, aArgs[i]);
-                otCliOutputFormat("ssid: %s\n", ssid);
+                if (i < aArgsLength && strlen(aArgs[i]) < SSIDMAXLEN) {
+                    strcpy(ssid, aArgs[i]);
+                    otCliOutputFormat("ssid: %s\n", ssid);
+                } else {
+                    otCliOutputFormat("Wrong format of ssid\n");
+                    return OT_ERROR_INVALID_ARGS;
+                }
             } else if (strcmp(aArgs[i], "-p") == 0) {
                 i++;
-                strcpy(psk, aArgs[i]);
-                otCliOutputFormat("psk: %s\n", psk);
+                if (i < aArgsLength && strlen(aArgs[i]) < PASSWORDMAXLEN) {
+                    strcpy(psk, aArgs[i]);
+                    otCliOutputFormat("psk: %s\n", psk);
+                } else {
+                    otCliOutputFormat("Wrong format of password\n");
+                    return OT_ERROR_INVALID_ARGS;
+                }
             }
         }
-        if (!s_wifi_connected) {
-            wifi_join(ssid, psk);
+        if (strcmp(ssid, "") == 0) {
+            otCliOutputFormat("None ssid\n");
+            return OT_ERROR_INVALID_ARGS;
+        }
+        if (esp_ot_wifi_connect(ssid, psk) == ESP_OK) {
+            if (!s_border_router_initialized) {
+                esp_openthread_lock_acquire(portMAX_DELAY);
+                esp_openthread_set_backbone_netif(get_example_netif());
+                if (esp_openthread_border_router_init() != ESP_OK) {
+                    ESP_LOGE(OT_EXT_CLI_TAG, "Fail to initialize border router");
+                }
+                esp_openthread_lock_release();
+                s_border_router_initialized = true;
+            }
+            otCliOutputFormat("wifi sta is connected successfully\n");
         } else {
-            otCliOutputFormat("wifi has already connected\n");
+            ESP_LOGW(OT_EXT_CLI_TAG, "Connection time out, please check your ssid & password, then retry");
+            otCliOutputFormat("wifi sta connection is failed\n");
         }
     } else if (strcmp(aArgs[0], "state") == 0) {
-        if (s_wifi_connected) {
-            otCliOutputFormat("connected\n");
-        } else {
-            otCliOutputFormat("disconnected\n");
-        }
+        otCliOutputFormat("%s\n", wifi_state_string[s_wifi_state]);
     } else if (strcmp(aArgs[0], "disconnect") == 0) {
-        if (aArgsLength == 2) {
-            s_wifi_disconnect_delay_ms = atoi(aArgs[1]);
-            otCliOutputFormat("wifi reconnect delay in ms: %d\n", s_wifi_disconnect_delay_ms);
-        } else if (aArgsLength > 2) {
-            otCliOutputFormat("invalid commands\n");
-        }
-        if (s_wifi_connected) {
-            esp_wifi_disconnect();
+        if (s_wifi_state) {
+            if (esp_ot_wifi_disconnect() == ESP_OK) {
+                otCliOutputFormat("disconnect wifi\n");
+            } else {
+                ESP_LOGE(OT_EXT_CLI_TAG, "Fail to disconnect wifi");
+            }
         } else {
             otCliOutputFormat("wifi is not ready, please connect wifi first\n");
         }
@@ -254,8 +341,79 @@ otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs
         } else {
             otCliOutputFormat("Fail to get the mac address\n");
         }
+    } else if (strcmp(aArgs[0], "config") == 0) {
+        if (aArgsLength == 1) {
+            wifi_config_print();
+        } else {
+            if (strcmp(aArgs[1], "clear") == 0) {
+                esp_ot_wifi_config_clear();
+            } else {
+                otCliOutputFormat("invalid arguments: %s\n", aArgs[1]);
+                return OT_ERROR_INVALID_ARGS;
+            }
+        }
     } else {
         otCliOutputFormat("invalid commands\n");
     }
     return OT_ERROR_NONE;
+}
+
+esp_err_t esp_ot_wifi_config_init(void)
+{
+    esp_err_t err = nvs_open("wifi_config", NVS_READWRITE, &s_wifi_config_nvs_handle);
+    ESP_RETURN_ON_ERROR(err, OT_EXT_CLI_TAG, "Failed to open wifi_config NVS namespace (0x%x)", err);
+    return ESP_OK;
+}
+
+esp_err_t esp_ot_wifi_config_set_ssid(const char *ssid)
+{
+    ESP_RETURN_ON_FALSE((s_wifi_config_nvs_handle != 0), ESP_FAIL, OT_EXT_CLI_TAG, "wifi_config NVS handle is invalid");
+    ESP_RETURN_ON_ERROR(nvs_set_str(s_wifi_config_nvs_handle, SSIDKEY, ssid), OT_EXT_CLI_TAG, "No buffers for ssid");
+    ESP_RETURN_ON_ERROR(nvs_commit(s_wifi_config_nvs_handle), OT_EXT_CLI_TAG,
+                        "wifi_config NVS handle shut down when setting ssid");
+    return ESP_OK;
+}
+
+esp_err_t esp_ot_wifi_config_get_ssid(char *ssid)
+{
+    ESP_RETURN_ON_FALSE((sizeof(ssid) < SSIDMAXLEN), ESP_FAIL, OT_EXT_CLI_TAG,
+                        "The buffer size is not enough to get ssid");
+
+    size_t length = SSIDMAXLEN;
+    ESP_RETURN_ON_FALSE((s_wifi_config_nvs_handle != 0), ESP_FAIL, OT_EXT_CLI_TAG, "wifi_config NVS handle is invalid");
+    if (nvs_get_str(s_wifi_config_nvs_handle, SSIDKEY, ssid, &length) != ESP_OK) {
+        ESP_LOGI(OT_EXT_CLI_TAG, "None wifi ssid in nvs");
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+
+esp_err_t esp_ot_wifi_config_set_password(const char *password)
+{
+    ESP_RETURN_ON_FALSE((s_wifi_config_nvs_handle != 0), ESP_FAIL, OT_EXT_CLI_TAG, "wifi_config NVS handle is invalid");
+    ESP_RETURN_ON_ERROR(nvs_set_str(s_wifi_config_nvs_handle, PASSWORDKEY, password), OT_EXT_CLI_TAG,
+                        "No buffers for password");
+    ESP_RETURN_ON_ERROR(nvs_commit(s_wifi_config_nvs_handle), OT_EXT_CLI_TAG,
+                        "wifi_config NVS handle shut down when setting password");
+    return ESP_OK;
+}
+
+esp_err_t esp_ot_wifi_config_get_password(char *password)
+{
+    ESP_RETURN_ON_FALSE((sizeof(password) < PASSWORDMAXLEN), ESP_FAIL, OT_EXT_CLI_TAG,
+                        "The buffer size is not enough to get password");
+    size_t length = PASSWORDMAXLEN;
+    ESP_RETURN_ON_FALSE((s_wifi_config_nvs_handle != 0), ESP_FAIL, OT_EXT_CLI_TAG, "wifi_config NVS handle is invalid");
+    if (nvs_get_str(s_wifi_config_nvs_handle, PASSWORDKEY, password, &length) != ESP_OK) {
+        ESP_LOGI(OT_EXT_CLI_TAG, "None wifi password in nvs");
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+
+esp_err_t esp_ot_wifi_config_clear(void)
+{
+    ESP_RETURN_ON_FALSE((s_wifi_config_nvs_handle != 0), ESP_FAIL, OT_EXT_CLI_TAG, "wifi_config NVS handle is invalid");
+    ESP_RETURN_ON_ERROR(nvs_erase_all(s_wifi_config_nvs_handle), OT_EXT_CLI_TAG, "Fail to clear wifi configurations");
+    return ESP_OK;
 }

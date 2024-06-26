@@ -28,6 +28,9 @@ if(CONFIG_OPENTHREAD_RCP_COMMAND)
 endif()
 
 set(include "include")
+if(CONFIG_OPENTHREAD_CLI_WIFI)
+    list(APPEND include $ENV{IDF_PATH}/examples/common_components/protocol_examples_common/include)
+endif()
 idf_component_register(SRCS "${srcs}"
                     INCLUDE_DIRS "${include}"
                     PRIV_REQUIRES lwip openthread iperf esp_netif esp_wifi http_parser esp_http_client esp_coex heap mbedtls nvs_flash)
