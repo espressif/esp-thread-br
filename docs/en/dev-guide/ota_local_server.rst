@@ -26,7 +26,7 @@ The Border Router OTA image will be automatically generated when building the ``
 
 .. code-block:: bash
 
-   cp esp-thread-br/examples/basic_thread_border_router/build/br_ota_image ota_server_storage
+   cp esp-thread-br/examples/basic_thread_border_router/build/ota_with_rcp_image ota_server_storage
 
 Rebuilding the Border Router Firmware with the New Certificate
 ---------------------------------------------------------------
@@ -52,5 +52,5 @@ To download the image from the server and run the following command on the Borde
 
 .. code-block:: bash
 
-   ota download https://${HOST_URL}:8070/br_ota_image
+   ota download https://${HOST_URL}:8070/ota_with_rcp_image
 

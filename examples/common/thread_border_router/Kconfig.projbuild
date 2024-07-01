@@ -55,23 +55,9 @@ menu "ESP Thread Border Router Example"
             default "11"
     endmenu
 
-    config OPENTHREAD_BR_AUTO_UPDATE_RCP
-        bool 'Update RCP automatically'
-        default True
-        help
-            If enabled, the Thread Border Router will store the RCP image in its firmware and
-            compare the stored image version with the running RCP image upon boot. The RCP
-            will be automatically updated upon version mismatch.
-
-    config OPENTHREAD_BR_CREATE_OTA_IMAGE
-        bool 'Create the OTA image for border router'
-        default True
-        help
-            If enabled, an ota image will be generated during building.
-
     config OPENTHREAD_BR_AUTO_START
         bool 'Enable the automatic start mode in Thread Border Router.'
-        default False
+        default n
         help
             If enabled, The Thread Border Router will connect to Wi-Fi with pre-configured
             SSID and PSK, and then form a Thread network automatically. Otherwise, user need
@@ -81,7 +67,7 @@ menu "ESP Thread Border Router Example"
         bool 'Enable the web server in Thread Border Router.'
         select OPENTHREAD_COMMISSIONER
         select OPENTHREAD_JOINER
-        default False
+        default n
         help
             If enabled, a web server will be provided to configure and query Thread network via a Web GUI. 
 
