@@ -1220,4 +1220,5 @@ static void handler_got_ip_event(void *arg, esp_event_base_t event_base, int32_t
 void esp_br_web_start(char *base_path)
 {
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &handler_got_ip_event, base_path));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &handler_got_ip_event, base_path));
 }
