@@ -44,8 +44,8 @@ otError esp_ot_process_iperf(void *aContext, uint8_t aArgsLength, char *aArgs[])
         otCliOutputFormat("-f <output_format>  :     the output format of the report (Mbit/sec, Kbit/sec, bit/sec; "
                           "default Mbit/sec)\n");
         otCliOutputFormat("---example---\n");
-        otCliOutputFormat("create a tcp server :     iperf -s -i 3 -p 5001 -t 60 -f M\n");
-        otCliOutputFormat("create a udp client :     iperf -c <addr> -u -i 3 -t 60 -p 5001 -l 512 -f B\n");
+        otCliOutputFormat("create a tcp server :     iperf -V -s -i 3 -p 5001 -t 60 -f M\n");
+        otCliOutputFormat("create a udp client :     iperf -V -c <addr> -u -i 3 -t 60 -p 5001 -l 512 -f B\n");
     } else {
         for (int i = 0; i < aArgsLength; i++) {
             if (strcmp(aArgs[i], "-c") == 0) {

@@ -47,7 +47,7 @@
 
 static esp_openthread_platform_config_t s_openthread_platform_config;
 
-#if CONFIG_OPENTHREAD_BR_AUTO_UPDATE_RCP
+#if CONFIG_AUTO_UPDATE_RCP
 static void update_rcp(void)
 {
     // Deinit uart to transfer UART to the serial loader
@@ -79,14 +79,14 @@ static void try_update_ot_rcp(const esp_openthread_platform_config_t *config)
         esp_restart();
     }
 }
-#endif // CONFIG_OPENTHREAD_BR_AUTO_UPDATE_RCP
+#endif // CONFIG_AUTO_UPDATE_RCP
 
 static void rcp_failure_handler(void)
 {
-#if CONFIG_OPENTHREAD_BR_AUTO_UPDATE_RCP
+#if CONFIG_AUTO_UPDATE_RCP
     esp_rcp_mark_image_unusable();
     try_update_ot_rcp(&s_openthread_platform_config);
-#endif // CONFIG_OPENTHREAD_BR_AUTO_UPDATE_RCP
+#endif // CONFIG_AUTO_UPDATE_RCP
     esp_rcp_reset();
 }
 
@@ -103,7 +103,7 @@ static void ot_task_worker(void *ctx)
 
     // Initialize border routing features
     esp_openthread_lock_acquire(portMAX_DELAY);
-#if CONFIG_OPENTHREAD_BR_AUTO_UPDATE_RCP
+#if CONFIG_AUTO_UPDATE_RCP
     try_update_ot_rcp(&s_openthread_platform_config);
 #endif
     ESP_ERROR_CHECK(esp_netif_attach(openthread_netif, esp_openthread_netif_glue_init(&s_openthread_platform_config)));

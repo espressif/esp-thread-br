@@ -29,7 +29,7 @@ Now the image can be downloaded on the Border Router:
 
 .. code-block:: bash
 
-    ota download https://${HOST_URL}:8070/br_ota_image
+    ota download https://${HOST_URL}:8070/ota_with_rcp_image
 
 - Tips 1: For optimizing the firmware of border router, `CONFIG_COMPILER_OPTIMIZATION_SIZE` and `CONFIG_NEWLIB_NANO_FORMAT` are enabled by default.
 - Tips 2: If the OTA function is enabled, it is recommended to optimize the ot_rcp firmware size before building the OTA image. Please refer to `ot_rcp README <https://github.com/espressif/esp-idf/blob/master/examples/openthread/ot_rcp/README.md>`_ for detailed steps.
@@ -41,7 +41,7 @@ The OTA Image File Structure
 
 The OTA image is a single file containing the meta data of the RCP image, the RCP bootloader, the RCP partition table and the firmwares.
 
-The image can be generated with script :example_file:`basic_thread_border_router/create_ota_image.py`. By default this file is called automatically during build and packs the `ot_rcp` example image into the Border Router firmware.
+The image can be generated with script :component_file:`esp_rcp_update/create_ota_image.py`. By default this file is called automatically during build and packs the `ot_rcp` example image into the Border Router firmware.
 
 The RCP image header is defined as the following diagram:
 

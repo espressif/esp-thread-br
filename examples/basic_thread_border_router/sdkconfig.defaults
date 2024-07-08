@@ -53,7 +53,7 @@ CONFIG_OPENTHREAD_RADIO_SPINEL_UART=y
 #
 # OpenThread Border Router Example
 #
-CONFIG_OPENTHREAD_BR_AUTO_UPDATE_RCP=y
+CONFIG_AUTO_UPDATE_RCP=y
 # end of OpenThread Border Router Example
 
 #

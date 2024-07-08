@@ -144,8 +144,8 @@ For running iperf, you need to have two Thread devices on the same network.
 -l <len_send_buf>   :     the length of send buffer
 -f <output_format>  :     the output format of the report (Mbit/sec, Kbit/sec, bit/sec; default Mbit/sec)
 ---example---
-create a tcp server :     iperf -s -i 3 -p 5001 -t 60 -f M
-create a udp client :     iperf -c <addr> -u -i 3 -t 60 -p 5001 -l 512 -f B
+create a tcp server :     iperf -V -s -i 3 -p 5001 -t 60 -f M
+create a udp client :     iperf -V -c <addr> -u -i 3 -t 60 -p 5001 -l 512 -f B
 Done
 ```
 
@@ -306,7 +306,7 @@ Done
 Used for downloading border router firmware and updating the border router or the RCP alone.
 
 ```
-> ota download https://192.168.1.2:8070/br_ota_image
+> ota download https://192.168.1.2:8070/ota_with_rcp_image
 ```
 
 After downloading the device will restart and update itself with the new firmware. The RCP will also be updated if the firmware version changes.
