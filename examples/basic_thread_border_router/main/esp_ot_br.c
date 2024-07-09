@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "sdkconfig.h"
+
 #include "esp_check.h"
 #include "esp_err.h"
 #include "esp_event.h"
@@ -100,7 +102,9 @@ void app_main(void)
 
     ESP_ERROR_CHECK(mdns_init());
     ESP_ERROR_CHECK(mdns_hostname_set("esp-ot-br"));
+#if CONFIG_OPENTHREAD_CLI_OTA
     esp_set_ota_server_cert((char *)server_cert_pem_start);
+#endif
 
 #if CONFIG_OPENTHREAD_BR_START_WEB
     esp_br_web_start("/spiffs");

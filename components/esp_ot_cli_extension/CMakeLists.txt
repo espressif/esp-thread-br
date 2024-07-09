@@ -30,7 +30,7 @@ endif()
 set(include "include")
 idf_component_register(SRCS "${srcs}"
                     INCLUDE_DIRS "${include}"
-                    PRIV_REQUIRES lwip openthread iperf esp_netif esp_wifi http_parser esp_http_client esp_coex heap mbedtls nvs_flash)
+                    PRIV_REQUIRES lwip openthread iperf esp_netif esp_wifi http_parser esp_http_client esp_coex heap mbedtls nvs_flash esp_rcp_update)
 
 if (CONFIG_OPENTHREAD_CLI_OTA)
     idf_component_optional_requires(PUBLIC esp_br_http_ota)
