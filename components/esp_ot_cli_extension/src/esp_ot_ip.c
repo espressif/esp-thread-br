@@ -8,6 +8,7 @@
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "esp_netif_types.h"
+#include "esp_openthread_lock.h"
 #include "esp_openthread_netif_glue.h"
 #include "esp_ot_cli_extension.h"
 #include "esp_ot_wifi_cmd.h"
@@ -124,7 +125,10 @@ void esp_lwip_add_del_ip(ip_event_add_ip6_t *add_addr, const char *if_name, bool
 otError esp_ot_process_ip(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
 #if CONFIG_OPENTHREAD_BR_AUTO_START
-    if (esp_netif_get_handle_from_ifkey("WIFI_STA_DEF") != NULL && !wifi_addr_handle_init) {
+    esp_openthread_task_switching_lock_release();
+    esp_netif_t *esp_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    esp_openthread_task_switching_lock_acquire(portMAX_DELAY);
+    if (esp_netif != NULL && !wifi_addr_handle_init) {
         handle_wifi_addr_init();
         wifi_addr_handle_init = true;
     }
