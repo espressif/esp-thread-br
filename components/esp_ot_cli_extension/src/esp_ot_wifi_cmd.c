@@ -120,12 +120,9 @@ static void wifi_join(const char *ssid, const char *psk)
         }
         esp_wifi_init(&cfg);
         handle_wifi_addr_init();
-
+        ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_MAX_MODEM));
 #if CONFIG_ESP_COEX_SW_COEXIST_ENABLE && CONFIG_OPENTHREAD_RADIO_NATIVE
-        ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_MIN_MODEM));
         ESP_ERROR_CHECK(esp_coex_wifi_i154_enable());
-#else
-        ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 #endif
         ESP_ERROR_CHECK(
             esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &handler_on_wifi_disconnect, NULL));

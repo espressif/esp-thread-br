@@ -122,7 +122,7 @@ static void ot_task_worker(void *ctx)
     esp_openthread_lock_release();
     ESP_ERROR_CHECK(example_connect());
 #if CONFIG_EXAMPLE_CONNECT_WIFI
-    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_MAX_MODEM));
 #endif
     esp_openthread_lock_acquire(portMAX_DELAY);
     esp_openthread_set_backbone_netif(get_example_netif());
