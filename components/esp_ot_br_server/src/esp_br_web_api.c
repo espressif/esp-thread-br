@@ -281,8 +281,7 @@ void handle_ot_resource_node_set_dataset_request(const cJSON *request, cJSON *lo
     if (ret == OT_ERROR_NOT_FOUND) {
         ESP_GOTO_ON_FALSE(otDatasetCreateNewNetwork(ins, &dataset) == OT_ERROR_NONE, OT_ERROR_FAILED, exit, API_TAG,
                           "Cannot create a new dataset");
-        ESP_GOTO_ON_FALSE(otDatasetConvertToTlvs(&dataset, &datasetTlvs) == OT_ERROR_NONE, OT_ERROR_FAILED, exit,
-                          API_TAG, "Cannot convert the dataset");
+        otDatasetConvertToTlvs(&dataset, &datasetTlvs);
         errcode = 201;
         ret = OT_ERROR_NONE;
     }
