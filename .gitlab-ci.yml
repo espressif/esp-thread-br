@@ -1,5 +1,6 @@
 stages:
   - build
+  - check_results
   - docs
 
 variables:
@@ -112,6 +113,13 @@ build_examples:
     script:
         - *submodule_update
         - *build_basic_thread_border_router
+        - cd $ESP_THREAD_BR_PATH
+        - echo "build_examples_result=true" > build_examples_result.txt
+    artifacts:
+        when: always
+        paths:
+            - build_examples_result.txt
+        expire_in: 1 days
     tags:
         - build
     # allow failure if esp_ot_cli_extension version updated but haven't publish to component registry yet
@@ -134,6 +142,13 @@ build_idf_otbr_examples:
     script:
         - *setup_idf
         - *build_idf_example_ot_br
+        - cd $ESP_THREAD_BR_PATH
+        - echo "build_idf_otbr_example_result=true" > build_idf_otbr_example_result.txt
+    artifacts:
+        when: always
+        paths:
+            - build_idf_otbr_example_result.txt
+        expire_in: 1 days
     tags:
         - build
 
@@ -144,6 +159,13 @@ build_idf_otbr_autostart_examples:
     script:
         - *setup_idf
         - *build_idf_example_ot_br_autostart
+        - cd $ESP_THREAD_BR_PATH
+        - echo "build_idf_otbr_autostart_example_result=true" > build_idf_otbr_autostart_example_result.txt
+    artifacts:
+        when: always
+        paths:
+            - build_idf_otbr_autostart_example_result.txt
+        expire_in: 1 days
     tags:
         - build
 
@@ -154,6 +176,13 @@ build_idf_otcli_examples:
     script:
         - *setup_idf
         - *build_idf_example_ot_cli
+        - cd $ESP_THREAD_BR_PATH
+        - echo "build_idf_otcli_example_result=true" > build_idf_otcli_example_result.txt
+    artifacts:
+        when: always
+        paths:
+            - build_idf_otcli_example_result.txt
+        expire_in: 1 days
     tags:
         - build
 
@@ -174,6 +203,40 @@ build_docs:
         - build-docs -l en
     tags:
         - build_docs
+
+check_build_result:
+    stage: check_results
+    image: $ESP_ENV_IMAGE
+    needs:
+        - build_examples
+        - build_idf_otbr_examples
+        - build_idf_otbr_autostart_examples
+        - build_idf_otcli_examples
+    script:
+        - *submodule_update
+        - chmod 700 ./check_components_version.sh
+        - ALLOW_FAILURE_OUTPUT=$(./check_components_version.sh)
+        - echo "$ALLOW_FAILURE_OUTPUT"
+        - ALLOW_FAILURE_VALUE=$(echo "$ALLOW_FAILURE_OUTPUT" | cut -d'=' -f2)
+        - echo "ALLOW_FAILURE_VALUE=$ALLOW_FAILURE_VALUE"
+        - |
+          if [ "$ALLOW_FAILURE_VALUE" == "true" ]; then
+            echo "allow failure"
+            exit 0;
+          else
+            if [ -f "build_examples_result.txt" ] &&
+               [ -f "build_idf_otbr_example_result.txt" ] &&
+               [ -f "build_idf_otbr_autostart_example_result.txt" ] &&
+               [ -f "build_idf_otcli_example_result.txt" ]; then
+               echo "Success!!!"
+               exit 0
+            else
+               echo "Fail!!!"
+               exit 1
+            fi
+          fi
+    tags:
+        - build
 
 .deploy_docs_template:
     stage: docs
