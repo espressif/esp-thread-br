@@ -97,29 +97,35 @@ static void ot_task_worker(void *ctx)
 
     assert(openthread_netif != NULL);
 
-    // Initialize the OpenThread stack
-    esp_openthread_register_rcp_failure_handler(rcp_failure_handler);
-    ESP_ERROR_CHECK(esp_openthread_init(&s_openthread_platform_config));
-
     // Initialize border routing features
     esp_openthread_lock_acquire(portMAX_DELAY);
-#if CONFIG_AUTO_UPDATE_RCP
-    try_update_ot_rcp(&s_openthread_platform_config);
-#endif
     ESP_ERROR_CHECK(esp_netif_attach(openthread_netif, esp_openthread_netif_glue_init(&s_openthread_platform_config)));
-
+    ESP_ERROR_CHECK(esp_netif_set_default_netif(openthread_netif));
 #if CONFIG_OPENTHREAD_LOG_LEVEL_DYNAMIC
     (void)otLoggingSetLevel(CONFIG_LOG_DEFAULT_LEVEL);
 #endif
-
     esp_openthread_cli_init();
-    ESP_ERROR_CHECK(esp_netif_set_default_netif(openthread_netif));
     esp_cli_custom_command_init();
+    esp_openthread_cli_create_task();
+    esp_openthread_lock_release();
+
+    // Run the main loop
+    esp_openthread_launch_mainloop();
+
+    // Clean up
+    esp_openthread_netif_glue_deinit();
+    esp_netif_destroy(openthread_netif);
+    esp_vfs_eventfd_unregister();
+    esp_rcp_update_deinit();
+    vTaskDelete(NULL);
+}
+
+static void ot_br_init(void *ctx)
+{
 #if CONFIG_OPENTHREAD_BR_AUTO_START
 #if !CONFIG_EXAMPLE_CONNECT_WIFI && !CONFIG_EXAMPLE_CONNECT_ETHERNET
 #error No backbone netif!
 #endif
-    esp_openthread_lock_release();
     ESP_ERROR_CHECK(example_connect());
 #if CONFIG_EXAMPLE_CONNECT_WIFI
     ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_MAX_MODEM));
@@ -132,16 +138,6 @@ static void ot_task_worker(void *ctx)
     ESP_ERROR_CHECK(esp_openthread_auto_start((error == OT_ERROR_NONE) ? &dataset : NULL));
 #endif // CONFIG_OPENTHREAD_BR_AUTO_START
     esp_openthread_lock_release();
-
-    // Run the main loop
-    esp_openthread_cli_create_task();
-    esp_openthread_launch_mainloop();
-
-    // Clean up
-    esp_netif_destroy(openthread_netif);
-    esp_vfs_eventfd_unregister();
-    esp_openthread_netif_glue_deinit();
-    esp_rcp_update_deinit();
     vTaskDelete(NULL);
 }
 
@@ -150,5 +146,13 @@ void launch_openthread_border_router(const esp_openthread_platform_config_t *pla
 {
     s_openthread_platform_config = *platform_config;
     ESP_ERROR_CHECK(esp_rcp_update_init(update_config));
+
+    // Initialize the OpenThread stack
+    esp_openthread_register_rcp_failure_handler(rcp_failure_handler);
+    ESP_ERROR_CHECK(esp_openthread_init(&s_openthread_platform_config));
+#if CONFIG_AUTO_UPDATE_RCP
+    try_update_ot_rcp(&s_openthread_platform_config);
+#endif
     xTaskCreate(ot_task_worker, "ot_br_main", 6144, xTaskGetCurrentTaskHandle(), 5, NULL);
+    xTaskCreate(ot_br_init, "ot_br_init", 6144, NULL, 4, NULL);
 }
