@@ -90,36 +90,6 @@ static void rcp_failure_handler(void)
     esp_rcp_reset();
 }
 
-static void ot_task_worker(void *ctx)
-{
-    esp_netif_config_t cfg = ESP_NETIF_DEFAULT_OPENTHREAD();
-    esp_netif_t *openthread_netif = esp_netif_new(&cfg);
-
-    assert(openthread_netif != NULL);
-
-    // Initialize border routing features
-    esp_openthread_lock_acquire(portMAX_DELAY);
-    ESP_ERROR_CHECK(esp_netif_attach(openthread_netif, esp_openthread_netif_glue_init(&s_openthread_platform_config)));
-    ESP_ERROR_CHECK(esp_netif_set_default_netif(openthread_netif));
-#if CONFIG_OPENTHREAD_LOG_LEVEL_DYNAMIC
-    (void)otLoggingSetLevel(CONFIG_LOG_DEFAULT_LEVEL);
-#endif
-    esp_openthread_cli_init();
-    esp_cli_custom_command_init();
-    esp_openthread_cli_create_task();
-    esp_openthread_lock_release();
-
-    // Run the main loop
-    esp_openthread_launch_mainloop();
-
-    // Clean up
-    esp_openthread_netif_glue_deinit();
-    esp_netif_destroy(openthread_netif);
-    esp_vfs_eventfd_unregister();
-    esp_rcp_update_deinit();
-    vTaskDelete(NULL);
-}
-
 static void ot_br_init(void *ctx)
 {
 #if CONFIG_OPENTHREAD_BR_AUTO_START
@@ -141,11 +111,12 @@ static void ot_br_init(void *ctx)
     vTaskDelete(NULL);
 }
 
-void launch_openthread_border_router(const esp_openthread_platform_config_t *platform_config,
-                                     const esp_rcp_update_config_t *update_config)
+static void ot_task_worker(void *ctx)
 {
-    s_openthread_platform_config = *platform_config;
-    ESP_ERROR_CHECK(esp_rcp_update_init(update_config));
+    esp_netif_config_t cfg = ESP_NETIF_DEFAULT_OPENTHREAD();
+    esp_netif_t *openthread_netif = esp_netif_new(&cfg);
+
+    assert(openthread_netif != NULL);
 
     // Initialize the OpenThread stack
     esp_openthread_register_rcp_failure_handler(rcp_failure_handler);
@@ -153,6 +124,35 @@ void launch_openthread_border_router(const esp_openthread_platform_config_t *pla
 #if CONFIG_AUTO_UPDATE_RCP
     try_update_ot_rcp(&s_openthread_platform_config);
 #endif
-    xTaskCreate(ot_task_worker, "ot_br_main", 6144, xTaskGetCurrentTaskHandle(), 5, NULL);
+    // Initialize border routing features
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    ESP_ERROR_CHECK(esp_netif_attach(openthread_netif, esp_openthread_netif_glue_init(&s_openthread_platform_config)));
+    ESP_ERROR_CHECK(esp_netif_set_default_netif(openthread_netif));
+#if CONFIG_OPENTHREAD_LOG_LEVEL_DYNAMIC
+    (void)otLoggingSetLevel(CONFIG_LOG_DEFAULT_LEVEL);
+#endif
+    esp_openthread_cli_init();
+    esp_cli_custom_command_init();
+    esp_openthread_cli_create_task();
+    esp_openthread_lock_release();
+
     xTaskCreate(ot_br_init, "ot_br_init", 6144, NULL, 4, NULL);
+    // Run the main loop
+    esp_openthread_launch_mainloop();
+
+    // Clean up
+    esp_openthread_netif_glue_deinit();
+    esp_netif_destroy(openthread_netif);
+    esp_vfs_eventfd_unregister();
+    esp_rcp_update_deinit();
+    vTaskDelete(NULL);
+}
+
+void launch_openthread_border_router(const esp_openthread_platform_config_t *platform_config,
+                                     const esp_rcp_update_config_t *update_config)
+{
+    s_openthread_platform_config = *platform_config;
+    ESP_ERROR_CHECK(esp_rcp_update_init(update_config));
+
+    xTaskCreate(ot_task_worker, "ot_br_main", 6144, xTaskGetCurrentTaskHandle(), 5, NULL);
 }
