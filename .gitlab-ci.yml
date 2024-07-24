@@ -56,6 +56,8 @@ pre_commit:
   - idf.py build
 
   - cd $ESP_THREAD_BR_PATH/examples/basic_thread_border_router
+  - rm -rf sdkconfig.defaults
+  - cp ${CI_TOOLS_PATH}/sdkconfig.br.basic sdkconfig.defaults
   - idf.py build
 
 .build_local_components: &build_local_components
@@ -67,6 +69,8 @@ pre_commit:
   - cd $ESP_THREAD_BR_PATH/examples/basic_thread_border_router
   - rm -rf main/idf_component.yml
   - cp ${CI_TOOLS_PATH}/idf_component_local.yml main/idf_component.yml
+  - rm -rf sdkconfig.defaults
+  - cp ${CI_TOOLS_PATH}/sdkconfig.br.basic sdkconfig.defaults
   - idf.py build
 
 .build_idf_example_ot_br: &build_idf_example_ot_br
