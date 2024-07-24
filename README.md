@@ -32,11 +32,21 @@ The two SoCs are connected with following interfaces:
 
 The SDK also supports manually connecting an ESP32-H2 RCP to an ESP32 series Wi-Fi SoC.
 
+For standalone modules, we recommend the [ot_br](https://github.com/espressif/esp-idf/tree/master/examples/openthread/ot_br) example in esp-idf as a quick start.
+
+#### Connect an ESP32-H2 RCP to an ESP32 series Wi-Fi SoC using UART:
 ESP32 pin           | ESP32-H2 pin
 --------------------|-------------
   GND               |     G
   GPIO17 (UART RX)  |     TX
   GPIO18 (UART TX)  |     RX
+  GPIO7             |     RST
+  GPIO8             |     GPIO9 (BOOT)
+
+#### Connect an ESP32-H2 RCP to an ESP32 series Wi-Fi SoC using SPI:
+ESP32 pin           | ESP32-H2 pin
+--------------------|-------------
+  GND               |     G
   GPIO7             |     RST
   GPIO8  (SPI INTR) |     GPIO9 (BOOT)
   GPIO10 (SPI CS)   |     GPIO2
@@ -44,13 +54,10 @@ ESP32 pin           | ESP32-H2 pin
   GPIO12 (SPI CLK)  |     GPIO0
   GPIO13 (SPI MISO) |     GPIO1
 
-Note that the SPI GPIOs are optional, if the UART is selected for communication.
+Note that:
+1. The GPIO17 and GPIO18 on ESP32-S3 have different driver current([refer to ESP32-S3 TRM, Chapter 6.12](https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf)). If ESP32-S3 is used as the host, please change the UART RX/TX GPIOs to GPIO4 and GPIO5 which are recommended.
 
-The following image shows an example connection between ESP32 DevKitC and ESP32-H2 DevKitC:
-
-![br_standalone](docs/images/thread-border-router-esp32-esp32h2.jpg)
-
-In this setup, only UART interface is connected, so it doesn't support RCP Update or RF Coexistence features. You can refer to [ot_br](https://github.com/espressif/esp-idf/tree/master/examples/openthread/ot_br) example in esp-idf as a quick start.
+2. The configure `ESP_CONSOLE_USB_SERIAL_JTAG` is enabled by default, please connect the USB port of the ESP32 series Wi-Fi SoC to host.
 
 ## Ethernet based Thread Border Router
 
