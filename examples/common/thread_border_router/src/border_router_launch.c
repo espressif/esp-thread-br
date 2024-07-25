@@ -85,9 +85,16 @@ static void rcp_failure_handler(void)
 {
 #if CONFIG_AUTO_UPDATE_RCP
     esp_rcp_mark_image_unusable();
-    try_update_ot_rcp(&s_openthread_platform_config);
-#endif // CONFIG_AUTO_UPDATE_RCP
-    esp_rcp_reset();
+    char internal_rcp_version[RCP_VERSION_MAX_SIZE];
+    if (esp_rcp_load_version_in_storage(internal_rcp_version, sizeof(internal_rcp_version)) == ESP_OK) {
+        ESP_LOGI(TAG, "Internal RCP Version: %s", internal_rcp_version);
+        update_rcp();
+    } else {
+        ESP_LOGI(TAG, "RCP firmware not found in storage, will reboot to try next image");
+        esp_rcp_mark_image_verified(false);
+        esp_restart();
+    }
+#endif
 }
 
 static void ot_br_init(void *ctx)
