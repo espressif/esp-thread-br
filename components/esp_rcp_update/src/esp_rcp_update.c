@@ -11,11 +11,11 @@
 #include <string.h>
 
 #include "esp32_port.h"
-#include "esp_br_firmware.h"
 #include "esp_check.h"
 #include "esp_err.h"
 #include "esp_loader.h"
 #include "esp_log.h"
+#include "esp_rcp_firmware.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "driver/gpio.h"
@@ -63,12 +63,12 @@ static esp_loader_error_t connect_to_target(target_chip_t target_chip, uint32_t 
     return ESP_LOADER_SUCCESS;
 }
 
-static esp_err_t seek_to_subfile(FILE *fp, esp_br_filetag_t tag, esp_br_subfile_info_t *found_info)
+static esp_err_t seek_to_subfile(FILE *fp, esp_rcp_filetag_t tag, esp_rcp_subfile_info_t *found_info)
 {
     if (fseek(fp, 0, SEEK_SET) != 0) {
         return ESP_FAIL;
     }
-    esp_br_subfile_info_t subfile_info;
+    esp_rcp_subfile_info_t subfile_info;
     if (fread(&subfile_info, 1, sizeof(subfile_info), fp) != sizeof(subfile_info)) {
         return ESP_FAIL;
     }
@@ -94,12 +94,12 @@ esp_err_t esp_rcp_load_version_in_storage(char *version_str, size_t size)
     char fullpath[RCP_FILENAME_MAX_SIZE];
     int8_t update_seq = esp_rcp_get_update_seq();
 
-    sprintf(fullpath, "%s_%d/" ESP_BR_RCP_IMAGE_FILENAME, s_handle.update_config.firmware_dir, update_seq);
+    sprintf(fullpath, "%s_%d/" ESP_RCP_IMAGE_FILENAME, s_handle.update_config.firmware_dir, update_seq);
     FILE *fp = fopen(fullpath, "r");
     if (fp == NULL) {
         return ESP_ERR_NOT_FOUND;
     }
-    esp_br_subfile_info_t version_info;
+    esp_rcp_subfile_info_t version_info;
     ESP_RETURN_ON_ERROR(seek_to_subfile(fp, FILETAG_RCP_VERSION, &version_info), TAG, "Failed to find version subfile");
     memset(version_str, 0, size);
     int read_size = size < version_info.size ? size : version_info.size;
@@ -249,10 +249,10 @@ esp_err_t esp_rcp_update(void)
 
     char fullpath[RCP_FILENAME_MAX_SIZE];
     int update_seq = esp_rcp_get_update_seq();
-    sprintf(fullpath, "%s_%d/" ESP_BR_RCP_IMAGE_FILENAME, s_handle.update_config.firmware_dir, update_seq);
+    sprintf(fullpath, "%s_%d/" ESP_RCP_IMAGE_FILENAME, s_handle.update_config.firmware_dir, update_seq);
     FILE *fp = fopen(fullpath, "r");
     ESP_RETURN_ON_FALSE(fp != NULL, ESP_ERR_NOT_FOUND, TAG, "Cannot find rcp image");
-    esp_br_subfile_info_t subfile;
+    esp_rcp_subfile_info_t subfile;
     seek_to_subfile(fp, FILETAG_RCP_FLASH_ARGS, &subfile);
     int num_flash_binaries = subfile.size / sizeof(rcp_flash_arg_t);
 
