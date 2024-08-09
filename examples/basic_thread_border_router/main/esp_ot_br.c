@@ -41,8 +41,10 @@ extern const uint8_t server_cert_pem_end[] asm("_binary_ca_cert_pem_end");
 static esp_err_t init_spiffs(void)
 {
 #if CONFIG_AUTO_UPDATE_RCP
-    esp_vfs_spiffs_conf_t rcp_fw_conf = {
-        .base_path = "/rcp_fw", .partition_label = "rcp_fw", .max_files = 10, .format_if_mount_failed = false};
+    esp_vfs_spiffs_conf_t rcp_fw_conf = {.base_path = "/" CONFIG_RCP_PARTITION_NAME,
+                                         .partition_label = CONFIG_RCP_PARTITION_NAME,
+                                         .max_files = 10,
+                                         .format_if_mount_failed = false};
     ESP_RETURN_ON_ERROR(esp_vfs_spiffs_register(&rcp_fw_conf), TAG, "Failed to mount rcp firmware storage");
 #endif
 #if CONFIG_OPENTHREAD_BR_START_WEB
