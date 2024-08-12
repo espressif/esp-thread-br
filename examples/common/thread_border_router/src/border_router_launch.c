@@ -113,8 +113,8 @@ static void ot_br_init(void *ctx)
     otOperationalDatasetTlvs dataset;
     otError error = otDatasetGetActiveTlvs(esp_openthread_get_instance(), &dataset);
     ESP_ERROR_CHECK(esp_openthread_auto_start((error == OT_ERROR_NONE) ? &dataset : NULL));
-#endif // CONFIG_OPENTHREAD_BR_AUTO_START
     esp_openthread_lock_release();
+#endif // CONFIG_OPENTHREAD_BR_AUTO_START
     vTaskDelete(NULL);
 }
 
@@ -161,5 +161,5 @@ void launch_openthread_border_router(const esp_openthread_platform_config_t *pla
     s_openthread_platform_config = *platform_config;
     ESP_ERROR_CHECK(esp_rcp_update_init(update_config));
 
-    xTaskCreate(ot_task_worker, "ot_br_main", 6144, xTaskGetCurrentTaskHandle(), 5, NULL);
+    xTaskCreate(ot_task_worker, "ot_br_main", 8192, xTaskGetCurrentTaskHandle(), 5, NULL);
 }
