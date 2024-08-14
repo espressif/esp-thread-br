@@ -219,12 +219,14 @@ check_build_result:
     script:
         - *submodule_update
         - chmod 700 ./check_components_version.sh
-        - ALLOW_FAILURE_OUTPUT=$(./check_components_version.sh)
-        - echo "$ALLOW_FAILURE_OUTPUT"
-        - ALLOW_FAILURE_VALUE=$(echo "$ALLOW_FAILURE_OUTPUT" | cut -d'=' -f2)
-        - echo "ALLOW_FAILURE_VALUE=$ALLOW_FAILURE_VALUE"
+        - ALLOW_EXT_CMD_FAILURE_OUTPUT=$(./check_components_version.sh "components/esp_ot_cli_extension")
+        - ALLOW_EXT_CMD_FAILURE_VALUE=$(echo "$ALLOW_EXT_CMD_FAILURE_OUTPUT" | cut -d'=' -f2)
+        - echo "ALLOW_EXT_CMD_FAILURE_VALUE=$ALLOW_EXT_CMD_FAILURE_VALUE"
+        - ALLOW_RCP_UPDATE_FAILURE_OUTPUT=$(./check_components_version.sh "components/esp_rcp_update")
+        - ALLOW_RCP_UPDATE_FAILURE_VALUE=$(echo "$ALLOW_RCP_UPDATE_FAILURE_OUTPUT" | cut -d'=' -f2)
+        - echo "ALLOW_RCP_UPDATE_FAILURE_VALUE=$ALLOW_RCP_UPDATE_FAILURE_VALUE"
         - |
-          if [ "$ALLOW_FAILURE_VALUE" == "true" ]; then
+          if [ "$ALLOW_EXT_CMD_FAILURE_VALUE" == "true" ] || [ "$ALLOW_RCP_UPDATE_FAILURE_VALUE" == "true" ]; then
             echo "allow failure"
             exit 0;
           else
