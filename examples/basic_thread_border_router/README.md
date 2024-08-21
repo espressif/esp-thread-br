@@ -30,6 +30,8 @@ If the `OPENTHREAD_BR_AUTO_START` option is enabled, the device will connect to 
 
 The Wi-Fi network's ssid and psk needs to be pre-configured with `EXAMPLE_WIFI_SSID` and `EXAMPLE_WIFI_PASSWORD`.
 
+Note that in this mode, the device will first attempt to use the Wi-Fi SSID and password stored in NVS. If no Wi-Fi information is stored, it will then use the `EXAMPLE_WIFI_SSID` and `EXAMPLE_WIFI_PASSWORD` from menuconfig.
+
 The Thread network parameters could be pre-configured with `OPENTHREAD_NETWORK_xx` options.
 
 If the `OPENTHREAD_BR_START_WEB` option is enabled, [ESP Thread Border Router Web Server](../../components/esp_ot_br_server/README.md) will be provided to configure and query Thread network via a Web GUI.
@@ -45,7 +47,7 @@ First build the [ot_rcp](https://github.com/espressif/esp-idf/tree/master/exampl
 Build the project and flash it to the board, then run monitor tool to view serial output:
 
 ```
-idf.py -p PORT build flash monitor
+idf.py -p PORT build erase-flash flash monitor
 ```
 
 If the `OPENTHREAD_BR_AUTO_START` option is not enabled, you need to manually configure the networks with CLI commands.

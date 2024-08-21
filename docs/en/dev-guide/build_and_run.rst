@@ -94,6 +94,8 @@ The auto start mode is disabled by default, if you want the device connects to t
 
 When automatic start mode is enabled, the Thread dataset, Wi-Fi SSID and password must be set in menuconfig. The corresponding options are ``Component config -> OpenThread -> Thread Operational Dataset``, ``Example Connection Configuration -> WiFi SSID`` and ``Example Connection Configuration -> WiFi Password``.
 
+Note that in this mode, the device will first attempt to use the Wi-Fi SSID and password stored in NVS. If no Wi-Fi information is stored, it will then use the `EXAMPLE_WIFI_SSID` and `EXAMPLE_WIFI_PASSWORD` from menuconfig.
+
 .. note::
 
    The following configuration options are all optional, jump to `2.1.4. Build and Run the Thread Border Router`_ if you don't need any customized settings.

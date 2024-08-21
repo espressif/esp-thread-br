@@ -635,10 +635,11 @@ Used for connecting the border router to the Wi-Fi network.
 ---wifi parameter---
 connect -s <ssid> -p <psk>               :      connect to a wifi network with an ssid and a psk
 connect -s <ssid>                        :      connect to a wifi network with an ssid
-disconnect                               :      wifi disconnect once, only for test
-disconnect <delay>                       :      wifi disconnect, and reconnect after delay(ms), only for test
+disconnect                               :      wifi disconnect
 state                                    :      get wifi state, disconnect or connect
 mac <role>                               :      get mac address of wifi netif, <role> can be "sta" or "ap"
+config                                   :      get stored wifi configurations
+config clear                             :      clear stored wifi configurations
 ---example---
 join a wifi:
 ssid: threadcertAP
@@ -647,10 +648,11 @@ join a wifi:
 ssid: threadAP
 does not have a psk                      :      wifi connect -s threadAP
 get wifi state                           :      wifi state
-wifi disconnect once                     :      wifi disconnect
-wifi disconnect, and reconnect after 2s  :      wifi disconnect 2000
+wifi disconnect                          :      wifi disconnect
 get mac address of Wi-Fi station         :      wifi mac sta
 get mac address of Wi-Fi soft-AP         :      wifi mac ap
+get stored wifi configurations           :      wifi config
+clear stored wifi configurations         :      wifi config clear
 ```
 
 To join a Wi-Fi network, please use the `wifi connect` command:

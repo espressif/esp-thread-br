@@ -37,6 +37,10 @@
 #include "openthread/tasklet.h"
 #include "openthread/thread_ftd.h"
 
+#if CONFIG_OPENTHREAD_CLI_WIFI
+#include "esp_ot_wifi_cmd.h"
+#endif
+
 #if CONFIG_OPENTHREAD_BR_AUTO_START
 #include "esp_wifi.h"
 #include "protocol_examples_common.h"
@@ -99,21 +103,48 @@ static void rcp_failure_handler(void)
 
 static void ot_br_init(void *ctx)
 {
+#if CONFIG_OPENTHREAD_CLI_WIFI
+    ESP_ERROR_CHECK(esp_ot_wifi_config_init());
+#endif
 #if CONFIG_OPENTHREAD_BR_AUTO_START
-#if !CONFIG_EXAMPLE_CONNECT_WIFI && !CONFIG_EXAMPLE_CONNECT_ETHERNET
+#if CONFIG_EXAMPLE_CONNECT_WIFI || CONFIG_EXAMPLE_CONNECT_ETHERNET
+    bool wifi_or_ethernet_connected = false;
+#else
 #error No backbone netif!
 #endif
-    ESP_ERROR_CHECK(example_connect());
 #if CONFIG_EXAMPLE_CONNECT_WIFI
-    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_MAX_MODEM));
+    char wifi_ssid[32] = "";
+    char wifi_password[64] = "";
+    if (esp_ot_wifi_config_get_ssid(wifi_ssid) == ESP_OK) {
+        ESP_LOGI(TAG, "use the Wi-Fi config from NVS");
+        esp_ot_wifi_config_get_password(wifi_password);
+    } else {
+        ESP_LOGI(TAG, "use the Wi-Fi config from Kconfig");
+        strcpy(wifi_ssid, CONFIG_EXAMPLE_WIFI_SSID);
+        strcpy(wifi_password, CONFIG_EXAMPLE_WIFI_PASSWORD);
+    }
+    if (esp_ot_wifi_connect(wifi_ssid, wifi_password) == ESP_OK) {
+        wifi_or_ethernet_connected = true;
+    } else {
+        ESP_LOGE(TAG, "Fail to connect to Wi-Fi, please try again manually");
+    }
 #endif
-    esp_openthread_lock_acquire(portMAX_DELAY);
-    esp_openthread_set_backbone_netif(get_example_netif());
-    ESP_ERROR_CHECK(esp_openthread_border_router_init());
-    otOperationalDatasetTlvs dataset;
-    otError error = otDatasetGetActiveTlvs(esp_openthread_get_instance(), &dataset);
-    ESP_ERROR_CHECK(esp_openthread_auto_start((error == OT_ERROR_NONE) ? &dataset : NULL));
-    esp_openthread_lock_release();
+#if CONFIG_EXAMPLE_CONNECT_ETHERNET
+    ESP_ERROR_CHECK(example_ethernet_connect());
+    wifi_or_ethernet_connected = true;
+#endif
+    if (wifi_or_ethernet_connected) {
+        esp_openthread_lock_acquire(portMAX_DELAY);
+        esp_openthread_set_backbone_netif(get_example_netif());
+        ESP_ERROR_CHECK(esp_openthread_border_router_init());
+        esp_ot_wifi_border_router_init_flag_set(true);
+        otOperationalDatasetTlvs dataset;
+        otError error = otDatasetGetActiveTlvs(esp_openthread_get_instance(), &dataset);
+        ESP_ERROR_CHECK(esp_openthread_auto_start((error == OT_ERROR_NONE) ? &dataset : NULL));
+        esp_openthread_lock_release();
+    } else {
+        ESP_LOGE(TAG, "Auto-start mode failed, please try to start manually");
+    }
 #endif // CONFIG_OPENTHREAD_BR_AUTO_START
     vTaskDelete(NULL);
 }

@@ -21,9 +21,6 @@
 #include "openthread/cli.h"
 
 #if CONFIG_OPENTHREAD_CLI_WIFI
-#if CONFIG_OPENTHREAD_BR_AUTO_START
-static bool wifi_addr_handle_init = false;
-#endif
 ESP_EVENT_DECLARE_BASE(WIFI_ADDRESS_EVENT);
 #endif
 
@@ -124,17 +121,6 @@ void esp_lwip_add_del_ip(ip_event_add_ip6_t *add_addr, const char *if_name, bool
 
 otError esp_ot_process_ip(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
-#if CONFIG_OPENTHREAD_BR_AUTO_START
-    esp_openthread_task_switching_lock_release();
-    esp_netif_t *esp_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-    esp_openthread_task_switching_lock_acquire(portMAX_DELAY);
-    if (esp_netif != NULL && !wifi_addr_handle_init) {
-        handle_wifi_addr_init();
-        wifi_addr_handle_init = true;
-    }
-#endif // CONFIG_OPENTHREAD_BR_AUTO_START
-
-    (void)(aContext);
     if (aArgsLength == 0) {
         otCliOutputFormat("---ip parameter---\n");
         otCliOutputFormat("print                    :     print all ip on each interface of lwip\n");
