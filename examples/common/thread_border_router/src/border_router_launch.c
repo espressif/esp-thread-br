@@ -43,6 +43,7 @@
 
 #if CONFIG_OPENTHREAD_BR_AUTO_START
 #include "esp_wifi.h"
+#include "example_common_private.h"
 #include "protocol_examples_common.h"
 #endif
 
@@ -137,7 +138,9 @@ static void ot_br_init(void *ctx)
         esp_openthread_lock_acquire(portMAX_DELAY);
         esp_openthread_set_backbone_netif(get_example_netif());
         ESP_ERROR_CHECK(esp_openthread_border_router_init());
+#if CONFIG_EXAMPLE_CONNECT_WIFI
         esp_ot_wifi_border_router_init_flag_set(true);
+#endif
         otOperationalDatasetTlvs dataset;
         otError error = otDatasetGetActiveTlvs(esp_openthread_get_instance(), &dataset);
         ESP_ERROR_CHECK(esp_openthread_auto_start((error == OT_ERROR_NONE) ? &dataset : NULL));
