@@ -193,7 +193,12 @@ void launch_openthread_border_router(const esp_openthread_platform_config_t *pla
                                      const esp_rcp_update_config_t *update_config)
 {
     s_openthread_platform_config = *platform_config;
+
+#if CONFIG_AUTO_UPDATE_RCP
     ESP_ERROR_CHECK(esp_rcp_update_init(update_config));
+#else
+    OT_UNUSED_VARIABLE(update_config);
+#endif
 
     xTaskCreate(ot_task_worker, "ot_br_main", 8192, xTaskGetCurrentTaskHandle(), 5, NULL);
 }
