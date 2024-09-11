@@ -5,11 +5,11 @@
  */
 
 #include "esp_br_http_ota.h"
-#include "esp_br_firmware.h"
 #include "esp_check.h"
 #include "esp_log.h"
 #include "esp_ota_ops.h"
-#include "esp_rcp_update.h"
+#include "esp_rcp_firmware.h"
+#include "esp_rcp_ota.h"
 
 #define DEFAULT_REQUEST_SIZE 64 * 1024
 #define TAG "BR_OTA"
@@ -129,173 +129,80 @@ static int http_client_read_check_connection(esp_http_client_handle_t client, ch
     return len;
 }
 
-static int http_read_for(esp_http_client_handle_t http_client, char *data, size_t size)
+static esp_err_t download_ota_image(esp_http_client_config_t *config)
 {
-    int read_len = 0;
-    while (read_len < size) {
-        int len = http_client_read_check_connection(http_client, data, size - read_len);
-        if (len < 0) {
-            return read_len;
-        }
-        read_len += len;
-    }
-    return read_len;
-}
-
-static esp_err_t download_br_ota_firmware(esp_http_client_handle_t http_client, uint32_t br_firmware_size)
-{
-    const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
-    ESP_RETURN_ON_FALSE(update_partition != NULL, ESP_ERR_NOT_FOUND, TAG, "Failed to find ota partition");
-
-    esp_ota_handle_t ota_handle;
-    int ret = ESP_OK;
-    ESP_GOTO_ON_ERROR(esp_ota_begin(update_partition, OTA_WITH_SEQUENTIAL_WRITES, &ota_handle), exit, TAG,
-                      "Failed to start ota");
-    ESP_LOGI(TAG, "Downloading Border Router firmware data...");
+    esp_err_t ret = ESP_OK;
     bool download_done = false;
-    uint32_t read_size = 0;
-    while (!download_done) {
-        int len = http_client_read_check_connection(http_client, s_download_data_buf, sizeof(s_download_data_buf));
-        download_done = esp_http_client_is_complete_data_received(http_client);
-        ESP_GOTO_ON_FALSE(len >= 0, ESP_FAIL, exit, TAG, "Failed to download");
-        read_size += len;
-        ESP_GOTO_ON_ERROR(esp_ota_write(ota_handle, s_download_data_buf, len), exit, TAG, "Failed to write ota");
-        ESP_LOGI(TAG, "%lu/%lu bytes", read_size, br_firmware_size);
-    }
-    ESP_GOTO_ON_FALSE(read_size == br_firmware_size, ESP_FAIL, exit, TAG, "Incomplete firmware");
-
-exit:
-    if (ret == ESP_OK) {
-        ret = esp_ota_end(ota_handle);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to submit OTA");
-        }
-    } else {
-        esp_ota_abort(ota_handle);
-    }
-    return ret;
-}
-
-static int write_file_for_length(FILE *fp, const void *buf, size_t size)
-{
-    static const int k_max_retry = 5;
-    int retry_count = 0;
-    int offset = 0;
-    const uint8_t *data = (const uint8_t *)buf;
-    while (offset < size) {
-        int ret =
-            fwrite(data + offset, 1, ((size - offset) < OTA_MAX_WRITE_SIZE ? (size - offset) : OTA_MAX_WRITE_SIZE), fp);
-        if (ret < 0) {
-            return ret;
-        }
-        if (ret == 0) {
-            retry_count++;
-        } else {
-            offset += ret;
-            retry_count = 0;
-        }
-        if (retry_count > k_max_retry) {
-            return -1;
-        }
-    }
-    return size;
-}
-
-static esp_err_t download_ota_image(esp_http_client_config_t *config, const char *rcp_firmware_dir,
-                                    int8_t rcp_update_seq)
-{
-    char rcp_target_path[RCP_FILENAME_MAX_SIZE];
-    bool download_done = false;
-
-    sprintf(rcp_target_path, "%s_%d/" ESP_BR_RCP_IMAGE_FILENAME, rcp_firmware_dir, rcp_update_seq);
-
-    ESP_LOGI(TAG, "Downloading %s, RCP target file %s\n", config->url, rcp_target_path);
+    esp_rcp_ota_handle_t rcp_ota_handle = 0;
+    esp_ota_handle_t host_ota_handle = 0;
+    uint32_t br_fw_downloaded = 0;
+    uint32_t br_fw_size = 0;
+    char *br_fist_write_ptr = NULL;
+    size_t br_first_write_size = 0;
+    ESP_LOGI(TAG, "Downloading from %s\n", config->url);
     esp_http_client_handle_t http_client = esp_http_client_init(config);
     ESP_RETURN_ON_FALSE(http_client != NULL, ESP_FAIL, TAG, "Failed to create HTTP client");
-    esp_err_t ret = ESP_OK;
-    FILE *fp = fopen(rcp_target_path, "w");
-    if (!fp) {
-        ESP_LOGE(TAG, "Fail to open %s, will delete it and create a new one", rcp_target_path);
-        remove(rcp_target_path);
-        fp = fopen(rcp_target_path, "w");
-    }
-
-    ESP_GOTO_ON_FALSE(fp != NULL, ESP_FAIL, exit, TAG, "Failed to open target file");
+    ESP_GOTO_ON_ERROR(esp_rcp_ota_begin(&rcp_ota_handle), exit, TAG, "Failed to begin RCP OTA");
     ESP_GOTO_ON_ERROR(_http_connect(http_client), exit, TAG, "Failed to connect to HTTP server");
 
-    // First decide the br firmware offset
-    uint32_t header_size = 0;
-    uint32_t read_size = 0;
-    uint32_t br_firmware_offset = 0;
-    uint32_t br_firmware_size = 0;
     while (!download_done) {
-        esp_br_subfile_info_t subfile_info;
-        int len = http_read_for(http_client, (char *)&subfile_info, sizeof(subfile_info));
-        ESP_LOGI(TAG, "subfile_info: tag 0x%lx size %lu offset %lu\n", subfile_info.tag, subfile_info.size,
-                 subfile_info.offset);
+        int len = http_client_read_check_connection(http_client, s_download_data_buf, sizeof(s_download_data_buf));
+        size_t rcp_ota_received_len = 0;
+        ESP_GOTO_ON_FALSE(len >= 0, ESP_FAIL, exit, TAG, "Failed to download");
         download_done = esp_http_client_is_complete_data_received(http_client);
-        ESP_GOTO_ON_FALSE(len == sizeof(subfile_info), ESP_FAIL, exit, TAG, "Incomplete header");
-
-        read_size += len;
-        if (subfile_info.tag == FILETAG_IMAGE_HEADER) {
-            header_size = subfile_info.size;
-        } else if (subfile_info.tag == FILETAG_BR_FIRMWARE) {
-            br_firmware_offset = subfile_info.offset;
-            br_firmware_size = subfile_info.size;
-        }
-        ESP_GOTO_ON_FALSE(write_file_for_length(fp, &subfile_info, len) == len, ESP_FAIL, exit, TAG,
-                          "Failed to write data");
-        if (read_size >= header_size) {
+        ESP_GOTO_ON_ERROR(esp_rcp_ota_receive(rcp_ota_handle, s_download_data_buf, len, &rcp_ota_received_len), exit,
+                          TAG, "Failed to receive host RCP OTA data");
+        if (esp_rcp_ota_get_state(rcp_ota_handle) == ESP_RCP_OTA_STATE_FINISHED) {
+            br_fw_size = esp_rcp_ota_get_subfile_size(rcp_ota_handle, FILETAG_HOST_FIRMWARE);
+            br_fist_write_ptr = &s_download_data_buf[rcp_ota_received_len];
+            br_first_write_size = len - rcp_ota_received_len;
             break;
         }
     }
-
-    while (!download_done && read_size < br_firmware_offset) {
-        int target_read_size = sizeof(s_download_data_buf) < br_firmware_offset - read_size
-            ? sizeof(s_download_data_buf)
-            : br_firmware_offset - read_size;
-        int len = http_client_read_check_connection(http_client, s_download_data_buf, target_read_size);
-        download_done = esp_http_client_is_complete_data_received(http_client);
-
-        ESP_GOTO_ON_FALSE(len >= 0, ESP_FAIL, exit, TAG, "Failed to download");
-        if (len > 0) {
-            int r = write_file_for_length(fp, s_download_data_buf, len);
-            if (r != len) {
-                ESP_GOTO_ON_FALSE(r == len, ESP_FAIL, exit, TAG, "Failed to write OTA");
-            }
+    if (br_fw_size > 0) {
+        const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
+        ESP_GOTO_ON_FALSE(update_partition != NULL, ESP_ERR_NOT_FOUND, exit, TAG, "Failed to find ota partition");
+        ESP_GOTO_ON_ERROR(esp_ota_begin(update_partition, OTA_WITH_SEQUENTIAL_WRITES, &host_ota_handle), exit, TAG,
+                          "Failed to begin host OTA");
+        if (br_fist_write_ptr && br_first_write_size > 0) {
+            ESP_GOTO_ON_ERROR(esp_ota_write(host_ota_handle, br_fist_write_ptr, br_first_write_size), exit, TAG,
+                              "Failed to write ota");
+            br_fw_downloaded += br_first_write_size;
+            ESP_LOGD(TAG, "Border Router firmware download %lu/%lu bytes", br_fw_downloaded, br_fw_size);
         }
-        read_size += len;
-        ESP_LOGI(TAG, "Downloaded %lu bytes", read_size);
+        while (!download_done && br_fw_downloaded < br_fw_size) {
+            int len = http_client_read_check_connection(http_client, s_download_data_buf, sizeof(s_download_data_buf));
+            download_done = esp_http_client_is_complete_data_received(http_client);
+            ESP_GOTO_ON_FALSE(len >= 0, ESP_FAIL, exit, TAG, "Failed to download");
+            br_fw_downloaded += len;
+            ESP_GOTO_ON_ERROR(esp_ota_write(host_ota_handle, s_download_data_buf, len), exit, TAG,
+                              "Failed to write ota");
+            ESP_LOGD(TAG, "Border Router firmware download %lu/%lu bytes", br_fw_downloaded, br_fw_size);
+        }
+        ret = esp_ota_end(host_ota_handle);
+        host_ota_handle = 0;
+        ESP_GOTO_ON_ERROR(ret, exit, TAG, "Failed to end host OTA");
+        ESP_GOTO_ON_ERROR(esp_ota_set_boot_partition(esp_ota_get_next_update_partition(NULL)), exit, TAG,
+                          "Failed to set boot partition");
     }
-
-    ESP_GOTO_ON_FALSE(read_size == br_firmware_offset, ESP_FAIL, exit, TAG, "Incomplete RCP image");
-    ESP_GOTO_ON_ERROR(download_br_ota_firmware(http_client, br_firmware_size), exit, TAG,
-                      "Failed to download OTA firmware");
-    ESP_GOTO_ON_ERROR(esp_rcp_submit_new_image(), exit, TAG, "Failed to submit RCP image");
-    ret = esp_ota_set_boot_partition(esp_ota_get_next_update_partition(NULL));
+    ret = esp_rcp_ota_end(rcp_ota_handle);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to set new OTA boot partition");
-        // Try to revert the RCP image submission. The RCP image update sequence will be set back to the original number
-        // by calling esp_rcp_submit_new_image again.
-        esp_rcp_submit_new_image();
+        // rollback the host boot partition when failing to end RCP OTA
+        esp_ota_set_boot_partition(esp_ota_get_next_update_partition(NULL));
     }
-
+    rcp_ota_handle = 0;
 exit:
     _http_cleanup(http_client);
-    if (fp != NULL) {
-        fclose(fp);
+    if (ret != ESP_OK && host_ota_handle) {
+        esp_ota_abort(host_ota_handle);
+    }
+    if (ret != ESP_OK && rcp_ota_handle) {
+        esp_rcp_ota_abort(rcp_ota_handle);
     }
     return ret;
 }
 
 esp_err_t esp_br_http_ota(esp_http_client_config_t *http_config)
 {
-    const char *firmware_dir = esp_rcp_get_firmware_dir();
-    ESP_RETURN_ON_FALSE(http_config != NULL, ESP_ERR_INVALID_ARG, TAG, "NULL http config");
-    ESP_RETURN_ON_FALSE(http_config->url != NULL, ESP_ERR_INVALID_ARG, TAG, "NULL http url");
-
-    int8_t rcp_update_seq = esp_rcp_get_next_update_seq();
-    ESP_RETURN_ON_ERROR(download_ota_image(http_config, firmware_dir, rcp_update_seq), TAG,
-                        "Failed to download ota image");
-    return ESP_OK;
+    return download_ota_image(http_config);
 }
