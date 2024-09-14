@@ -54,8 +54,9 @@ pre_commit:
   - idf.py set-target esp32h2
   - git rev-parse HEAD
   - idf.py build
-
   - cd $ESP_THREAD_BR_PATH/examples/basic_thread_border_router
+  - rm -rf CMakeLists.txt
+  - cp ${CI_TOOLS_PATH}/basic_thread_border_router.cmake CMakeLists.txt
   - rm -rf sdkconfig.defaults
   - cp ${CI_TOOLS_PATH}/sdkconfig.br.basic sdkconfig.defaults
   - idf.py build
@@ -69,6 +70,8 @@ pre_commit:
   - cd $ESP_THREAD_BR_PATH/examples/basic_thread_border_router
   - rm -rf main/idf_component.yml
   - cp ${CI_TOOLS_PATH}/idf_component_local.yml main/idf_component.yml
+  - rm -rf CMakeLists.txt
+  - cp ${CI_TOOLS_PATH}/basic_thread_border_router.cmake CMakeLists.txt
   - rm -rf sdkconfig.defaults
   - cp ${CI_TOOLS_PATH}/sdkconfig.br.basic sdkconfig.defaults
   - idf.py build

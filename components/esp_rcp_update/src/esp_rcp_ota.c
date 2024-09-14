@@ -43,7 +43,7 @@ esp_err_t esp_rcp_ota_begin(esp_rcp_ota_handle_t *out_handle)
     rcp_ota_entry_t *new_entry = NULL;
     ESP_RETURN_ON_FALSE(out_handle, ESP_ERR_INVALID_ARG, TAG, "out_handle cannot be NULL");
 
-    new_entry = (rcp_ota_entry_t *)calloc(sizeof(rcp_ota_entry_t), 1);
+    new_entry = (rcp_ota_entry_t *)calloc(1, sizeof(rcp_ota_entry_t));
     ESP_RETURN_ON_FALSE(new_entry, ESP_ERR_NO_MEM, TAG, "Failed to allocate memory for RCP OTA handle");
     LIST_INSERT_HEAD(&s_rcp_ota_entries_head, new_entry, entries);
 
