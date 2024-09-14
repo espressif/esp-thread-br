@@ -898,7 +898,7 @@ static void diagnosticTlv_result_handler(otError aError, otMessage *aMessage, co
  * @brief the function will send diagnostic to get network's topology message and update the set of diagnostic.
  *
  */
-static esp_err_t build_thread_network_topology()
+static esp_err_t build_thread_network_topology(void)
 {
     esp_err_t ret = ESP_OK;
     otInstance *ins = esp_openthread_get_instance();
