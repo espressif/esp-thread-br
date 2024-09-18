@@ -42,3 +42,7 @@ endif()
 if (CONFIG_OPENTHREAD_RCP_COMMAND)
     idf_component_optional_requires(PRIVATE esp_rcp_update)
 endif()
+
+if(CONFIG_OPENTHREAD_CLI_WIFI)
+    idf_component_optional_requires(PRIVATE protocol_examples_common)
+endif()
