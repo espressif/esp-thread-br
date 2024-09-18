@@ -8,7 +8,6 @@ set(EXTRA_COMPONENT_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../common
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/esp_br_http_ota
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/esp_ot_br_server
-    $ENV{IDF_PATH}/examples/common_components/protocol_examples_common
 )
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
