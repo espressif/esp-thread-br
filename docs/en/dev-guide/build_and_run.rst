@@ -9,9 +9,11 @@ This document contains instructions on building the images for ESP Thread Border
 
 Clone the `esp-idf <https://github.com/espressif/esp-idf>`_ and the `esp-thread-br <https://github.com/espressif/esp-thread-br>`_ repository.
 
+It is recommended to use ESP-IDF `v5.3.1 <https://github.com/espressif/esp-idf/tree/v5.3.1>`_ with this SDK.
+
 .. code-block:: bash
 
-   git clone -b v5.1.3 --recursive https://github.com/espressif/esp-idf.git
+   git clone -b v5.3.1 --recursive https://github.com/espressif/esp-idf.git
 
 .. code-block:: bash
 
@@ -84,6 +86,22 @@ For any other customized settings, you can configure the project in menuconfig.
 .. code-block:: bash
 
    idf.py menuconfig
+
+.. note::
+
+   `LWIP_IPV6_NUM_ADDRESSES` configuration is fixed in the border router library, it was changed from 8 to 12 since IDF v5.3.1 release. Please update this configuration based on the following table:
+
+      +--------------------+-------------------------+
+      |    IDF Versions    | LWIP_IPV6_NUM_ADDRESSES |
+      +--------------------+-------------------------+
+      | v5.1.4 and earlier |            8            |
+      +--------------------+-------------------------+
+      | v5.2.2 and earlier |            8            |
+      +--------------------+-------------------------+
+      | v5.3.0             |            8            |
+      +--------------------+-------------------------+
+      | v5.3.1 and later   |            12           |
+      +--------------------+-------------------------+
 
 2.1.3.1. Wi-Fi based Thread Border Router
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
