@@ -8,6 +8,8 @@ ESP-THREAD-BR is the official [ESP Thread Border Router](https://openthread.io/g
 
 The SDK is built on top of [ESP-IDF](https://github.com/espressif/esp-idf) and [OpenThread](https://github.com/openthread/openthread). The OpenThread port and ESP Border Router implementation is provided as pre-built library in ESP-IDF.
 
+It is recommended to use ESP-IDF [v5.3.1](https://github.com/espressif/esp-idf/tree/v5.3.1) with this SDK.
+
 # Hardware Platforms
 
 ## Wi-Fi based Thread Border Router

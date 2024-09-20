@@ -14,25 +14,30 @@ Please refer to [ESP Thread Border Router Hardware](../../README.md##Hardware-Pl
 
 Refer to [ESP-IDF Get Started](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/get-started/index.html).
 
-Note that it is recommended to use the latest [esp-idf](https://github.com/espressif/esp-idf).
+It is recommended to use ESP-IDF [v5.3.1](https://github.com/espressif/esp-idf/tree/v5.3.1) with this example.
 
 ### Configure the project
 
-ESP32-S3 is the host SoC on ESP Thread Border Router Board, so set target to esp32s3:
+ESP32-S3 is the host SoC on ESP Thread Border Router Board, esp32s3 is selected by default in the example. Set the other target with this command:
 
 ```
-idf.py set-target esp32s3
+idf.py set-target <target>
 ```
+
+`LWIP_IPV6_NUM_ADDRESSES` configuration is fixed in the border router library, it was changed from 8 to 12 since IDF v5.3.1 release. Please update this configuration based on the following table:
+
+|     IDF Versions        |  LWIP_IPV6_NUM_ADDRESSES  |
+|:-----------------------:|:-------------------------:|
+|   v5.1.4 and earlier    |            8              |
+|   v5.2.2 and earlier    |            8              |
+|   v5.3.0                |            8              |
+|   v5.3.1 and later      |            12             |
 
 The host could be pre-configured with `OPENTHREAD_RADIO_SPINEL_UART` or `OPENTHREAD_RADIO_SPINEL_SPI` to select UART or SPI to access the Radio Co-Processor.
 
-If the `OPENTHREAD_BR_AUTO_START` option is enabled, the device will connect to the configured Wi-Fi and form Thread network automatically then act as the border router.
-
-The Wi-Fi network's ssid and psk needs to be pre-configured with `EXAMPLE_WIFI_SSID` and `EXAMPLE_WIFI_PASSWORD`.
-
-Note that in this mode, the device will first attempt to use the Wi-Fi SSID and password stored in NVS. If no Wi-Fi information is stored, it will then use the `EXAMPLE_WIFI_SSID` and `EXAMPLE_WIFI_PASSWORD` from menuconfig.
-
-The Thread network parameters could be pre-configured with `OPENTHREAD_NETWORK_xx` options.
+If the `OPENTHREAD_BR_AUTO_START` option is enabled, the device will connect to the configured Wi-Fi and form Thread network automatically then act as the border router:
+- The Wi-Fi network's ssid and psk needs to be pre-configured with `EXAMPLE_WIFI_SSID` and `EXAMPLE_WIFI_PASSWORD`. In this mode, the device will first attempt to use the Wi-Fi SSID and password stored in NVS. If no Wi-Fi information is stored, it will then use the pre-configured ssid and psk.
+- The Thread network parameters could be pre-configured with `OPENTHREAD_NETWORK_xx` options.
 
 If the `OPENTHREAD_BR_START_WEB` option is enabled, [ESP Thread Border Router Web Server](../../components/esp_ot_br_server/README.md) will be provided to configure and query Thread network via a Web GUI.
 
