@@ -7,7 +7,7 @@ variables:
     CI_DOCKER_REGISTRY: "ciregistry.espressif.cn:8443"
     ESP_THREAD_BR_PATH: "$CI_PROJECT_DIR"
     CI_TOOLS_PATH: "$CI_PROJECT_DIR/tools/ci"
-    ESP_ENV_IMAGE: "$CI_DOCKER_REGISTRY/esp-env-v5.4:1"
+    ESP_ENV_IMAGE: "$CI_DOCKER_REGISTRY/esp-env-v5.5:2"
 
 before_script:
   - mkdir -p ~/.ssh
