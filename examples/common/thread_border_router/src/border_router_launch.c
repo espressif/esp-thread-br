@@ -161,6 +161,7 @@ static void ot_task_worker(void *ctx)
 
     // Initialize the OpenThread stack
     esp_openthread_register_rcp_failure_handler(rcp_failure_handler);
+    esp_openthread_set_compatibility_error_callback(rcp_failure_handler);
     ESP_ERROR_CHECK(esp_openthread_init(&s_openthread_platform_config));
 #if CONFIG_AUTO_UPDATE_RCP
     try_update_ot_rcp(&s_openthread_platform_config);
