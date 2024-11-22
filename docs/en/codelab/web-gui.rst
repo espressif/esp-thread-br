@@ -82,7 +82,7 @@ The access method for other APIs is similar to the one described above.
 
 Web GUI REST APIs
 -------------------
-The web server of ESP Thread Border Router provides the ``avaiable_network`` API to discover the all available Thread networks.
+The web server of ESP Thread Border Router provides the ``avaiable_network`` API to discover all the available Thread networks.
 
 Entering this link to the browser of Linux machine:
 
@@ -167,7 +167,7 @@ The feedback result may appear as follows:
     }
 
 
-The web server of ESP Thread Border Router provides the ``node_information`` API to otbain the Thread node information.
+The web server of ESP Thread Border Router provides the ``node_information`` API to obtain the Thread node information.
 
 Entering this link to the browser of Linux machine:
 
@@ -203,7 +203,7 @@ The feedback result may appear as follows:
 
 The web server of ESP Thread Border Router provides the ``topology`` API to retrieve information about the relationship between Thread networks.
 
-Entering this link to the browser of Linux machine:
+Entering this link to the browser of a Linux machine:
 
 .. code-block::
 
@@ -280,7 +280,7 @@ The feedback result may appear as follows:
     }
 
 
-The web server provides an ``HTTP_POST`` entry that allows users to configure the Border Router to use either ``networkKeyType`` or ``pskdType`` for joining other networks.
+The web server provides a ``HTTP_POST`` entry that allows users to configure the Border Router to use either ``networkKeyType`` or ``pskdType`` for joining other networks.
 
 The JSON format of ``join_network`` API appears as follow:
 
@@ -298,7 +298,7 @@ The JSON format of ``join_network`` API appears as follow:
 
 Note that the network to be joined MUST be the networks scanned by the ``available_network`` API, the ``index`` indicates the sequence of available networks.
 
-The web server provides an ``HTTP_POST`` entry that allows users to configure the Border Router to use the parameter provided by user for forming a Thread network.
+The web server provides a ``HTTP_POST`` entry that allows users to configure the Border Router to use the parameter provided by user for forming a Thread network.
 
 The JSON format of ``form_network`` API appears as follow:
 
@@ -316,7 +316,7 @@ The JSON format of ``form_network`` API appears as follow:
     }
 
 
-The web server provides an ``HTTP_POST`` entry that allows users to configure the Border Router for setting current Thread network.
+The web server provides a ``HTTP_POST`` entry that allows users to configure the Border Router for setting current Thread network.
 
 The JSON format of ``add_prefix`` API appears as follow:
 
