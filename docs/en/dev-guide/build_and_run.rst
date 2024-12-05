@@ -9,15 +9,25 @@ This document contains instructions on building the images for ESP Thread Border
 
 Clone the `esp-idf <https://github.com/espressif/esp-idf>`_ and the `esp-thread-br <https://github.com/espressif/esp-thread-br>`_ repository.
 
-It is recommended to use ESP-IDF `v5.3.1 <https://github.com/espressif/esp-idf/tree/v5.3.1>`_ with this SDK.
+The current esp-thread-br master branch is compatible with the ESP-IDF commit `e6aeb3d <https://github.com/espressif/esp-idf/commit/e6aeb3d36d2fcaf578e4e53308191a8e262dc822>`_.
+
+Refer to the specific tags for each stable release at `esp-thread-br releases <https://github.com/espressif/esp-thread-br/releases>`_.
 
 .. code-block:: bash
 
-   git clone -b v5.3.1 --recursive https://github.com/espressif/esp-idf.git
+   git clone --recursive https://github.com/espressif/esp-idf.git
 
 .. code-block:: bash
 
    cd esp-idf
+
+.. code-block:: bash
+
+   git checkout e6aeb3d36d2fcaf578e4e53308191a8e262dc822
+
+.. code-block:: bash
+
+   git submodule update --init --depth 1
 
 .. code-block:: bash
 
