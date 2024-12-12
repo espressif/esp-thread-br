@@ -21,27 +21,28 @@
 
 static EventGroupHandle_t tcp_client_event_group;
 static EventGroupHandle_t tcp_server_event_group;
+static _lock_t s_tcp_client_mutex = NULL;
+static _lock_t s_tcp_server_mutex = NULL;
 
 static void tcp_client_receive_task(void *pvParameters)
 {
     char rx_buffer[128];
     int len = 0;
     TCP_CLIENT *tcp_client_member = (TCP_CLIENT *)pvParameters;
-    int receive_error_nums = 0;
     int set_exit = 0;
 
     while (true) {
         len = recv(tcp_client_member->sock, rx_buffer, sizeof(rx_buffer) - 1, 0);
         if (len < 0) {
-            receive_error_nums++;
-            if (receive_error_nums >= 5 && !set_exit && tcp_client_member->sock != -1) {
+            _lock_acquire_recursive(&s_tcp_client_mutex);
+            if (errno == ENOTCONN && !set_exit && tcp_client_member->sock != -1) {
                 set_exit = 1;
                 ESP_LOGW(OT_EXT_CLI_TAG, "TCP client fail when receiving message");
                 xEventGroupSetBits(tcp_client_event_group, TCP_CLIENT_DELETE_BIT);
             }
+            _lock_release_recursive(&s_tcp_client_mutex);
         }
         if (len > 0) {
-            receive_error_nums = 0;
             ESP_LOGI(OT_EXT_CLI_TAG, "sock %d Received %d bytes from %s", tcp_client_member->sock, len,
                      tcp_client_member->remote_ipaddr);
             rx_buffer[len] = '\0';
@@ -62,6 +63,7 @@ static void tcp_client_add(TCP_CLIENT *tcp_client_member)
     int err_flag = 0;
 
     struct sockaddr_in6 dest_addr = {0};
+    struct timeval timeout;
 
     inet6_aton(tcp_client_member->remote_ipaddr, &dest_addr.sin6_addr);
     dest_addr.sin6_family = AF_INET6;
@@ -76,6 +78,10 @@ static void tcp_client_add(TCP_CLIENT *tcp_client_member)
 
     ESP_GOTO_ON_FALSE((tcp_client_member->sock >= 0), ESP_FAIL, exit, OT_EXT_CLI_TAG,
                       "Unable to create socket: errno %d", errno);
+
+    timeout.tv_sec = TCP_SOCKET_RECEIVE_TIMEOUT;
+    timeout.tv_usec = 0;
+    setsockopt(tcp_client_member->sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
     ESP_LOGI(OT_EXT_CLI_TAG, "Socket created, connecting to %s:%d", tcp_client_member->remote_ipaddr,
              tcp_client_member->remote_port);
@@ -113,11 +119,13 @@ static void tcp_client_send(TCP_CLIENT *tcp_client_member)
 
 static void tcp_client_delete(TCP_CLIENT *tcp_client_member)
 {
-    ESP_LOGI(OT_EXT_CLI_TAG, "TCP client is disconnecting with %s", tcp_client_member->remote_ipaddr);
-    tcp_client_member->exist = 0;
-    shutdown(tcp_client_member->sock, 0);
-    close(tcp_client_member->sock);
-    tcp_client_member->sock = -1;
+    if (tcp_client_member->exist == 1) {
+        ESP_LOGI(OT_EXT_CLI_TAG, "TCP client is disconnecting with %s", tcp_client_member->remote_ipaddr);
+        tcp_client_member->exist = 0;
+        shutdown(tcp_client_member->sock, 0);
+        close(tcp_client_member->sock);
+        tcp_client_member->sock = -1;
+    }
 }
 
 static void tcp_socket_client_task(void *pvParameters)
@@ -141,14 +149,14 @@ static void tcp_socket_client_task(void *pvParameters)
             tcp_client_delete(tcp_client_member);
         } else if (tcp_event == TCP_CLIENT_CLOSE_BIT) {
             xEventGroupClearBits(tcp_client_event_group, TCP_CLIENT_CLOSE_BIT);
-            if (tcp_client_member->exist == 1) {
-                tcp_client_delete(tcp_client_member);
-            }
+            _lock_acquire_recursive(&s_tcp_client_mutex);
+            tcp_client_delete(tcp_client_member);
+            vEventGroupDelete(tcp_client_event_group);
+            _lock_release_recursive(&s_tcp_client_mutex);
             break;
         }
     }
     ESP_LOGI(OT_EXT_CLI_TAG, "Closed TCP client successfully");
-    vEventGroupDelete(tcp_client_event_group);
     vTaskDelete(NULL);
 }
 
@@ -249,7 +257,6 @@ static void tcp_server_task(void *pvParameters)
     char addr_str[128];
     struct sockaddr_storage source_addr;
     TCP_SERVER *tcp_server_member = (TCP_SERVER *)pvParameters;
-    int receive_error_nums = 0;
     int set_exit = 0;
 
     socklen_t addr_len = sizeof(source_addr);
@@ -269,18 +276,22 @@ static void tcp_server_task(void *pvParameters)
         inet6_ntoa_r(((struct sockaddr_in6 *)&source_addr)->sin6_addr, addr_str, sizeof(addr_str) - 1);
         ESP_LOGI(OT_EXT_CLI_TAG, "Socket accepted ip address: %s", addr_str);
         strncpy(tcp_server_member->remote_ipaddr, addr_str, strlen(addr_str) + 1);
+        struct timeval timeout;
+        timeout.tv_sec = TCP_SOCKET_RECEIVE_TIMEOUT;
+        timeout.tv_usec = 0;
+        setsockopt(tcp_server_member->connect_sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
         while (true) {
             len = recv(connect_sock, rx_buffer, sizeof(rx_buffer) - 1, 0);
             if (len < 0) {
-                receive_error_nums++;
-                if (receive_error_nums >= 5 && !set_exit && tcp_server_member->connect_sock != -1) {
+                _lock_acquire_recursive(&s_tcp_server_mutex);
+                if (errno == ENOTCONN && !set_exit && tcp_server_member->connect_sock != -1) {
                     ESP_LOGW(OT_EXT_CLI_TAG, "TCP server fail when receiving message");
                     xEventGroupSetBits(tcp_server_event_group, TCP_SERVER_DELETE_BIT);
                     set_exit = 1;
                 }
+                _lock_release_recursive(&s_tcp_server_mutex);
             }
             if (len > 0) {
-                receive_error_nums = 0;
                 ESP_LOGI(OT_EXT_CLI_TAG, "sock %d Received %d bytes from %s", connect_sock, len, addr_str);
                 rx_buffer[len] = '\0';
                 ESP_LOGI(OT_EXT_CLI_TAG, "%s", rx_buffer);
@@ -353,18 +364,20 @@ static void tcp_server_send(TCP_SERVER *tcp_server_member)
 
 static void tcp_server_delete(TCP_SERVER *tcp_server_member)
 {
-    tcp_server_member->exist = 0;
-    int listen_sock = tcp_server_member->listen_sock;
-    int connect_sock = tcp_server_member->connect_sock;
-    tcp_server_member->listen_sock = -1;
-    tcp_server_member->connect_sock = -1;
-    shutdown(listen_sock, 0);
-    close(listen_sock);
-    tcp_server_member->listen_sock = -1;
-    if (connect_sock >= 0) {
-        shutdown(connect_sock, 0);
-        close(connect_sock);
-        ESP_LOGI(OT_EXT_CLI_TAG, "TCP server is disconnecting with %s", tcp_server_member->remote_ipaddr);
+    if (tcp_server_member->exist == 1) {
+        tcp_server_member->exist = 0;
+        int listen_sock = tcp_server_member->listen_sock;
+        int connect_sock = tcp_server_member->connect_sock;
+        tcp_server_member->listen_sock = -1;
+        tcp_server_member->connect_sock = -1;
+        shutdown(listen_sock, 0);
+        close(listen_sock);
+        tcp_server_member->listen_sock = -1;
+        if (connect_sock >= 0) {
+            shutdown(connect_sock, 0);
+            close(connect_sock);
+            ESP_LOGI(OT_EXT_CLI_TAG, "TCP server is disconnecting with %s", tcp_server_member->remote_ipaddr);
+        }
     }
 }
 
@@ -389,14 +402,14 @@ static void tcp_socket_server_task(void *pvParameters)
             tcp_server_delete(tcp_server_member);
         } else if (tcp_event == TCP_SERVER_CLOSE_BIT) {
             xEventGroupClearBits(tcp_server_event_group, TCP_SERVER_CLOSE_BIT);
-            if (tcp_server_member->exist == 1) {
-                tcp_server_delete(tcp_server_member);
-            }
+            _lock_acquire_recursive(&s_tcp_server_mutex);
+            tcp_server_delete(tcp_server_member);
+            vEventGroupDelete(tcp_server_event_group);
+            _lock_release_recursive(&s_tcp_server_mutex);
             break;
         }
     }
     ESP_LOGI(OT_EXT_CLI_TAG, "Closed TCP server successfully");
-    vEventGroupDelete(tcp_server_event_group);
     vTaskDelete(NULL);
 }
 

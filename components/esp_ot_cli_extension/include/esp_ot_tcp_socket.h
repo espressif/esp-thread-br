@@ -21,6 +21,7 @@ extern "C" {
 #define TCP_SERVER_SEND_BIT BIT1
 #define TCP_SERVER_DELETE_BIT BIT2
 #define TCP_SERVER_CLOSE_BIT BIT3
+#define TCP_SOCKET_RECEIVE_TIMEOUT 1
 
 /**
  * @brief User command "tcpsockserver" process.
