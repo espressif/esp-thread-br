@@ -169,7 +169,6 @@ static void ot_task_worker(void *ctx)
     // Initialize border routing features
     esp_openthread_lock_acquire(portMAX_DELAY);
     ESP_ERROR_CHECK(esp_netif_attach(openthread_netif, esp_openthread_netif_glue_init(&s_openthread_platform_config)));
-    ESP_ERROR_CHECK(esp_netif_set_default_netif(openthread_netif));
 #if CONFIG_OPENTHREAD_LOG_LEVEL_DYNAMIC
     (void)otLoggingSetLevel(CONFIG_LOG_DEFAULT_LEVEL);
 #endif
