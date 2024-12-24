@@ -10,5 +10,6 @@
    service_discovery
    nat64
    web-gui
+   trel
 
 
