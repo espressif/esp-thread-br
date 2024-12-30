@@ -5,6 +5,7 @@
 .. toctree::
    :maxdepth: 1
 
+   basic_setup
    connectivity
    multicast_forwarding
    service_discovery
