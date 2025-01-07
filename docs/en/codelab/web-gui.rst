@@ -21,7 +21,7 @@ To perform web gui, the follow device are required:
 - An ESP Thread Border Router
 - A Linux host machine with browser
 
-Enable the ``CONFIG_OPENTHREAD_BR_START_SERVER`` option to enable the Web Server feature.
+Enable the ``CONFIG_OPENTHREAD_BR_START_WEB`` option to enable the Web Server feature.
 
 The Thread Border Router and the Linux Host machine shall be connected to the same Wi-Fi network that has access to the Internet.
 
