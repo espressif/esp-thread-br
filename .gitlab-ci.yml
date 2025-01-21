@@ -8,14 +8,7 @@ variables:
     ESP_THREAD_BR_PATH: "$CI_PROJECT_DIR"
     CI_TOOLS_PATH: "$CI_PROJECT_DIR/tools/ci"
     ESP_ENV_IMAGE: "$CI_DOCKER_REGISTRY/esp-env-v5.5:2"
-
-before_script:
-  - mkdir -p ~/.ssh
-  - chmod 700 ~/.ssh
-  - echo -n "${GITLAB_KEY}" >~/.ssh/id_rsa_base64
-  - base64 --decode --ignore-garbage ~/.ssh/id_rsa_base64 >~/.ssh/id_rsa
-  - chmod 600 ~/.ssh/id_rsa
-  - echo -e "Host gitlab.espressif.cn\n\tStrictHostKeyChecking no\n" >>~/.ssh/config
+    ESP_IDF_HTTP: "https://gitlab-ci-token:${CI_JOB_TOKEN}@${ESP_GITLAB}/espressif/esp-idf.git"
 
 pre_commit:
   stage: .pre
@@ -41,11 +34,9 @@ pre_commit:
 
 .setup_idf: &setup_idf
   - cd $CI_PROJECT_DIR
-  - git clone --recursive -b master ${IDF_GIT_REPO_URL}
+  - git clone --depth=1 -b $CI_COMMIT_REF_NAME ${ESP_IDF_HTTP} || git clone --depth=1 -b master ${ESP_IDF_HTTP}
   - cd esp-idf
-  - git checkout --track origin/$CI_COMMIT_REF_NAME || git branch
-  - git submodule update --recursive --init
-  - git rev-parse HEAD
+  - git submodule update --init --depth=1
   - ./install.sh
   - . ./export.sh
 
