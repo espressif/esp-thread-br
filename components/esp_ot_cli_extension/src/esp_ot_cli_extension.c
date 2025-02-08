@@ -6,6 +6,7 @@
 
 #include "esp_ot_cli_extension.h"
 #include "esp_openthread.h"
+#include "esp_ot_br_lib_compati_check.h"
 #include "esp_ot_curl.h"
 #include "esp_ot_dns64.h"
 #include "esp_ot_heap_diag.h"
@@ -48,6 +49,9 @@ static const otCliCommand kCommands[] = {
     {"udpsockserver", esp_ot_process_udp_server},
 #if CONFIG_OPENTHREAD_CLI_WIFI
     {"wifi", esp_ot_process_wifi_cmd},
+#endif // CONFIG_OPENTHREAD_CLI_WIFI
+#if CONFIG_OPENTHREAD_BR_LIB_CHECK
+    {"brlibcheck", esp_openthread_process_br_lib_compatibility_check},
 #endif // CONFIG_OPENTHREAD_CLI_WIFI
 };
 

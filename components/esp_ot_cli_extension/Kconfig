@@ -27,4 +27,9 @@ menu "OpenThread Extension CLI"
         depends on OPENTHREAD_CLI_ESP_EXTENSION && OPENTHREAD_BORDER_ROUTER && AUTO_UPDATE_RCP
         default y if AUTO_UPDATE_RCP
 
+    config OPENTHREAD_BR_LIB_CHECK
+        bool "Enable br lib compatibility check command, only for testing"
+        depends on OPENTHREAD_CLI_ESP_EXTENSION && OPENTHREAD_BORDER_ROUTER
+        default n
+
 endmenu

@@ -27,6 +27,10 @@ if(CONFIG_OPENTHREAD_RCP_COMMAND)
     list(APPEND srcs   "src/esp_ot_rcp_commands.c")
 endif()
 
+if(CONFIG_OPENTHREAD_BR_LIB_CHECK)
+    list(APPEND srcs   "src/esp_ot_br_lib_compati_check.c")
+endif()
+
 set(include "include")
 
 idf_component_register(SRCS "${srcs}"
