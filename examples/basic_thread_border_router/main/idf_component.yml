@@ -1,5 +1,6 @@
 ## IDF Component Manager Manifest File
 dependencies:
+  espressif/esp_websocket_client: "^1.2.3"
   espressif/mdns: "^1.0.0"
   espressif/esp_ot_cli_extension:
     version: "~1.2.0"
