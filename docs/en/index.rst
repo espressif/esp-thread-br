@@ -18,6 +18,8 @@ It provides the following features:
   - Service Discovery
   - Multicast Forwarding
   - NAT64
+  - Credential Sharing
+  - TREL
   - RCP update
   - RF coexistence
   - Web GUI

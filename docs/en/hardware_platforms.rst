@@ -57,7 +57,7 @@ The development board has a variety of variants to choose from, as shown in the 
 
    * - ESP Thread BR-Zigbee GW
      - ESP32-S3-WROOM-1 and ESP32-H2-MINI-1
-     - 4 MB
+     - 8 MB [B]_
      - 2 MB
      - ESP Thread Border Router/Zigbee Gateway Board
    * - ESP Thread BR-Zigbee GW_SUB
@@ -67,6 +67,7 @@ The development board has a variety of variants to choose from, as shown in the 
      - ESP Thread Border Router/Zigbee Gateway Sub-Ethernet
 
 .. [A] The flash is integrated in the chip's package.
+.. [B] It was 4 MB in some early samples.
 
 Retail Orders
 ^^^^^^^^^^^^^

@@ -14,7 +14,7 @@ Please refer to [ESP Thread Border Router Hardware](../../README.md##Hardware-Pl
 
 Refer to [ESP-IDF Get Started](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/get-started/index.html).
 
-Currently, it is recommended to use ESP-IDF commit [e6aeb3d](https://github.com/espressif/esp-idf/commit/e6aeb3d36d2fcaf578e4e53308191a8e262dc822).
+Currently, it is recommended to use ESP-IDF [v5.2.4](https://github.com/espressif/esp-idf/tree/v5.2.4) release.
 
 ### Configure the project
 
@@ -26,12 +26,12 @@ idf.py set-target <target>
 
 `LWIP_IPV6_NUM_ADDRESSES` configuration is fixed in the border router library, it was changed from 8 to 12 since IDF v5.3.1 release. Please update this configuration based on the following table:
 
-|     IDF Versions        |  LWIP_IPV6_NUM_ADDRESSES  |
-|:-----------------------:|:-------------------------:|
-|   v5.1.4 and earlier    |            8              |
-|   v5.2.2 and earlier    |            8              |
-|   v5.3.0                |            8              |
-|   v5.3.1 and later      |            12             |
+|     IDF Versions                         |  LWIP_IPV6_NUM_ADDRESSES  |
+|:----------------------------------------:|:-------------------------:|
+|  v5.1.4 and earlier                      |            8              |
+|  v5.2.2 and earlier                      |            8              |
+|  v5.3.0                                  |            8              |
+|  v5.1.5, v5.2.3, v5.3.1, v5.4 and later  |            12             |
 
 The host could be pre-configured with `OPENTHREAD_RADIO_SPINEL_UART` or `OPENTHREAD_RADIO_SPINEL_SPI` to select UART or SPI to access the Radio Co-Processor.
 
