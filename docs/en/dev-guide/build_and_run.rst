@@ -57,11 +57,17 @@ Build the ``esp-idf/examples/openthread/ot_rcp`` example. The firmware doesn't n
 
    cd $IDF_PATH/examples/openthread/ot_rcp
 
-Select the ESP32-H2 as the RCP.
+If you want to use ESP32-H2 as the RCP, set the target accordingly:
 
 .. code-block:: bash
 
    idf.py set-target esp32h2
+
+Alternatively, if you want to use ESP32-C6 as the RCP:
+
+.. code-block:: bash
+
+   idf.py set-target esp32c6
 
 The default communication interface on the ESP Thread Border Router board is UART0 with 460800 baudrate, which can be configured in `esp_ot_config.h <https://github.com/espressif/esp-idf/blob/master/examples/openthread/ot_rcp/main/esp_ot_config.h>`_.
 
@@ -96,6 +102,8 @@ For any other customized settings, you can configure the project in menuconfig.
 .. code-block:: bash
 
    idf.py menuconfig
+
+If you want to use an ESP32-C6 RCP as alternative to ESP32-H2, you have to set the config option ``ESP Thread Border Router Example → Border router board type`` to ``Standalone dev kits`` first and then ``ESP Thread Border Router Example → RCP target chip`` to ``ESP32-C6``.
 
 .. note::
 

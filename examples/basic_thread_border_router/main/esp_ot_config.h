@@ -77,7 +77,7 @@
         .rcp_type = RCP_TYPE_ESP32H2_UART, .uart_rx_pin = CONFIG_PIN_TO_RCP_TX, .uart_tx_pin = CONFIG_PIN_TO_RCP_RX, \
         .uart_port = 1, .uart_baudrate = 115200, .reset_pin = CONFIG_PIN_TO_RCP_RESET,                               \
         .boot_pin = CONFIG_PIN_TO_RCP_BOOT, .update_baudrate = 460800,                                               \
-        .firmware_dir = "/" CONFIG_RCP_PARTITION_NAME "/ot_rcp", .target_chip = ESP32H2_CHIP,                        \
+        .firmware_dir = "/" CONFIG_RCP_PARTITION_NAME "/ot_rcp", .target_chip = CONFIG_ESP_RCP_TARGET_CHIP,              \
     }
 #else
 #define ESP_OPENTHREAD_RCP_UPDATE_CONFIG() \

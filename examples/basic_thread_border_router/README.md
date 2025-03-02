@@ -41,11 +41,19 @@ If the `OPENTHREAD_BR_AUTO_START` option is enabled, the device will connect to 
 
 If the `OPENTHREAD_BR_START_WEB` option is enabled, [ESP Thread Border Router Web Server](../../components/esp_ot_br_server/README.md) will be provided to configure and query Thread network via a Web GUI.
 
+You can select between ESP32-H2 and ESP32-C6 as the RCP target. By default, ESP32-H2 is selected. To use ESP32-C6 as the RCP, run `idf.py menuconfig` and set the config option `ESP Thread Border Router Example → Border router board type` to `Standalone dev kits` first and then `ESP Thread Border Router Example → RCP target chip` to `ESP32-C6`.
+
 ### Create the RCP firmware image
 
 The border router supports updating the RCP upon boot.
 
 First build the [ot_rcp](https://github.com/espressif/esp-idf/tree/master/examples/openthread/ot_rcp) example in IDF. In the building process, the built RCP image will be automatically packed into the border router firmware.
+
+If you want to use ESP32-C6 as the RCP, set the target accordingly before building the RCP:
+
+```
+idf.py set-target esp32c6
+```
 
 ### Build, Flash, and Run
 

@@ -17,6 +17,29 @@ menu "ESP Thread Border Router Example"
                 Integrated border router dev kit
     endchoice
 
+choice ESP_RCP_TARGET_CHIP
+        prompt "RCP target chip"
+        default ESP_RCP_TARGET_ESP32H2
+        depends on AUTO_UPDATE_RCP && ESP_BR_BOARD_STANDALONE
+        help
+            Select the target chip for RCP
+
+        config ESP_RCP_TARGET_ESP32H2
+            bool "ESP32-H2"
+            help
+                Select ESP32-H2 as RCP
+
+        config ESP_RCP_TARGET_ESP32C6
+            bool "ESP32-C6"
+            help
+                Select ESP32-C6 as RCP
+    endchoice
+
+    config ESP_RCP_TARGET_CHIP
+        int
+        default 7 if ESP_RCP_TARGET_ESP32H2
+        default 8 if ESP_RCP_TARGET_ESP32C6
+
     menu "Board Configuration"
         config PIN_TO_RCP_RESET
             int "Pin to RCP reset"
@@ -69,7 +92,7 @@ menu "ESP Thread Border Router Example"
         select OPENTHREAD_JOINER
         default n
         help
-            If enabled, a web server will be provided to configure and query Thread network via a Web GUI. 
+            If enabled, a web server will be provided to configure and query Thread network via a Web GUI.
 
     menu "External coexist wire type and pin config"
         config EXTERNAL_COEX_WIRE_TYPE
