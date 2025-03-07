@@ -12,5 +12,6 @@
    nat64
    web-gui
    trel
+   home_assistant
 
 

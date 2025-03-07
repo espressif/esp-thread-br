@@ -9,9 +9,9 @@ This document contains instructions on building the images for ESP Thread Border
 
 Clone the `esp-idf <https://github.com/espressif/esp-idf>`_ and the `esp-thread-br <https://github.com/espressif/esp-thread-br>`_ repository.
 
-The current esp-thread-br master branch is compatible with the ESP-IDF commit `e6aeb3d <https://github.com/espressif/esp-idf/commit/e6aeb3d36d2fcaf578e4e53308191a8e262dc822>`_.
-
 Refer to the specific tags for each stable release at `esp-thread-br releases <https://github.com/espressif/esp-thread-br/releases>`_.
+
+Follow the steps below to obtain the latest esp-thread-br master branch and the recommended ESP-IDF version `v5.2.4 <https://github.com/espressif/esp-idf/tree/v5.2.4>`_ release:
 
 .. code-block:: bash
 
@@ -23,7 +23,7 @@ Refer to the specific tags for each stable release at `esp-thread-br releases <h
 
 .. code-block:: bash
 
-   git checkout e6aeb3d36d2fcaf578e4e53308191a8e262dc822
+   git checkout v5.2.4
 
 .. code-block:: bash
 
@@ -63,16 +63,13 @@ Select the ESP32-H2 as the RCP.
 
    idf.py set-target esp32h2
 
-The default communication interface on the ESP Thread Border Router board is UART0 with 460800 baudrate, which can be configured in `esp_ot_config.h <https://github.com/espressif/esp-idf/blob/master/examples/openthread/ot_rcp/main/esp_ot_config.h>`_.
-
-.. code-block:: bash
-
-   idf.py menuconfig
-
 .. code-block:: bash
 
    idf.py build
 
+.. note::
+
+   The default communication interface on the ESP Thread Border Router board uses UART0 with `baud rate = 460800`. If you are setting up a project using standalone modules, please update the UART configurations (`radio_uart_config`) in `esp_ot_config.h <https://github.com/espressif/esp-idf/blob/master/examples/openthread/ot_rcp/main/esp_ot_config.h>`_ before building the project.
 
 2.1.3. Configure ESP Thread Border Router
 -----------------------------------------
@@ -101,17 +98,17 @@ For any other customized settings, you can configure the project in menuconfig.
 
    `LWIP_IPV6_NUM_ADDRESSES` configuration is fixed in the border router library, it was changed from 8 to 12 since IDF v5.3.1 release. Please update this configuration based on the following table:
 
-      +--------------------+-------------------------+
-      |    IDF Versions    | LWIP_IPV6_NUM_ADDRESSES |
-      +--------------------+-------------------------+
-      | v5.1.4 and earlier |            8            |
-      +--------------------+-------------------------+
-      | v5.2.2 and earlier |            8            |
-      +--------------------+-------------------------+
-      | v5.3.0             |            8            |
-      +--------------------+-------------------------+
-      | v5.3.1 and later   |            12           |
-      +--------------------+-------------------------+
+      +----------------------------------------+-------------------------+
+      |    IDF Versions                        | LWIP_IPV6_NUM_ADDRESSES |
+      +----------------------------------------+-------------------------+
+      | v5.1.4 and earlier                     |            8            |
+      +----------------------------------------+-------------------------+
+      | v5.2.2 and earlier                     |            8            |
+      +----------------------------------------+-------------------------+
+      | v5.3.0                                 |            8            |
+      +----------------------------------------+-------------------------+
+      | v5.1.5, v5.2.3, v5.3.1, v5.4 and later |            12           |
+      +----------------------------------------+-------------------------+
 
 2.1.3.1. Wi-Fi based Thread Border Router
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
