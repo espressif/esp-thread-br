@@ -207,7 +207,7 @@ esp_err_t esp_rcp_submit_new_image()
 esp_err_t esp_rcp_update_init(const esp_rcp_update_config_t *update_config)
 {
     ESP_RETURN_ON_ERROR(nvs_open("storage", NVS_READWRITE, &s_handle.nvs_handle), "TAG", "Failed to open nvs");
-    ESP_RETURN_ON_FALSE(update_config->rcp_type == RCP_TYPE_ESP32H2_UART || update_config->rcp_type == RCP_TYPE_ESP32C6_UART, 
+    ESP_RETURN_ON_FALSE(update_config->rcp_type > RCP_TYPE_INVALID && update_config->rcp_type < RCP_TYPE_MAX,
                         ESP_ERR_INVALID_ARG, TAG, "Unsupported RCP type");
 
     s_handle.update_config = *update_config;
