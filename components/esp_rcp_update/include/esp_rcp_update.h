@@ -20,6 +20,8 @@ extern "C" {
 typedef enum {
     RCP_TYPE_INVALID = 0,  /* Invalid type */
     RCP_TYPE_ESP32H2_UART, /* ESP32H2 connected via UART */
+    RCP_TYPE_ESP32C6_UART, /* ESP32C6 connected via UART */
+    RCP_TYPE_MAX,          /* Max type */
 } esp_rcp_type_t;
 
 /**
