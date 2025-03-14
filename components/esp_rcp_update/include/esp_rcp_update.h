@@ -18,9 +18,14 @@ extern "C" {
 #define RCP_URL_MAX_SIZE 100
 
 typedef enum {
-    RCP_TYPE_INVALID = 0,  /* Invalid type */
-    RCP_TYPE_ESP32H2_UART, /* ESP32H2 connected via UART */
+    RCP_TYPE_INVALID = 0, /* Invalid type */
+    RCP_TYPE_UART = 1,    /* Connected via UART */
+    RCP_TYPE_MAX = 2,     /* Max type */
 } esp_rcp_type_t;
+
+/* For compatibility, will be removed in the next major update. */
+#define RCP_TYPE_ESP32H2_UART \
+    _Pragma("GCC warning \"'RCP_TYPE_ESP32H2_UART' enum is deprecated, use 'RCP_TYPE_UART' instead\"") RCP_TYPE_UART
 
 /**
  * @brief The RCP update config for OpenThread.
