@@ -6,3 +6,11 @@ repos:
     rev: 'v14.0.6'  # Use the sha / tag you want to point at
     hooks:
     - id: clang-format
+
+  - repo: local
+    hooks:
+      - id: check-version-increment
+        name: Check Version Increment in Specific idf_component.yml
+        entry: python3 check_components_version.py
+        language: python
+        files: "(components/esp_rcp_update/idf_component.yml|components/esp_ot_cli_extension/idf_component.yml)"
