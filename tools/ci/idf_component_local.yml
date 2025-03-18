@@ -5,7 +5,6 @@ dependencies:
     path: ${ESP_THREAD_BR_PATH}/components/esp_ot_cli_extension
   espressif/esp_rcp_update:
     path: ${ESP_THREAD_BR_PATH}/components/esp_rcp_update
-  espressif/esp-serial-flasher: "~0.0.0"
   esp_br_http_ota:
     path: ${ESP_THREAD_BR_PATH}/components/esp_br_http_ota
   esp_ot_br_server:
