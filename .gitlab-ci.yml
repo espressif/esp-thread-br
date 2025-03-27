@@ -40,6 +40,14 @@ pre_commit:
   - ./install.sh
   - . ./export.sh
 
+.setup_idf_master: &setup_idf_master
+  - cd $CI_PROJECT_DIR
+  - git clone --depth=1 -b master ${ESP_IDF_HTTP}
+  - cd esp-idf
+  - git submodule update --init --depth=1
+  - ./install.sh
+  - . ./export.sh
+
 .build_basic_thread_border_router: &build_basic_thread_border_router
   - cd $IDF_PATH/examples/openthread/ot_rcp
   - idf.py set-target esp32h2
@@ -106,9 +114,12 @@ build_examples:
     image: espressif/idf:latest
     script:
         - *submodule_update
+        - cd $ESP_THREAD_BR_PATH
+        - python3 ${CI_TOOLS_PATH}/get_component_version.py $ESP_THREAD_BR_PATH/examples/basic_thread_border_router/main/idf_component.yml build_examples_result.txt esp_ot_cli_extension
+        - python3 ${CI_TOOLS_PATH}/get_component_version.py $ESP_THREAD_BR_PATH/examples/basic_thread_border_router/main/idf_component.yml build_examples_result.txt esp_rcp_update
         - *build_basic_thread_border_router
         - cd $ESP_THREAD_BR_PATH
-        - echo "build_examples_result=true" > build_examples_result.txt
+        - echo "Success" > build_examples_result.txt
     artifacts:
         when: always
         paths:
@@ -134,10 +145,12 @@ build_idf_otbr_examples:
     image: $ESP_ENV_IMAGE
     allow_failure: true
     script:
-        - *setup_idf
+        - *setup_idf_master
+        - cd $ESP_THREAD_BR_PATH
+        - python3 ${CI_TOOLS_PATH}/get_component_version.py $IDF_PATH/examples/openthread/ot_br/main/idf_component.yml build_idf_otbr_example_result.txt esp_ot_cli_extension
         - *build_idf_example_ot_br
         - cd $ESP_THREAD_BR_PATH
-        - echo "build_idf_otbr_example_result=true" > build_idf_otbr_example_result.txt
+        - echo "Success" > build_idf_otbr_example_result.txt
     artifacts:
         when: always
         paths:
@@ -151,10 +164,12 @@ build_idf_otbr_autostart_examples:
     image: $ESP_ENV_IMAGE
     allow_failure: true
     script:
-        - *setup_idf
+        - *setup_idf_master
+        - cd $ESP_THREAD_BR_PATH
+        - python3 ${CI_TOOLS_PATH}/get_component_version.py $IDF_PATH/examples/openthread/ot_br/main/idf_component.yml build_idf_otbr_autostart_example_result.txt esp_ot_cli_extension
         - *build_idf_example_ot_br_autostart
         - cd $ESP_THREAD_BR_PATH
-        - echo "build_idf_otbr_autostart_example_result=true" > build_idf_otbr_autostart_example_result.txt
+        - echo "Success" > build_idf_otbr_autostart_example_result.txt
     artifacts:
         when: always
         paths:
@@ -168,10 +183,12 @@ build_idf_otcli_examples:
     image: $ESP_ENV_IMAGE
     allow_failure: true
     script:
-        - *setup_idf
+        - *setup_idf_master
+        - cd $ESP_THREAD_BR_PATH
+        - python3 ${CI_TOOLS_PATH}/get_component_version.py $IDF_PATH/examples/openthread/ot_cli/main/idf_component.yml build_idf_otcli_example_result.txt esp_ot_cli_extension
         - *build_idf_example_ot_cli
         - cd $ESP_THREAD_BR_PATH
-        - echo "build_idf_otcli_example_result=true" > build_idf_otcli_example_result.txt
+        - echo "Success" > build_idf_otcli_example_result.txt
     artifacts:
         when: always
         paths:
@@ -208,29 +225,8 @@ check_build_result:
         - build_idf_otcli_examples
     script:
         - *submodule_update
-        - chmod 700 ./check_components_version.sh
-        - ALLOW_EXT_CMD_FAILURE_OUTPUT=$(./check_components_version.sh "components/esp_ot_cli_extension")
-        - ALLOW_EXT_CMD_FAILURE_VALUE=$(echo "$ALLOW_EXT_CMD_FAILURE_OUTPUT" | cut -d'=' -f2)
-        - echo "ALLOW_EXT_CMD_FAILURE_VALUE=$ALLOW_EXT_CMD_FAILURE_VALUE"
-        - ALLOW_RCP_UPDATE_FAILURE_OUTPUT=$(./check_components_version.sh "components/esp_rcp_update")
-        - ALLOW_RCP_UPDATE_FAILURE_VALUE=$(echo "$ALLOW_RCP_UPDATE_FAILURE_OUTPUT" | cut -d'=' -f2)
-        - echo "ALLOW_RCP_UPDATE_FAILURE_VALUE=$ALLOW_RCP_UPDATE_FAILURE_VALUE"
-        - |
-          if [ "$ALLOW_EXT_CMD_FAILURE_VALUE" == "true" ] || [ "$ALLOW_RCP_UPDATE_FAILURE_VALUE" == "true" ]; then
-            echo "allow failure"
-            exit 0;
-          else
-            if [ -f "build_examples_result.txt" ] &&
-               [ -f "build_idf_otbr_example_result.txt" ] &&
-               [ -f "build_idf_otbr_autostart_example_result.txt" ] &&
-               [ -f "build_idf_otcli_example_result.txt" ]; then
-               echo "Success!!!"
-               exit 0
-            else
-               echo "Fail!!!"
-               exit 1
-            fi
-          fi
+        - chmod 700 ./check_build_results.sh
+        - ./check_build_results.sh
     tags:
         - build
 
