@@ -1,6 +1,5 @@
 stages:
   - build
-  - check_results
   - docs
 
 variables:
@@ -54,6 +53,9 @@ pre_commit:
   - git rev-parse HEAD
   - idf.py build
   - cd $ESP_THREAD_BR_PATH/examples/basic_thread_border_router
+  - git fetch origin main
+  - python3 $ESP_THREAD_BR_PATH/example_build_version_check.py basic_thread_border_router esp_ot_cli_extension
+  - python3 $ESP_THREAD_BR_PATH/example_build_version_check.py basic_thread_border_router esp_rcp_update
   - rm -rf CMakeLists.txt
   - cp ${CI_TOOLS_PATH}/basic_thread_border_router.cmake CMakeLists.txt
   - idf.py build
@@ -72,10 +74,10 @@ pre_commit:
   - idf.py build
 
 .build_idf_example_ot_br: &build_idf_example_ot_br
-  - cd $IDF_PATH/examples/openthread/ot_br/main
-  - rm -rf idf_component.yml
-  - cp ${CI_TOOLS_PATH}/idf_component_otbr.yml idf_component.yml
-  - cd ..
+  - cd $ESP_THREAD_BR_PATH
+  - git fetch origin main
+  - python3 example_build_version_check.py ot_br esp_ot_cli_extension
+  - cd $IDF_PATH/examples/openthread/ot_br
   - rm -rf CMakeLists.txt
   - cp ${CI_TOOLS_PATH}/ot_br.cmake CMakeLists.txt
   - idf.py set-target esp32s3
@@ -84,10 +86,10 @@ pre_commit:
   - idf.py build
 
 .build_idf_example_ot_br_autostart: &build_idf_example_ot_br_autostart
-  - cd $IDF_PATH/examples/openthread/ot_br/main
-  - rm -rf idf_component.yml
-  - cp ${CI_TOOLS_PATH}/idf_component_otbr.yml idf_component.yml
-  - cd ..
+  - cd $ESP_THREAD_BR_PATH
+  - git fetch origin main
+  - python3 example_build_version_check.py ot_br esp_ot_cli_extension
+  - cd $IDF_PATH/examples/openthread/ot_br
   - rm -rf CMakeLists.txt
   - cp ${CI_TOOLS_PATH}/ot_br.cmake CMakeLists.txt
   - rm -rf sdkconfig.defaults
@@ -98,10 +100,10 @@ pre_commit:
   - idf.py build
 
 .build_idf_example_ot_cli: &build_idf_example_ot_cli
-  - cd $IDF_PATH/examples/openthread/ot_cli/main
-  - rm -rf idf_component.yml
-  - cp ${CI_TOOLS_PATH}/idf_component_otcli.yml idf_component.yml
-  - cd ..
+  - cd $ESP_THREAD_BR_PATH
+  - git fetch origin main
+  - python3 example_build_version_check.py ot_cli esp_ot_cli_extension
+  - cd $IDF_PATH/examples/openthread/ot_cli
   - rm -rf CMakeLists.txt
   - cp ${CI_TOOLS_PATH}/ot_cli.cmake CMakeLists.txt
   - idf.py set-target esp32c6
@@ -114,21 +116,9 @@ build_examples:
     image: espressif/idf:latest
     script:
         - *submodule_update
-        - cd $ESP_THREAD_BR_PATH
-        - python3 ${CI_TOOLS_PATH}/get_component_version.py $ESP_THREAD_BR_PATH/examples/basic_thread_border_router/main/idf_component.yml build_examples_result.txt esp_ot_cli_extension
-        - python3 ${CI_TOOLS_PATH}/get_component_version.py $ESP_THREAD_BR_PATH/examples/basic_thread_border_router/main/idf_component.yml build_examples_result.txt esp_rcp_update
         - *build_basic_thread_border_router
-        - cd $ESP_THREAD_BR_PATH
-        - echo "Success" > build_examples_result.txt
-    artifacts:
-        when: always
-        paths:
-            - build_examples_result.txt
-        expire_in: 1 days
     tags:
         - build
-    # allow failure if esp_ot_cli_extension version updated but haven't publish to component registry yet
-    allow_failure: true
 
 build_examples_local_components:
     stage: build
@@ -143,57 +133,27 @@ build_examples_local_components:
 build_idf_otbr_examples:
     stage: build
     image: $ESP_ENV_IMAGE
-    allow_failure: true
     script:
         - *setup_idf_master
-        - cd $ESP_THREAD_BR_PATH
-        - python3 ${CI_TOOLS_PATH}/get_component_version.py $IDF_PATH/examples/openthread/ot_br/main/idf_component.yml build_idf_otbr_example_result.txt esp_ot_cli_extension
         - *build_idf_example_ot_br
-        - cd $ESP_THREAD_BR_PATH
-        - echo "Success" > build_idf_otbr_example_result.txt
-    artifacts:
-        when: always
-        paths:
-            - build_idf_otbr_example_result.txt
-        expire_in: 1 days
     tags:
         - build
 
 build_idf_otbr_autostart_examples:
     stage: build
     image: $ESP_ENV_IMAGE
-    allow_failure: true
     script:
         - *setup_idf_master
-        - cd $ESP_THREAD_BR_PATH
-        - python3 ${CI_TOOLS_PATH}/get_component_version.py $IDF_PATH/examples/openthread/ot_br/main/idf_component.yml build_idf_otbr_autostart_example_result.txt esp_ot_cli_extension
         - *build_idf_example_ot_br_autostart
-        - cd $ESP_THREAD_BR_PATH
-        - echo "Success" > build_idf_otbr_autostart_example_result.txt
-    artifacts:
-        when: always
-        paths:
-            - build_idf_otbr_autostart_example_result.txt
-        expire_in: 1 days
     tags:
         - build
 
 build_idf_otcli_examples:
     stage: build
     image: $ESP_ENV_IMAGE
-    allow_failure: true
     script:
         - *setup_idf_master
-        - cd $ESP_THREAD_BR_PATH
-        - python3 ${CI_TOOLS_PATH}/get_component_version.py $IDF_PATH/examples/openthread/ot_cli/main/idf_component.yml build_idf_otcli_example_result.txt esp_ot_cli_extension
         - *build_idf_example_ot_cli
-        - cd $ESP_THREAD_BR_PATH
-        - echo "Success" > build_idf_otcli_example_result.txt
-    artifacts:
-        when: always
-        paths:
-            - build_idf_otcli_example_result.txt
-        expire_in: 1 days
     tags:
         - build
 
@@ -214,21 +174,6 @@ build_docs:
         - build-docs -l en
     tags:
         - build_docs
-
-check_build_result:
-    stage: check_results
-    image: $ESP_ENV_IMAGE
-    needs:
-        - build_examples
-        - build_idf_otbr_examples
-        - build_idf_otbr_autostart_examples
-        - build_idf_otcli_examples
-    script:
-        - *submodule_update
-        - chmod 700 ./check_build_results.sh
-        - ./check_build_results.sh
-    tags:
-        - build
 
 .deploy_docs_template:
     stage: docs
