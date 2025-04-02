@@ -1,0 +1,15 @@
+menu "ESP Thread Border Router M5Stack Example"
+
+    config OPENTHREAD_EPHEMERALKEY_LIFE_TIME
+        int "The life time (seconds) of openthread ephemeral key"
+        default 100
+        help
+            Set the lifetime of the OpenThread ephemeral key in seconds.
+
+    config OPENTHREAD_EPHEMERALKEY_PORT
+        int "The UDP port to use with the ephemeral key"
+        default 49180
+        help
+            Set the UDP port to use with the ephemeral key.
+
+endmenu

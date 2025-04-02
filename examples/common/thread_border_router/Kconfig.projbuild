@@ -15,44 +15,57 @@ menu "ESP Thread Border Router Example"
             bool "Border router dev kit"
             help
                 Integrated border router dev kit
+
+        config ESP_BR_BOARD_M5STACK_CORES3
+            bool "Border router M5Stack CoreS3"
+            help
+                M5Stack CoreS3
     endchoice
 
     menu "Board Configuration"
         config PIN_TO_RCP_RESET
             int "Pin to RCP reset"
-            default "7"
+            default 7 if ESP_BR_BOARD_DEV_KIT
+            default 7 if ESP_BR_BOARD_M5STACK_CORES3
 
         config PIN_TO_RCP_BOOT
             int "Pin to RCP boot"
-            default "8"
+            default 8 if ESP_BR_BOARD_DEV_KIT
+            default 18 if ESP_BR_BOARD_M5STACK_CORES3
 
         config PIN_TO_RCP_TX
             int "Pin to RCP TX"
-            default "17"
+            default 17 if ESP_BR_BOARD_DEV_KIT
+            default 10 if ESP_BR_BOARD_M5STACK_CORES3
 
         config PIN_TO_RCP_RX
             int "Pin to RCP RX"
-            default "18"
+            default 18 if ESP_BR_BOARD_DEV_KIT
+            default 17 if ESP_BR_BOARD_M5STACK_CORES3
 
         config PIN_TO_RCP_CS
             depends on OPENTHREAD_RADIO_SPINEL_SPI
             int "Pin to RCP SPI CS"
-            default "10"
+            default 10 if ESP_BR_BOARD_DEV_KIT
+            default 13 if ESP_BR_BOARD_M5STACK_CORES3
 
         config PIN_TO_RCP_SCLK
             depends on OPENTHREAD_RADIO_SPINEL_SPI
             int "Pin to RCP SPI SCLK"
-            default "12"
+            default 12 if ESP_BR_BOARD_DEV_KIT
+            default 36 if ESP_BR_BOARD_M5STACK_CORES3
 
         config PIN_TO_RCP_MISO
             depends on OPENTHREAD_RADIO_SPINEL_SPI
             int "Pin to RCP SPI MISO"
-            default "13"
+            default 13 if ESP_BR_BOARD_DEV_KIT
+            default 35 if ESP_BR_BOARD_M5STACK_CORES3
 
         config PIN_TO_RCP_MOSI
             depends on OPENTHREAD_RADIO_SPINEL_SPI
             int "Pin to RCP SPI MOSI"
-            default "11"
+            default 11 if ESP_BR_BOARD_DEV_KIT
+            default 37 if ESP_BR_BOARD_M5STACK_CORES3
     endmenu
 
     config OPENTHREAD_BR_AUTO_START
@@ -83,22 +96,26 @@ menu "ESP Thread Border Router Example"
         config EXTERNAL_COEX_REQUEST_PIN
             int "The number of external coexist request pin"
             depends on ESP_COEX_EXTERNAL_COEXIST_ENABLE && (EXTERNAL_COEX_WIRE_TYPE >= 0)
-            default 12
+            default 12 if ESP_BR_BOARD_DEV_KIT
+            default 36 if ESP_BR_BOARD_M5STACK_CORES3
 
         config EXTERNAL_COEX_GRANT_PIN
             int "The number of external coexist grant pin"
             depends on ESP_COEX_EXTERNAL_COEXIST_ENABLE && (EXTERNAL_COEX_WIRE_TYPE >= 1)
-            default 13
+            default 13 if ESP_BR_BOARD_DEV_KIT
+            default 35 if ESP_BR_BOARD_M5STACK_CORES3
 
         config EXTERNAL_COEX_PRIORITY_PIN
             int "The number of external coexist priority pin"
             depends on ESP_COEX_EXTERNAL_COEXIST_ENABLE && (EXTERNAL_COEX_WIRE_TYPE >= 2)
-            default 10
+            default 10 if ESP_BR_BOARD_DEV_KIT
+            default 13 if ESP_BR_BOARD_M5STACK_CORES3
 
         config EXTERNAL_COEX_TX_LINE_PIN
             int "The number of external coexist tx_line pin"
             depends on ESP_COEX_EXTERNAL_COEXIST_ENABLE && (EXTERNAL_COEX_WIRE_TYPE = 3)
-            default 11
+            default 11 if ESP_BR_BOARD_DEV_KIT
+            default 37 if ESP_BR_BOARD_M5STACK_CORES3
     endmenu # External coexist wire type and pin config
 
 endmenu

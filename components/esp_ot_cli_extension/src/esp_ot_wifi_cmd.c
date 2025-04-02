@@ -421,3 +421,8 @@ esp_err_t esp_ot_wifi_config_clear(void)
     ESP_RETURN_ON_ERROR(nvs_erase_all(s_wifi_config_nvs_handle), OT_EXT_CLI_TAG, "Fail to clear wifi configurations");
     return ESP_OK;
 }
+
+esp_ot_wifi_state_t esp_ot_wifi_state_get(void)
+{
+    return s_wifi_state;
+}

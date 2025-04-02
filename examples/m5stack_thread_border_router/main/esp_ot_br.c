@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2022 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -27,6 +27,7 @@
 #include "freertos/FreeRTOS.h"
 
 #include "border_router_launch.h"
+#include "border_router_m5stack.h"
 #include "esp_br_web.h"
 
 #if CONFIG_EXTERNAL_COEX_ENABLE
@@ -88,9 +89,13 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-#if !CONFIG_OPENTHREAD_BR_AUTO_START && CONFIG_EXAMPLE_CONNECT_ETHERNET
-// TODO: Add a mechanism for connecting ETH manually.
-#error Currently we do not support a manual way to connect ETH, if you want to use ETH, please enable OPENTHREAD_BR_AUTO_START.
+#if CONFIG_EXAMPLE_CONNECT_ETHERNET || !CONFIG_EXAMPLE_CONNECT_WIFI
+#error Ethernet is not supported on M5Stack. Please use Wi-Fi instead.
+#endif
+
+#if CONFIG_OPENTHREAD_RADIO_SPINEL_SPI
+// TODO: Support configuring the M5Stack's Radio Spinel to work in SPI mode
+#error Radio Spinel over SPI is not supported on M5Stack. Use UART instead.
 #endif
 
 #if CONFIG_EXTERNAL_COEX_ENABLE
@@ -108,4 +113,5 @@ void app_main(void)
 #endif
 
     launch_openthread_border_router(&platform_config, &rcp_update_config);
+    ESP_ERROR_CHECK(border_router_m5stack_init());
 }

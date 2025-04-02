@@ -6,6 +6,7 @@ repos:
     rev: 'v14.0.6'  # Use the sha / tag you want to point at
     hooks:
     - id: clang-format
+      exclude: "examples/common/thread_border_router_m5stack/image/.*"
 
   - repo: local
     hooks:

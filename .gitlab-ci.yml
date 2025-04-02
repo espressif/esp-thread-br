@@ -60,6 +60,19 @@ pre_commit:
   - cp ${CI_TOOLS_PATH}/basic_thread_border_router.cmake CMakeLists.txt
   - idf.py build
 
+.build_m5stack_thread_border_router: &build_m5stack_thread_border_router
+  - cd $IDF_PATH/examples/openthread/ot_rcp
+  - idf.py set-target esp32h2
+  - git rev-parse HEAD
+  - idf.py build
+  - cd $ESP_THREAD_BR_PATH/examples/m5stack_thread_border_router
+  - git fetch origin main
+  - python3 $ESP_THREAD_BR_PATH/example_build_version_check.py m5stack_thread_border_router esp_ot_cli_extension
+  - python3 $ESP_THREAD_BR_PATH/example_build_version_check.py m5stack_thread_border_router esp_rcp_update
+  - rm -rf CMakeLists.txt
+  - cp ${CI_TOOLS_PATH}/basic_thread_border_router.cmake CMakeLists.txt
+  - idf.py build
+
 .build_local_components: &build_local_components
   - cd $IDF_PATH/examples/openthread/ot_rcp
   - idf.py set-target esp32h2
@@ -117,6 +130,15 @@ build_examples:
     script:
         - *submodule_update
         - *build_basic_thread_border_router
+    tags:
+        - build
+
+build_examples_m5stack:
+    stage: build
+    image: espressif/idf:v5.4.1
+    script:
+        - *submodule_update
+        - *build_m5stack_thread_border_router
     tags:
         - build
 
