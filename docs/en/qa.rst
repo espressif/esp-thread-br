@@ -59,7 +59,7 @@ The **ESP Thread RCP** (`ot_rcp <https://github.com/espressif/esp-idf/tree/maste
 
 - The default baudrate in `otbr-agent`` is 115200, while the default baudrate in (`ot_rcp <https://github.com/espressif/esp-idf/tree/master/examples/openthread/ot_rcp>`_) example is 460800
 
-Please refer to Step 4 in ` OpenThread Border Router Build and Configuration <https://openthread.io/guides/border-router/build#attach-and-configure-rcp-device>`_ and update the UART configuration to use the correct USB port number (i.e. replace `/dev/ttyUSB0` with `/dev/ttyUSBx`) and baud rate in the `otbr-agent` configuration file `/etc/default/otbr-agent`:
+Please refer to `Attach and configure RCP device <https://openthread.io/guides/border-router/build#attach-and-configure-rcp-device>`_ and update the UART configuration to use the correct USB port number (i.e. replace `/dev/ttyUSB0` with `/dev/ttyUSBx`) and baud rate in the `otbr-agent` configuration file `/etc/default/otbr-agent`:
 
 .. code-block::
 
