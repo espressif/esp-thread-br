@@ -11,6 +11,6 @@ repos:
     hooks:
       - id: check-version-increment
         name: Check Version Increment in Specific idf_component.yml
-        entry: python3 check_components_version.py
+        entry: bash -c "export ESP_THREAD_BR_PATH=$(pwd) && python3 precommit_version_check.py"
         language: python
-        files: "(components/esp_rcp_update/idf_component.yml|components/esp_ot_cli_extension/idf_component.yml)"
+        additional_dependencies: [pyyaml]
