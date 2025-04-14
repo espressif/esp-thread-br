@@ -34,6 +34,8 @@ The SDK also supports manually connecting an ESP32-H2 RCP to an ESP32 series Wi-
 
 For standalone modules, we recommend the [ot_br](https://github.com/espressif/esp-idf/tree/master/examples/openthread/ot_br) example in esp-idf as a quick start.
 
+Communication between RCP and SoC can be achieved using either one out of two supported serial communication protocols: UART or SPI. 
+
 #### Connect an ESP32-H2 RCP to an ESP32 series Wi-Fi SoC using UART:
 ESP32 pin           | ESP32-H2 pin
 --------------------|-------------
