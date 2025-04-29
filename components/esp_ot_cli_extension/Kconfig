@@ -10,7 +10,7 @@ menu "OpenThread Extension CLI"
     config OPENTHREAD_CLI_WIFI
         bool "Enable wifi connection command"
         depends on OPENTHREAD_CLI_ESP_EXTENSION && OPENTHREAD_BORDER_ROUTER && EXAMPLE_CONNECT_WIFI
-        default y if ESP_WIFI_ENABLED
+        default y if ESP_WIFI_ENABLED || ESP_WIFI_REMOTE_ENABLED
 
     config OPENTHREAD_CLI_OTA
         bool "Enable OTA command"
