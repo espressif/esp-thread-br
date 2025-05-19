@@ -144,7 +144,9 @@ static esp_err_t wifi_join(const char *ssid, const char *password)
         return ESP_ERR_INVALID_ARG;
     }
 
+    esp_openthread_task_switching_lock_release();
     esp_err_t err = example_wifi_sta_do_connect(wifi_config, true);
+    esp_openthread_task_switching_lock_acquire(portMAX_DELAY);
     return err;
 }
 
@@ -177,7 +179,9 @@ void esp_ot_wifi_border_router_init_flag_set(bool initialized)
 esp_err_t esp_ot_wifi_connect(const char *ssid, const char *password)
 {
     if (!s_wifi_initialized) {
+        esp_openthread_task_switching_lock_release();
         example_wifi_start();
+        esp_openthread_task_switching_lock_acquire(portMAX_DELAY);
 #if CONFIG_ESP_COEX_SW_COEXIST_ENABLE && CONFIG_OPENTHREAD_RADIO_NATIVE
         ESP_ERROR_CHECK(esp_coex_wifi_i154_enable());
 #endif
@@ -220,7 +224,9 @@ esp_err_t esp_ot_wifi_disconnect(void)
     ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT, WIFI_EVENT_STA_CONNECTED, &handler_on_wifi_connect));
     s_wifi_handler_registered = false;
     s_wifi_state = OT_WIFI_DISCONNECTED;
+    esp_openthread_task_switching_lock_release();
     esp_err_t err = example_wifi_sta_do_disconnect();
+    esp_openthread_task_switching_lock_acquire(portMAX_DELAY);
     return err;
 }
 
@@ -294,12 +300,10 @@ otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs
         }
         if (esp_ot_wifi_connect(ssid, psk) == ESP_OK) {
             if (!s_border_router_initialized) {
-                esp_openthread_lock_acquire(portMAX_DELAY);
                 esp_openthread_set_backbone_netif(get_example_netif());
                 if (esp_openthread_border_router_init() != ESP_OK) {
                     ESP_LOGE(OT_EXT_CLI_TAG, "Fail to initialize border router");
                 }
-                esp_openthread_lock_release();
                 s_border_router_initialized = true;
             }
             otCliOutputFormat("wifi sta is connected successfully\n");
