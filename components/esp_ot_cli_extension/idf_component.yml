@@ -1,4 +1,4 @@
-version: "1.3.2"
+version: "1.3.3"
 description: Espressif OpenThread CLI Extension
 url: https://github.com/espressif/esp-thread-br/tree/main/components/esp_ot_cli_extension
 dependencies:
