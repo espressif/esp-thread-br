@@ -55,6 +55,23 @@ menu "ESP Thread Border Router Example"
             default "11"
     endmenu
 
+    choice ESP_BR_RCP_TARGET
+        prompt "Border router RCP target"
+        default ESP_BR_H2_TARGET
+        help
+            The board running the Thread RCP.
+
+        config ESP_BR_H2_TARGET
+            bool "ESP32-H2"
+            help
+                ESP32-H2 RCP 
+
+        config ESP_BR_C6_TARGET
+            bool "ESP32-C6"
+            help
+                ESP32-C6 RCP
+    endchoice
+
     config OPENTHREAD_BR_AUTO_START
         bool 'Enable the automatic start mode in Thread Border Router.'
         default n

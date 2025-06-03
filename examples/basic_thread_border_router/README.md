@@ -41,6 +41,8 @@ If the `OPENTHREAD_BR_AUTO_START` option is enabled, the device will connect to 
 
 If the `OPENTHREAD_BR_START_WEB` option is enabled, [ESP Thread Border Router Web Server](../../components/esp_ot_br_server/README.md) will be provided to configure and query Thread network via a Web GUI.
 
+The `ESP_CONSOLE_USB_SERIAL_JTAG` option is enabled by default for ESP Thread Border Router Hardware. If you are using other hardware, you may enable `ESP_CONSOLE_UART_DEFAULT` if you wish to use the UART port for serial communication instead. In either case, `OPENTHREAD_CONSOLE_TYPE_USB_SERIAL_JTAG` or `OPENTHREAD_CONSOLE_TYPE_UART` will be selected accordingly. If you enable `ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG`, please manually specify which `OPENTHREAD_CONSOLE_TYPE` you would like to use.
+
 ### Create the RCP firmware image
 
 The border router supports updating the RCP upon boot.
