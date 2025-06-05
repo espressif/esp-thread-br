@@ -1,0 +1,24 @@
+## IDF Component Manager Manifest File
+dependencies:
+  espressif/mdns: "^1.0.0"
+  espressif/esp_ot_cli_extension:
+    version: "~1.3.0"
+  espressif/esp_rcp_update:
+    version: "~1.4.0"
+  esp_br_http_ota:
+    path: ../../../components/esp_br_http_ota
+  esp_ot_br_server:
+    path: ../../../components/esp_ot_br_server
+  thread_border_router:
+    path: ../../common/thread_border_router
+  thread_border_router_m5stack:
+    path: ../../common/thread_border_router_m5stack
+  protocol_examples_common:
+    path: ${IDF_PATH}/examples/common_components/protocol_examples_common
+  espressif/m5stack_core_s3:
+    version: "^1.1.0"
+  lvgl/lvgl: "==8.4.0"
+
+  ## Required IDF version
+  idf:
+    version: ">=5.1.0"
