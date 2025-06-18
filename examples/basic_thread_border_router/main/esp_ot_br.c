@@ -70,9 +70,18 @@ void app_main(void)
     // * netif
     // * task queue
     // * border router
-    // * spi interface
+    size_t max_eventfd = 3;
+
+#if CONFIG_OPENTHREAD_RADIO_SPINEL_SPI
+    // * SpiSpinelInterface (The Spi Spinel Interface needs an eventfd.)
+    max_eventfd++;
+#endif
+#if CONFIG_OPENTHREAD_RADIO_TREL
+    // * TREL reception (The Thread Radio Encapsulation Link needs an eventfd for reception.)
+    max_eventfd++;
+#endif
     esp_vfs_eventfd_config_t eventfd_config = {
-        .max_fds = 4,
+        .max_fds = max_eventfd,
     };
 
     esp_openthread_platform_config_t platform_config = {
