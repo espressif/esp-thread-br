@@ -1,15 +1,38 @@
 menu "ESP Thread Border Router M5Stack Example"
 
-    config OPENTHREAD_EPHEMERALKEY_LIFE_TIME
-        int "The life time (seconds) of openthread ephemeral key"
-        default 100
+    choice RADIO_CO_PROCESSOR_MODE
+        prompt "IEEE 802.15.4 Radio Co-Processor Mode"
+        default RADIO_CO_PROCESSOR_MODULE_H2
         help
-            Set the lifetime of the OpenThread ephemeral key in seconds.
+            Select the target hardware configuration for the IEEE 802.15.4 Radio Co-Processor.
 
-    config OPENTHREAD_EPHEMERALKEY_PORT
-        int "The UDP port to use with the ephemeral key"
-        default 49180
-        help
-            Set the UDP port to use with the ephemeral key.
+        config RADIO_CO_PROCESSOR_MODULE_H2
+            bool "Module Gateway H2"
+            help
+                Select this if you are using a Module Gateway H2.
+
+        config RADIO_CO_PROCESSOR_UNIT_H2
+            bool "Unit Gateway H2"
+            help
+                Select this if you are using a Unit Gateway H2, the following must be ensured:
+                    1. Connect the CoreS3 and Module Gateway H2 via PORT C.
+                    2. Disable the AUTO_UPDATE_RCP feature.
+                    3. Set PIN_TO_RCP_TX to 18 and PIN_TO_RCP_RX to 17.
+    endchoice # RADIO_CO_PROCESSOR_MODE
+
+    menu "Thread Ephemeral Key Configurations"
+        config OPENTHREAD_EPHEMERALKEY_LIFE_TIME
+            int "The life time (seconds) of openthread ephemeral key"
+            default 100
+            help
+                Set the lifetime of the OpenThread ephemeral key in seconds.
+
+        config OPENTHREAD_EPHEMERALKEY_PORT
+            int "The UDP port to use with the ephemeral key"
+            default 49180
+            help
+                Set the UDP port to use with the ephemeral key.
+
+    endmenu
 
 endmenu
