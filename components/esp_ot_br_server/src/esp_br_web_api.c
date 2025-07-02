@@ -358,7 +358,7 @@ static esp_err_t get_openthread_network_properties(otInstance *ins, thread_netwo
     ESP_RETURN_ON_FALSE(ins && network, ESP_FAIL, API_TAG, "Invalid instance or openthread network");
     char output[64] = "";
     sprintf(output, "%s", otThreadGetNetworkName(ins));
-    ESP_RETURN_ON_FALSE((strlen(output) + 1) < sizeof(otNetworkName), ESP_FAIL, API_TAG, "Network name is too long");
+    ESP_RETURN_ON_FALSE(strlen(output) < sizeof(otNetworkName), ESP_FAIL, API_TAG, "Network name is too long");
 
     memcpy(&network->name, output, strlen(output) + 1);                               /* 1. name */
     network->panid = otLinkGetPanId(ins);                                             /* 2. PANID */
