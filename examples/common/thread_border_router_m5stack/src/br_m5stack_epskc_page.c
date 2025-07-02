@@ -45,7 +45,7 @@ static void epskc_delete_btn_handler(lv_event_t *e)
     page = atomic_exchange(&s_epskc_display_page, page);
     if (page) {
         esp_openthread_lock_acquire(portMAX_DELAY);
-        otBorderAgentClearEphemeralKey(esp_openthread_get_instance());
+        otBorderAgentEphemeralKeyStop(esp_openthread_get_instance());
         esp_openthread_lock_release();
         delete_epskc_display_page(page);
     }
@@ -71,9 +71,9 @@ static void create_ephemeral_key_page(char *key_txt)
     char txt[13] = "";
 
     esp_openthread_lock_acquire(portMAX_DELAY);
-    err = otBorderAgentSetEphemeralKey(esp_openthread_get_instance(), key_txt,
-                                       CONFIG_OPENTHREAD_EPHEMERALKEY_LIFE_TIME * 1000,
-                                       CONFIG_OPENTHREAD_EPHEMERALKEY_PORT);
+    err = otBorderAgentEphemeralKeyStart(esp_openthread_get_instance(), key_txt,
+                                         CONFIG_OPENTHREAD_EPHEMERALKEY_LIFE_TIME * 1000,
+                                         CONFIG_OPENTHREAD_EPHEMERALKEY_PORT);
     esp_openthread_lock_release();
 
     BR_M5STACK_GOTO_ON_FALSE(err == OT_ERROR_NONE, exit, "Fail to apply ephemeral key");

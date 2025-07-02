@@ -135,7 +135,7 @@ build_examples:
 
 build_examples_m5stack:
     stage: build
-    image: espressif/idf:v5.4.1
+    image: espressif/idf:v5.4.2
     script:
         - *submodule_update
         - *build_m5stack_thread_border_router

@@ -29,7 +29,7 @@ This example requires the M5Stack CoreS3 along with the ESP32-H2 Thread/Zigbee G
 
 ### IDF Version Required
 
-This example requires [IDF v5.4.1](https://github.com/espressif/esp-idf/tree/v5.4.1). It may not work with later IDF versions.
+This example requires [IDF v5.4.2](https://github.com/espressif/esp-idf/tree/v5.4.2). It may not be compatible with older or newer versions of IDF.
 
 ### Configure the Project
 
