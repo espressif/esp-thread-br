@@ -121,6 +121,6 @@ void app_main(void)
     esp_br_web_start("/spiffs");
 #endif
 
-    launch_openthread_border_router(&platform_config, &rcp_update_config);
     ESP_ERROR_CHECK(border_router_m5stack_init());
+    launch_openthread_border_router(&platform_config, &rcp_update_config);
 }

@@ -13,7 +13,19 @@ It connects to a pre-configured Wi-Fi network and automatically forms a Thread n
 This example requires the M5Stack CoreS3 along with the ESP32-H2 Thread/Zigbee Gateway Module. Please refer to:
 
 - [M5Stack CoreS3](https://shop.m5stack.com/products/m5stack-cores3-esp32s3-lotdevelopment-kit)
+<p align="center">
+  <img src="images/M5Stack-CoreS3.png" alt="M5Stack CoreS3" width="400"/>
+</p>
+
 - [ESP32-H2 Thread/Zigbee Gateway Module](https://shop.m5stack.com/products/esp32-h2-thread-zigbee-gateway-module)
+<p align="center">
+  <img src="images/ESP32-H2-Thread-Zigbee-Gateway-Module.png" alt="ESP32-H2 Thread/Zigbee Gateway Module" width="400"/>
+</p>
+
+- [ESP32-H2 Thread/Zigbee Gateway Unit](https://shop.m5stack.com/products/esp32-h2-thread-zigbee-gateway-unit)
+<p align="center">
+  <img src="images/ESP32-H2-Thread-Zigbee-Gateway-Unit.png" alt="ESP32-H2 Thread/Zigbee Gateway Unit" width="400"/>
+</p>
 
 ### IDF Version Required
 
@@ -56,3 +68,14 @@ Upon startup, the device will connect to the pre-configured Wi-Fi network and jo
 4. `Thread`: This button is used to view and configure basic Thread parameters.
 
 This example can be used in conjunction with an external Commissioner such as `ot-commissioner`. The ephemeral key allows the Commissioner to connect to the Thread Border Router over Wi-Fi. Once connected, the Commissioner can retrieve or configure parameters for the Border Router and its child nodes via the same network.
+
+### Adapting to Unit Gateway H2
+The above configuration process is intended for use with the [Module Gateway H2](https://docs.m5stack.com/en/module/Module%20Gateway%20H2). If you are using the [Unit Gateway H2](https://docs.m5stack.com/en/unit/Unit%20Gateway%20H2), please follow the steps below:
+
+1. Hardware Setup: Prepare a Unit Gateway H2 flashed with `ot_rcp` and connect it to the M5Stack via `PORT.C`.
+2. Build Configuration:
+   * Enable the `RADIO_CO_PROCESSOR_UNIT_H2` feature via menuconfig.
+   * Disable the `AUTO_UPDATE_RCP` feature via menuconfig.
+   * Set `PIN_TO_RCP_TX` to `18` and `PIN_TO_RCP_RX` to `17` via menuconfig.
+
+After that, build and flash as usual. The example will then operate using the Unit Gateway H2.

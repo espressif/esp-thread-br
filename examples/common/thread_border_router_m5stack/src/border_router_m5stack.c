@@ -9,6 +9,7 @@
 
 #include "br_m5stack_animation.h"
 #include "br_m5stack_layout.h"
+#include "br_m5stack_power.h"
 
 #include "esp_err.h"
 #include "bsp/esp-bsp.h"
@@ -16,6 +17,9 @@
 static void ot_br_m5stack_worker(void *ctx)
 {
     br_m5stack_bsp_init();
+#if CONFIG_RADIO_CO_PROCESSOR_UNIT_H2
+    ESP_ERROR_CHECK(br_m5stack_enable_port_c_power());
+#endif
     br_m5stack_display_init();
     boot_animation_start(br_m5stack_create_ui);
 
