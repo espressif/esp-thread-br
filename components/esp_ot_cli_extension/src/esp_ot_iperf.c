@@ -118,12 +118,15 @@ otError esp_ot_process_iperf(void *aContext, uint8_t aArgsLength, char *aArgs[])
             }
         }
         if (client_flag) {
+#if CONFIG_LWIP_IPV4
             if (cfg.type == IPERF_IP_TYPE_IPV4) {
                 cfg.destination_ip4 = inet_addr(s_dest_ip_addr);
                 char ip_addr[50];
                 strncpy(ip_addr, inet_ntoa(cfg.destination_ip4), sizeof(ip_addr));
                 otCliOutputFormat("ip:%s\n", ip_addr);
-            } else {
+            } else
+#endif // CONFIG_LWIP_IPV4
+            {
                 cfg.destination_ip6 = s_dest_ip_addr;
                 otCliOutputFormat("ip:%s\n", cfg.destination_ip6);
             }
