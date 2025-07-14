@@ -157,9 +157,13 @@ For measuring the TCP throughput, first create an iperf service on one node:
 Done
 ```
 
-Then create an iperf client connecting to the service on another node. Here we use `fdde:ad00:beef:0:a7c6:6311:9c8c:271b` as the example service address.
+Then create an iperf client connecting to the service on another node. Note that only the [ML-EID](https://openthread.io/guides/thread-primer/ipv6-addressing#unicast_address_types) address can be used for iperf.
 
 ```bash
+> ipaddr mleid
+fdde:ad00:beef:0:a7c6:6311:9c8c:271b
+Done
+
 > iperf -V -c fdde:ad00:beef:0:a7c6:6311:9c8c:271b -t 20 -i 1 -p 5001 -l 85
 Done
         Interval Bandwidth
