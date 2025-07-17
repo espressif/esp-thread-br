@@ -1,0 +1,5 @@
+
+[codespell]
+skip = *.py
+ignore-regex = _
+ignore-words-list = ot
