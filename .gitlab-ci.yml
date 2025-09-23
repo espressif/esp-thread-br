@@ -244,3 +244,18 @@ deploy_docs_production:
         DOCS_DEPLOY_SERVER: "$DOCS_PROD_SERVER"
         DOCS_DEPLOY_SERVER_USER: "$DOCS_PROD_SERVER_USER"
         DOCS_DEPLOY_URL_BASE: "https://docs.espressif.com/projects/esp-thread-br"
+
+check_typos:
+    image: $ESP_ENV_IMAGE
+    stage: build
+    script:
+        - pip install codespell
+        - git fetch origin main
+        - |
+            FILES=$(git diff --name-only origin/main...HEAD)
+            echo "Change files: $FILES"
+            if [ -n "$FILES" ]; then
+                ./tools/check_typos.sh $FILES
+            fi
+    tags:
+        - build      
