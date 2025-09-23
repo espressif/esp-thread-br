@@ -364,8 +364,12 @@ otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs
 
 esp_err_t esp_ot_wifi_config_init(void)
 {
-    esp_err_t err = nvs_open("wifi_config", NVS_READWRITE, &s_wifi_config_nvs_handle);
-    ESP_RETURN_ON_ERROR(err, OT_EXT_CLI_TAG, "Failed to open wifi_config NVS namespace (0x%x)", err);
+    static bool s_wifi_config_init = false;
+    if (!s_wifi_config_init) {
+        esp_err_t err = nvs_open("wifi_config", NVS_READWRITE, &s_wifi_config_nvs_handle);
+        ESP_RETURN_ON_ERROR(err, OT_EXT_CLI_TAG, "Failed to open wifi_config NVS namespace (0x%x)", err);
+        s_wifi_config_init = true;
+    }
     return ESP_OK;
 }
 
