@@ -57,6 +57,9 @@ static const otCliCommand kCommands[] = {
 
 void esp_cli_custom_command_init()
 {
+#if CONFIG_OPENTHREAD_CLI_WIFI
+    ESP_ERROR_CHECK(esp_ot_wifi_config_init());
+#endif
     esp_ot_heap_diag_init();
     otInstance *instance = esp_openthread_get_instance();
     otCliSetUserCommands(kCommands, (sizeof(kCommands) / sizeof(kCommands[0])), instance);

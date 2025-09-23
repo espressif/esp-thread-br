@@ -104,9 +104,6 @@ static void rcp_failure_handler(void)
 
 static void ot_br_init(void *ctx)
 {
-#if CONFIG_OPENTHREAD_CLI_WIFI
-    ESP_ERROR_CHECK(esp_ot_wifi_config_init());
-#endif
 #if CONFIG_OPENTHREAD_BR_AUTO_START
 #if CONFIG_EXAMPLE_CONNECT_WIFI || CONFIG_EXAMPLE_CONNECT_ETHERNET
     bool wifi_or_ethernet_connected = false;
