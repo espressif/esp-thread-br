@@ -1,6 +1,13 @@
+# Starting from esp-idf v5.3, the GPIO and UART drivers are moved to separate components
+if("${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}" VERSION_GREATER_EQUAL "5.3")
+    set (priv_requires "esp_driver_gpio" "esp_driver_uart")
+else()
+    set (priv_requires "driver")
+endif()
 idf_component_register(SRC_DIRS src
                        INCLUDE_DIRS include
-                       REQUIRES driver esp-serial-flasher nvs_flash)
+                       REQUIRES esp-serial-flasher nvs_flash
+                       PRIV_REQUIRES ${priv_requires})
 
 idf_build_get_property(python PYTHON)
 if(CONFIG_AUTO_UPDATE_RCP)
