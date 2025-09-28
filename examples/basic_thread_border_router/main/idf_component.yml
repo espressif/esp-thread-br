@@ -4,7 +4,7 @@ dependencies:
   espressif/esp_ot_cli_extension:
     version: "~1.4.0"
   espressif/esp_rcp_update:
-    version: "~1.4.0"
+    version: "~1.5.0"
   esp_br_http_ota:
     path: ../../../components/esp_br_http_ota
   esp_ot_br_server:
