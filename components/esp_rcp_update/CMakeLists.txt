@@ -22,6 +22,7 @@ spiffs_create_partition_image(${CONFIG_RCP_PARTITION_NAME} ${CMAKE_CURRENT_BINAR
 endif()
 
 if(CONFIG_CREATE_OTA_IMAGE_WITH_RCP_FW)
+    idf_build_get_property(elf_name EXECUTABLE_NAME GENERATOR_EXPRESSION)
     add_custom_command(OUTPUT ${build_dir}/ota_with_rcp_image
         COMMAND ${python} ${CMAKE_CURRENT_SOURCE_DIR}/create_ota_image.py
         --rcp-build-dir ${CONFIG_RCP_SRC_DIR}
