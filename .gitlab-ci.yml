@@ -80,6 +80,7 @@ pre_commit:
   - idf.py build
 
   - cd $ESP_THREAD_BR_PATH/examples/basic_thread_border_router
+  - echo "CONFIG_CREATE_OTA_IMAGE_WITH_RCP_FW=y" >> sdkconfig.defaults
   - rm -rf main/idf_component.yml
   - cp ${CI_TOOLS_PATH}/idf_component_local.yml main/idf_component.yml
   - rm -rf CMakeLists.txt
