@@ -40,7 +40,7 @@ otError esp_ot_process_iperf(void *aContext, uint8_t aArgsLength, char *aArgs[])
         otCliOutputFormat("-i <interval>       :     seconds between periodic bandwidth reports\n");
         otCliOutputFormat("-t <time>           :     time in seconds to transmit for (default 30 secs)\n");
         otCliOutputFormat("-p <port>           :     server port to listen on/connect to\n");
-        otCliOutputFormat("-l <len_send_buf>   :     the lenth of send buffer\n");
+        otCliOutputFormat("-l <len_send_buf>   :     the length of send buffer\n");
         otCliOutputFormat("-f <output_format>  :     the output format of the report (Mbit/sec, Kbit/sec, bit/sec; "
                           "default Mbit/sec)\n");
         otCliOutputFormat("---example---\n");

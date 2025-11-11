@@ -1,5 +1,5 @@
-
 [codespell]
-skip = *.py
+skip = _build
 ignore-regex = _
 ignore-words-list = ot
+write-changes = true

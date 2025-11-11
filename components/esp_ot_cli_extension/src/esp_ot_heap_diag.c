@@ -83,7 +83,7 @@ otError esp_ot_process_heap_diag(void *aContext, uint8_t aArgsLength, char *aArg
     if (aArgsLength == 0) {
         otCliOutputFormat("---heapdiag command parameter---\n");
         otCliOutputFormat("print               : print current heap usage\n");
-        otCliOutputFormat("daemon on <preriod> : start the daemon task to print heap usage per <period> ms\n");
+        otCliOutputFormat("daemon on <period> : start the daemon task to print heap usage per <period> ms\n");
         otCliOutputFormat("daemon off          : stop the daemon task for heap usage print\n");
 #if CONFIG_HEAP_TRACING_STANDALONE
         otCliOutputFormat("tracereset          : reset the heap trace baseline\n");

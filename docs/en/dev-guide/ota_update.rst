@@ -17,13 +17,13 @@ In addition to the UART connection to the RCP chip, two extra GPIO pins are requ
 Download and Update the Border Router Firmware
 -----------------------------------------------
 
-Create a HTTPS server providing the OTA image file, excute the follow command on your Linux Host machine:
+Create an HTTPS server providing the OTA image file, execute the follow command on your Linux Host machine:
 
 .. code-block:: bash
 
     openssl s_server -WWW -key ca_key.pem -cert ca_cert.pem -port 8070
 
-The private key and the certificate shall be accpetable for the Border Router. If they are self-signed, make sure to add the public key to the trusted key set of the Border Router.
+The private key and the certificate shall be acceptable for the Border Router. If they are self-signed, make sure to add the public key to the trusted key set of the Border Router.
 
 Now the image can be downloaded on the Border Router:
 

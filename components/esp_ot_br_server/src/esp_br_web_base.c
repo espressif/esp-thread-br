@@ -79,7 +79,7 @@ esp_err_t string_to_hex(char str[], uint8_t hex[], size_t size)
 /*---------------------------------------------------------------------------------
                                thread properties
 ---------------------------------------------------------------------------------*/
-#define CREATE_JSON_CHILD_TIEM(child_json, to_json, from_struct, type, element) \
+#define CREATE_JSON_CHILD_ITEM(child_json, to_json, from_struct, type, element) \
     cJSON *child_json = cJSON_CreateObject();                                   \
     if (child_json)                                                             \
         cJSON_AddItemToObject(to_json, #element, child_json);
@@ -237,7 +237,7 @@ esp_err_t network_formation_param_json_convert2_struct(const cJSON *root, cJSON 
                                                        thread_network_formation_param_t *param)
 {
     esp_err_t ret = ESP_OK;
-    ESP_RETURN_ON_FALSE(log, OT_ERROR_INVALID_ARGS, BASE_TAG, "Invalid arguement");
+    ESP_RETURN_ON_FALSE(log, OT_ERROR_INVALID_ARGS, BASE_TAG, "Invalid argument");
     if (!(root)) {
         ESP_LOGW(BASE_TAG, "Error: Package Type Error");
         cJSON_SetValuestring(log, "Error: Package Type Error");
@@ -268,8 +268,8 @@ esp_err_t network_formation_param_json_convert2_struct(const cJSON *root, cJSON 
     }
 
     if (!(temp = cJSON_GetObjectItem(root, "panId")) || sscanf(temp->valuestring, "0x%hx", &param->panid) != 1) {
-        ESP_LOGW(BASE_TAG, "Error: PanId requries \"0x\"");
-        cJSON_SetValuestring(log, "Error: PanId requries  \"0x\"");
+        ESP_LOGW(BASE_TAG, "Error: PanId requires \"0x\"");
+        cJSON_SetValuestring(log, "Error: PanId requires  \"0x\"");
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -321,7 +321,7 @@ void network_join_param_reset(thread_network_join_param_t *param)
 esp_err_t network_join_param_json_convert2_struct(const cJSON *root, cJSON *log, thread_network_join_param_t *param)
 {
     cJSON *temp = cJSON_GetObjectItem(root, "index");
-    ESP_RETURN_ON_FALSE(log, OT_ERROR_INVALID_ARGS, BASE_TAG, "Invalid arguement");
+    ESP_RETURN_ON_FALSE(log, OT_ERROR_INVALID_ARGS, BASE_TAG, "Invalid argument");
     if ((temp) && temp->valueint >= 0) {
         param->index = temp->valueint;
     } else {
@@ -512,7 +512,7 @@ void destroy_thread_diagnosticTlv_set(thread_diagnosticTlv_set_t *set)
         pre = next;
         next = pre->next;
     }
-    destroy_thread_diagnosticTlv_list(pre->diagTlv_next); // destory the last node
+    destroy_thread_diagnosticTlv_list(pre->diagTlv_next); // destroy the last node
     pre->diagTlv_next = NULL;
     free(pre);
     set = NULL;

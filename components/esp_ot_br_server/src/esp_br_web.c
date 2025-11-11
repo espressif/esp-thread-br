@@ -306,7 +306,7 @@ static cJSON *resource_status(char *error, char *msg)
 
 static esp_err_t httpd_server_register_http_uri(const http_server_t *server, httpd_uri_t *uris, uint8_t size)
 {
-    ESP_RETURN_ON_FALSE((server->handle && uris), ESP_ERR_INVALID_ARG, WEB_TAG, "Invalid arguement");
+    ESP_RETURN_ON_FALSE((server->handle && uris), ESP_ERR_INVALID_ARG, WEB_TAG, "Invalid argument");
     for (int i = 0; i < size; i++) {
         ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server->handle, &uris[i]), WEB_TAG,
                             "Failed to register %s for %d", uris[i].uri, i);
@@ -351,7 +351,7 @@ static cJSON *httpd_request_convert2_json(httpd_req_t *req, int type)
 static esp_err_t httpd_send_packet(httpd_req_t *req, cJSON *root)
 {
     esp_err_t ret = ESP_OK;
-    ESP_RETURN_ON_FALSE(root, ESP_FAIL, WEB_TAG, "Invalid Arguement");
+    ESP_RETURN_ON_FALSE(root, ESP_FAIL, WEB_TAG, "Invalid Argument");
     char *packet = cJSON_Print(root);
     ESP_RETURN_ON_FALSE(packet, ESP_FAIL, WEB_TAG, "Invalid Packet");
     ESP_LOGD(WEB_TAG, "Properties: %s\r\n", packet);
@@ -1062,7 +1062,7 @@ static reqeust_url_t parse_request_url_information(const char *uri, const struct
 }
 
 /**
- * @brief Verify and handle the client's default request, return corrresponding file to client.
+ * @brief Verify and handle the client's default request, return corresponding file to client.
  *
  * @param[in] req The request of http client.
  * @return

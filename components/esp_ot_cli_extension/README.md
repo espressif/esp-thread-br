@@ -235,15 +235,15 @@ Use this command to debug the Non-volatile storage (NVS).
 ---nvsdiag parameter---
 status                                   :     print the status of nvs
 detail                                   :     print detailed usage information of nvs
-deamon                                   :     print the status of nvs deamon task
-deamon start <interval>                  :     create the daemon task, print nvs status every <interval> milliseconds
-deamon stop                              :     delete the daemon task
+daemon                                   :     print the status of nvs daemon task
+daemon start <interval>                  :     create the daemon task, print nvs status every <interval> milliseconds
+daemon stop                              :     delete the daemon task
 ---example---
 print the status of nvs                  :     nvsdiag status
 print detailed usage information of nvs  :     nvsdiag detail
-print the status of nvs deamon task      :     nvsdiag deamon
-create a daemon task (interval=1s)       :     nvsdiag deamon start 1000
-delete the daemon task                   :     nvsdiag deamon stop
+print the status of nvs daemon task      :     nvsdiag daemon
+create a daemon task (interval=1s)       :     nvsdiag daemon start 1000
+delete the daemon task                   :     nvsdiag daemon stop
 Done
 ```
 
@@ -285,23 +285,23 @@ firstUsed=0 nextFree=1 used=1 erased=0
 Done
 ```
 
-Print the status of nvs deamon task:
+Print the status of nvs daemon task:
 ```bash
-> nvsdiag deamon
+> nvsdiag daemon
 nvs daemon task: disabled
 Done
 ```
 
 Create a daemon task with a printing interval of 5s:
 ```bash
-> nvsdiag deamon start 5000
+> nvsdiag daemon start 5000
 Done
 ```
-Then the basic status of NVS will be printed by deamon task every 5s.
+Then the basic status of NVS will be printed by daemon task every 5s.
 
 Stop the daemon task:
 ```bash
-> nvsdiag deamon stop
+> nvsdiag daemon stop
 Done
 ```
 
