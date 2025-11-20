@@ -1,6 +1,12 @@
 stages:
+  - pre_check
   - build
   - docs
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - when: always
 
 variables:
     CI_DOCKER_REGISTRY: "ciregistry.espressif.cn:8443"
@@ -8,24 +14,6 @@ variables:
     CI_TOOLS_PATH: "$CI_PROJECT_DIR/tools/ci"
     ESP_ENV_IMAGE: "$CI_DOCKER_REGISTRY/esp-env-v6.0:2"
     ESP_IDF_HTTP: "https://gitlab-ci-token:${CI_JOB_TOKEN}@${ESP_GITLAB}/espressif/esp-idf.git"
-
-pre_commit:
-  stage: .pre
-  image: "$CI_DOCKER_REGISTRY/esp-idf-pre-commit:1"
-  script:
-    - echo "Merge request is from ${CI_COMMIT_REF_NAME} into main"
-    - git fetch origin main ${CI_COMMIT_REF_NAME}
-    - export from_sha=$(git merge-base HEAD origin/main)
-    - echo "Checking changes from ${from_sha} to ${CI_COMMIT_SHA}:"
-    - git log --oneline ${from_sha}..${CI_COMMIT_SHA}
-    - echo "Modified files:"
-    - git diff-tree --no-commit-id --name-only -r ${from_sha} ${CI_COMMIT_SHA}
-    - echo "Running pre-commit:"
-    - pre-commit run --from ${from_sha} --to ${CI_COMMIT_SHA}
-  except:
-    - main
-  tags:
-    - host_test
 
 .submodule_update: &submodule_update
   - cd $ESP_THREAD_BR_PATH
@@ -246,17 +234,5 @@ deploy_docs_production:
         DOCS_DEPLOY_SERVER_USER: "$DOCS_PROD_SERVER_USER"
         DOCS_DEPLOY_URL_BASE: "https://docs.espressif.com/projects/esp-thread-br"
 
-check_typos:
-    image: $ESP_ENV_IMAGE
-    stage: build
-    script:
-        - pip install codespell
-        - git fetch origin main
-        - |
-            FILES=$(git diff --name-only origin/main...HEAD)
-            echo "Change files: $FILES"
-            if [ -n "$FILES" ]; then
-                ./tools/check_typos.sh $FILES
-            fi
-    tags:
-        - build      
+include:
+  - '.gitlab/ci/pre_commit.yml'

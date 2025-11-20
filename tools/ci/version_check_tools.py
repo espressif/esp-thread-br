@@ -229,7 +229,7 @@ def process_version(version):
         modified_version = version.lstrip('~^')
         return modified_version
     else:
-        print(f"Faile to handle version {version}")
+        print(f"Failed to handle version {version}")
         return None
 
 # Component check and attempt to replace. If the component is affected, replace it;

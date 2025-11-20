@@ -312,7 +312,7 @@ The BR device will connect to the Wi-Fi and then form a Thread network.
      I (5251) wifi:wifi firmware version: 0016c4d
      I (5251) wifi:wifi certification version: v7.0
      I (5251) wifi:config NVS flash: enabled
-     I (5251) wifi:config nano formating: enabled
+     I (5251) wifi:config nano formatting: enabled
      I (5251) wifi:Init data frame dynamic rx buffer num: 32
      I (5251) wifi:Init static rx mgmt buffer num: 5
      I (5251) wifi:Init management short buffer num: 32

@@ -537,7 +537,7 @@ otError handle_openthread_form_network_request(const cJSON *request, cJSON *log)
     otError ret = OT_ERROR_NONE;
     thread_network_formation_param_t param;
     network_formation_param_reset(&param);
-    ESP_RETURN_ON_FALSE(log, OT_ERROR_INVALID_ARGS, API_TAG, "Form log requires cJSON Sting type");
+    ESP_RETURN_ON_FALSE(log, OT_ERROR_INVALID_ARGS, API_TAG, "Form log requires cJSON String type");
     ESP_RETURN_ON_FALSE(!network_formation_param_json_convert2_struct(request, log, &param), OT_ERROR_INVALID_ARGS,
                         API_TAG, "Failed to parse FORM request");
 
@@ -625,7 +625,7 @@ otError handle_openthread_join_network_request(const cJSON *request, cJSON *log)
     otInstance *ins = esp_openthread_get_instance();
 
     network_join_param_reset(&param);
-    ESP_RETURN_ON_FALSE(log, OT_ERROR_INVALID_ARGS, API_TAG, "Join log requires cJSON Sting type");
+    ESP_RETURN_ON_FALSE(log, OT_ERROR_INVALID_ARGS, API_TAG, "Join log requires cJSON String type");
     ESP_RETURN_ON_FALSE(!network_join_param_json_convert2_struct(request, log, &param), OT_ERROR_INVALID_ARGS, API_TAG,
                         "Failed to parse JOIN request");
     /* join active dataset */
@@ -840,7 +840,7 @@ static const char *kMulticastAddrAllRouters = "ff03::2";
 static void update_diagnosticTlv(char *key, thread_diagnosticTlv_list_t *diag_list)
 {
     thread_diagnosticTlv_list_t *head = diag_list->next; /* skip the first invalid node. */
-    free(diag_list->diagTlv);                            /* aviod to lack memory, free the first invalid node. */
+    free(diag_list->diagTlv);                            /* avoid to lack memory, free the first invalid node. */
     free(diag_list);
     update_thread_diagnosticTlv_set(s_diagnosticTlv_set, key, head);
 }

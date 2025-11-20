@@ -53,23 +53,23 @@ otError esp_ot_process_nvs_diag(void *aContext, uint8_t aArgsLength, char *aArgs
         otCliOutputFormat("---nvsdiag parameter---\n");
         otCliOutputFormat("status                                   :     print the status of nvs\n");
         otCliOutputFormat("detail                                   :     print detailed usage information of nvs\n");
-        otCliOutputFormat("deamon                                   :     print the status of nvs deamon task\n");
-        otCliOutputFormat("deamon start <interval>                  :     create the daemon task, print nvs status "
+        otCliOutputFormat("daemon                                   :     print the status of nvs daemon task\n");
+        otCliOutputFormat("daemon start <interval>                  :     create the daemon task, print nvs status "
                           "every <interval> milliseconds\n");
-        otCliOutputFormat("deamon stop                              :     delete the daemon task\n");
+        otCliOutputFormat("daemon stop                              :     delete the daemon task\n");
         otCliOutputFormat("---example---\n");
         otCliOutputFormat("print the status of nvs                  :     nvsdiag status\n");
         otCliOutputFormat("print detailed usage information of nvs  :     nvsdiag detail\n");
-        otCliOutputFormat("print the status of nvs deamon task      :     nvsdiag deamon\n");
-        otCliOutputFormat("create a daemon task (interval=1s)       :     nvsdiag deamon start 1000\n");
-        otCliOutputFormat("delete the daemon task                   :     nvsdiag deamon stop\n");
+        otCliOutputFormat("print the status of nvs daemon task      :     nvsdiag daemon\n");
+        otCliOutputFormat("create a daemon task (interval=1s)       :     nvsdiag daemon start 1000\n");
+        otCliOutputFormat("delete the daemon task                   :     nvsdiag daemon stop\n");
     } else {
         if (strcmp(aArgs[0], "status") == 0) {
             nvs_basic_status_print();
         } else if (strcmp(aArgs[0], "detail") == 0) {
             nvs_basic_status_print();
             nvs_detail_status_print();
-        } else if (strcmp(aArgs[0], "deamon") == 0) {
+        } else if (strcmp(aArgs[0], "daemon") == 0) {
             if (aArgsLength == 1) {
                 otCliOutputFormat("nvs daemon task: %s\n", (nvs_daemon_task_handle != NULL) ? "enabled" : "disabled");
             } else if (aArgsLength == 2 && strcmp(aArgs[1], "stop") == 0) {

@@ -111,7 +111,7 @@ lv_obj_t *br_m5stack_create_button(lv_coord_t w, lv_coord_t h, lv_event_cb_t eve
     }
 
     label = lv_label_create(btn);
-    ESP_GOTO_ON_FALSE(label, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create a lable for button");
+    ESP_GOTO_ON_FALSE(label, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create a label for button");
     lv_label_set_text(label, txt);
     lv_obj_set_style_text_color(label, lv_color_black(), LV_STATE_DEFAULT);
     lv_obj_center(label);

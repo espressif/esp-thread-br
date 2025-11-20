@@ -15,3 +15,11 @@ repos:
         entry: bash -c "export ESP_THREAD_BR_PATH=$(pwd) && python3 precommit_version_check.py"
         language: python
         additional_dependencies: [pyyaml]
+
+  - repo: local
+    hooks:
+      - id: codespell
+        name: Check typos with codespell
+        entry: bash tools/check_typos.sh
+        language: system
+        pass_filenames: true
