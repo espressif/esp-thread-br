@@ -1,6 +1,6 @@
 .check_pre_commit_template:
   stage: pre_check
-  image: $ESP_ENV_IMAGE # or $CI_DOCKER_REGISTRY/esp-idf-pre-commit:1
+  image: "$CI_DOCKER_REGISTRY/esp-idf-pre-commit:2"
   tags: [host_test]
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
