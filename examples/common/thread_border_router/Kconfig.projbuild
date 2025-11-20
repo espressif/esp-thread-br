@@ -112,7 +112,15 @@ menu "ESP Thread Border Router Example"
         select OPENTHREAD_JOINER
         default n
         help
-            If enabled, a web server will be provided to configure and query Thread network via a Web GUI. 
+            If enabled, a web server will be provided to configure and query Thread network via a Web GUI.
+
+    config OPENTHREAD_BR_SOFTAP_SETUP
+        bool 'Enable SoftAP Wi-Fi configuration mode'
+        default n
+        help
+            If enabled, the border router will start a SoftAP (Access Point) mode when no Wi-Fi
+            credentials are found or WiFi connection fails. Users can connect to the AP and
+            configure Wi-Fi via a web interface at http://192.168.4.1.
 
     menu "External coexist wire type and pin config"
         config EXTERNAL_COEX_WIRE_TYPE

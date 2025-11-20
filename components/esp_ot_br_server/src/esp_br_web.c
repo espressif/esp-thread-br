@@ -4,10 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "esp_br_web.h"
+#include <limits.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "sdkconfig.h"
+
 #include "cJSON.h"
+#include "esp_br_web.h"
 #include "esp_br_web_api.h"
 #include "esp_br_web_base.h"
+#if CONFIG_OPENTHREAD_BR_SOFTAP_SETUP
+#include "esp_br_wifi_config.h"
+#endif
 #include "esp_check.h"
 #include "esp_err.h"
 #include "esp_event.h"
@@ -20,11 +30,7 @@
 #include "esp_vfs.h"
 #include "http_parser.h"
 #include "protocol_examples_common.h"
-#include "sdkconfig.h"
-#include <limits.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
+
 #include "openthread/dataset.h"
 #include "openthread/error.h"
 #include "openthread/ip6.h"
@@ -907,28 +913,6 @@ exit:
 /*-----------------------------------------------------
  Note：Handling for Client request
 -----------------------------------------------------*/
-/**
- * @brief Provide a blank html to client. when client accesses a error link, the function will be
- * call.
- *
- * @param[in] req The request from client's browser
- * @return
- *      -   ESP_OK                      : On success
- *      -   ESP_ERR_INVALID_ARG         : Null request pointer
- *      -   ESP_ERR_HTTPD_RESP_HDR      : Essential headers are too large for internal buffer
- *      -   ESP_ERR_HTTPD_RESP_SEND     : Error in raw send
- *      -   ESP_ERR_HTTPD_INVALID_REQ   : Invalid request
- */
-static esp_err_t blank_html_get_handler(httpd_req_t *req)
-{
-    esp_err_t ret = ESP_OK;
-    cJSON *response = resource_status("404", "404 Not Found");
-    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
-
-exit:
-    cJSON_Delete(response);
-    return ret;
-}
 static esp_err_t NOT_FOUND_handler(httpd_req_t *req)
 {
     esp_err_t ret = ESP_OK;
@@ -1071,6 +1055,14 @@ static reqeust_url_t parse_request_url_information(const char *uri, const struct
  */
 static esp_err_t default_urls_get_handler(httpd_req_t *req)
 {
+#if CONFIG_OPENTHREAD_BR_SOFTAP_SETUP
+    // Check if this is a WiFi config request (when WiFi config mode is active)
+    if (esp_br_wifi_config_is_active()) {
+        // Let WiFi config server handle it
+        return ESP_OK;
+    }
+#endif
+
     struct http_parser_url url;
     ESP_RETURN_ON_ERROR(http_parser_parse_url(req->uri, strlen(req->uri), 0, &url), WEB_TAG, "Failed to parse url");
     reqeust_url_t info =
@@ -1087,7 +1079,11 @@ static esp_err_t default_urls_get_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
     if (strcmp(info.file_name, "/") == 0) {
-        return blank_html_get_handler(req);
+        // For root path, serve index.html directly
+        char index_path[FILEPATH_MAX_SIZE];
+        strcpy(index_path, ((http_server_data_t *)req->user_ctx)->base_path);
+        strcat(index_path, "/index.html");
+        return index_html_get_handler(req, index_path);
     } else if (strcmp(info.file_name, "/index.html") == 0) {
         return index_html_get_handler(req, info.file_path);
     } else if (strcmp(info.file_name, "/static/style.css") == 0) {
@@ -1163,9 +1159,9 @@ static httpd_handle_t *start_esp_br_http_server(const char *base_path, const cha
     httpd_register_uri_handler(s_server.handle, &default_uris_get);
 
     // Show the login address in the console
-    ESP_LOGI(WEB_TAG, "%s\r\n", "<=======================server start========================>");
-    ESP_LOGI(WEB_TAG, "http://%s:%d/index.html\r\n", s_server.ip, s_server.port);
-    ESP_LOGI(WEB_TAG, "%s\r\n", "<===========================================================>");
+    ESP_LOGI(WEB_TAG, "%s\r\n", "<========server start========>");
+    ESP_LOGI(WEB_TAG, "http://%s\r\n", s_server.ip);
+    ESP_LOGI(WEB_TAG, "%s\r\n", "<============================>");
 
     return s_server.handle;
 }
@@ -1203,6 +1199,14 @@ void disconnect_handler(void *arg, esp_event_base_t event_base, int32_t event_id
 static bool is_br_web_server_started = false;
 static void handler_got_ip_event(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
+#if CONFIG_OPENTHREAD_BR_SOFTAP_SETUP
+    // Don't start Thread BR web server if WiFi config mode is active
+    if (esp_br_wifi_config_is_active()) {
+        ESP_LOGI(WEB_TAG, "WiFi config mode is active, skipping Thread BR web server");
+        return;
+    }
+#endif
+
     if (!is_br_web_server_started) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         char ipv4_address[SERVER_IPV4_LEN];

@@ -31,11 +31,11 @@ such as:
 
 .. code-block::
 
-    otbr_web: <=======================server start========================>
+    otbr_web: <========server start========>
 
-    otbr_web: http://192.168.200.98:80/index.html
+    otbr_web: http://192.168.200.98
 
-    otbr_web: <===========================================================>
+    otbr_web: <============================>
 
 
 All REST APIs can be accessed by visiting the IPv4 address of the Thread-Border-Router-Board using the ``HTTP`` on port 80 with the API field specified.
