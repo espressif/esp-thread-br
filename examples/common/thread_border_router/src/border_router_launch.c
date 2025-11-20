@@ -144,7 +144,7 @@ static void ot_br_init(void *ctx)
 #elif CONFIG_EXAMPLE_CONNECT_ETHERNET
     // Ethernet connection mode
     ESP_ERROR_CHECK(example_ethernet_connect());
-#endif  // CONFIG_EXAMPLE_CONNECT_WIFI || CONFIG_EXAMPLE_CONNECT_ETHERNET
+#endif // CONFIG_EXAMPLE_CONNECT_WIFI || CONFIG_EXAMPLE_CONNECT_ETHERNET
 
     esp_openthread_lock_acquire(portMAX_DELAY);
     esp_openthread_set_backbone_netif(get_example_netif());

@@ -77,6 +77,8 @@ void br_m5stack_hidden_page(lv_obj_t *page);
 
 void br_m5stack_display_page(lv_obj_t *page);
 
+lv_obj_t *br_m5stack_create_factoryreset_button(lv_obj_t *page);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

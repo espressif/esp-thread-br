@@ -17,6 +17,8 @@ void br_m5stack_display_init(void);
 
 void br_m5stack_create_ui(void);
 
+void br_m5stack_show_main_page(void);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

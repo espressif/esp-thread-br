@@ -11,3 +11,5 @@ idf_component_register(SRC_DIRS "src" "image"
                        INCLUDE_DIRS "include" "private_include" "${extra_include_dirs}"
                        REQUIRES "${requires}"
 )
+
+idf_component_optional_requires(PRIVATE esp_ot_br_server)

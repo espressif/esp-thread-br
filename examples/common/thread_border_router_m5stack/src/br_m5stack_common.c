@@ -10,7 +10,9 @@
 #include "esp_check.h"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_system.h"
 #include "lvgl.h"
+#include "nvs.h"
 #include "bsp/esp-bsp.h"
 #include "core/lv_obj_tree.h"
 
@@ -81,9 +83,9 @@ void br_m5stack_add_esp_tiny_logo(lv_obj_t *page)
     lv_obj_align(img_logo, LV_ALIGN_TOP_LEFT, 0, 0);
     img_text = lv_label_create(page);
     ESP_RETURN_ON_FALSE(img_text, , BR_M5STACK_TAG, "Failed to create an image text");
-    lv_label_set_text(img_text, "Espressif");
+    lv_label_set_text(img_text, "M5Stack Thread Border Router");
     lv_obj_set_style_text_color(img_text, lv_color_black(), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(img_text, &lv_font_montserrat_20, LV_PART_MAIN);
+    lv_obj_set_style_text_font(img_text, &lv_font_montserrat_18, LV_PART_MAIN);
     lv_obj_align_to(img_text, img_logo, LV_ALIGN_OUT_RIGHT_MID, 5, 0);
 }
 
@@ -267,4 +269,68 @@ void br_m5stack_display_page(lv_obj_t *page)
 {
     lv_obj_move_foreground(page);
     lv_obj_clear_flag(page, LV_OBJ_FLAG_HIDDEN);
+}
+
+// Factory reset functions
+static void br_m5stack_do_factoryreset(lv_event_t *e)
+{
+    esp_err_t ret = ESP_OK;
+    (void)ret;
+    br_m5stack_err_msg_t err_msg = "Failed to do factoryreset";
+    nvs_handle_t ot_nvs_handle;
+    esp_err_t err = ESP_OK;
+
+    err = nvs_open("openthread", NVS_READWRITE, &ot_nvs_handle);
+    ESP_GOTO_ON_ERROR(err, exit, BR_M5STACK_TAG, "Failed to open NVS namespace (0x%x)", err);
+    err = nvs_erase_all(ot_nvs_handle);
+    ESP_GOTO_ON_ERROR(err, exit, BR_M5STACK_TAG, "Failed to erase all OpenThread settings (0x%x)", err);
+    nvs_close(ot_nvs_handle);
+
+    err = nvs_open("wifi_config", NVS_READWRITE, &ot_nvs_handle);
+    ESP_GOTO_ON_ERROR(err, exit, BR_M5STACK_TAG, "Failed to open NVS namespace (0x%x)", err);
+    err = nvs_erase_all(ot_nvs_handle);
+    ESP_GOTO_ON_ERROR(err, exit, BR_M5STACK_TAG, "Failed to erase all Wi-Fi settings (0x%x)", err);
+    nvs_close(ot_nvs_handle);
+
+    esp_restart();
+
+exit:
+    BR_M5STACK_CREATE_WARNING_IF_EXIST(1000);
+}
+
+static void br_m5stack_factoryreset_confirm(lv_event_t *e)
+{
+    esp_err_t ret = ESP_OK;
+    lv_obj_t *factoryreset_page = NULL;
+    lv_obj_t *label = NULL;
+    lv_obj_t *yes_btn = NULL;
+    lv_obj_t *no_btn = NULL;
+
+    factoryreset_page = br_m5stack_create_blank_page(lv_layer_top());
+    ESP_GOTO_ON_FALSE(factoryreset_page, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create the factoryreset page");
+
+    label = br_m5stack_create_label(factoryreset_page, "Are you sure to execute factory reset?", &lv_font_montserrat_16,
+                                    lv_color_black(), LV_ALIGN_CENTER, 0, -20);
+    ESP_GOTO_ON_FALSE(label, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create the label for factoryreset page");
+
+    yes_btn = br_m5stack_create_button(100, 50, br_m5stack_do_factoryreset, LV_EVENT_CLICKED, "Yes", NULL);
+    ESP_GOTO_ON_FALSE(yes_btn, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create the yes button for factoryreset page");
+    br_m5stack_add_btn_to_page(factoryreset_page, yes_btn, LV_ALIGN_LEFT_MID, 40, 60);
+
+    no_btn = br_m5stack_create_button(100, 50, br_m5stack_delete_page_from_button, LV_EVENT_CLICKED, "No", NULL);
+    ESP_GOTO_ON_FALSE(no_btn, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create the no button for factoryreset page");
+    br_m5stack_add_btn_to_page(factoryreset_page, no_btn, LV_ALIGN_RIGHT_MID, -40, 60);
+
+exit:
+    if (ret != ESP_OK) {
+        BR_M5STACK_DELETE_OBJ_IF_EXIST(factoryreset_page);
+    }
+}
+
+lv_obj_t *br_m5stack_create_factoryreset_button(lv_obj_t *page)
+{
+    lv_obj_t *btn =
+        br_m5stack_create_button(130, 50, br_m5stack_factoryreset_confirm, LV_EVENT_CLICKED, "factoryreset", NULL);
+    ESP_RETURN_ON_FALSE(btn, NULL, BR_M5STACK_TAG, "Failed to create factoryreset button");
+    return btn;
 }

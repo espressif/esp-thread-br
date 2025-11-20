@@ -249,7 +249,7 @@ static esp_err_t wifi_config_start_softap(void)
     wifi_config.ap.ssid_len = strlen(s_softap_ssid);
     wifi_config.ap.max_connection = 4;
     wifi_config.ap.authmode = WIFI_AUTH_OPEN;
-    wifi_config.ap.beacon_interval = 100;  // Set beacon interval to 100ms for better discoverability
+    wifi_config.ap.beacon_interval = 100; // Set beacon interval to 100ms for better discoverability
 
     // Initialize WiFi if not already initialized
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -703,7 +703,6 @@ bool esp_br_wifi_config_is_active(void)
     return s_wifi_config_mode;
 }
 
-
 esp_err_t esp_br_wifi_config_get_softap_info(char *ssid, size_t ssid_len, char *ip_addr, size_t ip_addr_len)
 {
     if (!s_wifi_config_mode) {
@@ -728,4 +727,3 @@ esp_err_t esp_br_wifi_config_get_softap_info(char *ssid, size_t ssid_len, char *
 
     return ESP_OK;
 }
-
