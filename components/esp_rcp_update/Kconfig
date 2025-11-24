@@ -28,4 +28,27 @@ menu "OpenThread RCP Update"
         help
             The name of RCP storage partition.
 
+    config RCP_PATH_NAME
+        depends on AUTO_UPDATE_RCP
+        string "Name of RCP storage partition"
+        default "rcp"
+        help
+            The name of RCP storage partition.
+
+    config DEFAULT_PIN_TO_RCP_RESET
+        int "Default Pin to RCP reset"
+        default 7
+
+    config DEFAULT_PIN_TO_RCP_BOOT
+        int "Default Pin to RCP boot"
+        default 8
+
+    config DEFAULT_PIN_TO_RCP_TX
+        int "Default Pin to RCP TX"
+        default 17
+
+    config DEFAULT_PIN_TO_RCP_RX
+        int "Default Pin to RCP RX"
+        default 18
+
 endmenu
