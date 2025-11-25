@@ -4,10 +4,19 @@ if("${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}" VERSION_GREATER_EQUAL "5.3")
 else()
     set (priv_requires "driver")
 endif()
+
+if(CONFIG_OPENTHREAD_ENABLED AND CONFIG_AUTO_UPDATE_RCP)
+    list(APPEND srcs "src/esp_ot_rcp_update.c")
+endif()
+
 idf_component_register(SRC_DIRS src
                        INCLUDE_DIRS include
                        REQUIRES esp-serial-flasher nvs_flash
                        PRIV_REQUIRES ${priv_requires})
+
+if(CONFIG_OPENTHREAD_ENABLED)
+    idf_component_optional_requires(PRIVATE openthread)
+endif()
 
 idf_build_get_property(python PYTHON)
 if(CONFIG_AUTO_UPDATE_RCP)
