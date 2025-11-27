@@ -4,7 +4,7 @@ CONFIG_IDF_TARGET="esp32s3"
 #
 # Serial flasher config
 #
-CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
 # end of Serial flasher config
 
 #
