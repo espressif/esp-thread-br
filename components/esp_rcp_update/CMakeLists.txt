@@ -5,11 +5,14 @@ else()
     set (priv_requires "driver")
 endif()
 
-if(CONFIG_OPENTHREAD_ENABLED AND CONFIG_AUTO_UPDATE_RCP)
-    list(APPEND srcs "src/esp_ot_rcp_update.c")
+set(exclude_srcs "")
+
+if(NOT CONFIG_OPENTHREAD_ENABLED OR NOT CONFIG_AUTO_UPDATE_RCP)
+    list(APPEND exclude_srcs "src/esp_ot_rcp_update.c")
 endif()
 
 idf_component_register(SRC_DIRS src
+                       EXCLUDE_SRCS ${exclude_srcs}
                        INCLUDE_DIRS include
                        REQUIRES esp-serial-flasher nvs_flash
                        PRIV_REQUIRES ${priv_requires})
