@@ -73,11 +73,9 @@ static void wifi_config_wifi_event_handler(void *arg, esp_event_base_t event_bas
 // DNS Server implementation
 static esp_err_t wifi_config_dns_server_start(void)
 {
+    esp_err_t ret = ESP_OK;
     s_dns_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (s_dns_socket < 0) {
-        ESP_LOGE(WIFI_CONFIG_TAG, "Failed to create DNS socket");
-        return ESP_FAIL;
-    }
+    ESP_GOTO_ON_FALSE(s_dns_socket >= 0, ESP_FAIL, exit, WIFI_CONFIG_TAG, "Failed to create DNS socket");
 
     // Set socket to reuse address
     int opt = 1;
@@ -93,39 +91,43 @@ static esp_err_t wifi_config_dns_server_start(void)
     server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     server_addr.sin_port = htons(DNS_PORT);
 
-    if (bind(s_dns_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-        ESP_LOGE(WIFI_CONFIG_TAG, "Failed to bind DNS port %d", DNS_PORT);
-        close(s_dns_socket);
-        s_dns_socket = -1;
-        return ESP_FAIL;
-    }
+    ESP_GOTO_ON_FALSE(bind(s_dns_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) >= 0, ESP_FAIL, exit,
+                      WIFI_CONFIG_TAG, "Failed to bind DNS port %d", DNS_PORT);
 
     // Create semaphore for task synchronization
     s_dns_task_semaphore = xSemaphoreCreateBinary();
-    if (!s_dns_task_semaphore) {
-        ESP_LOGE(WIFI_CONFIG_TAG, "Failed to create DNS task semaphore");
-        close(s_dns_socket);
-        s_dns_socket = -1;
-        return ESP_ERR_NO_MEM;
-    }
+    ESP_GOTO_ON_FALSE(s_dns_task_semaphore != NULL, ESP_ERR_NO_MEM, exit, WIFI_CONFIG_TAG,
+                      "Failed to create DNS task semaphore");
+    ESP_GOTO_ON_FALSE(xTaskCreate(wifi_config_dns_server_task, "dns_server", 4096, NULL, 5, &s_dns_task_handle) ==
+                          pdPASS,
+                      ESP_ERR_NO_MEM, exit, WIFI_CONFIG_TAG, "Failed to create DNS server task");
 
-    if (xTaskCreate(wifi_config_dns_server_task, "dns_server", 4096, NULL, 5, &s_dns_task_handle) != pdPASS) {
-        ESP_LOGE(WIFI_CONFIG_TAG, "Failed to create DNS server task");
-        vSemaphoreDelete(s_dns_task_semaphore);
-        s_dns_task_semaphore = NULL;
-        close(s_dns_socket);
-        s_dns_socket = -1;
-        return ESP_ERR_NO_MEM;
-    }
     ESP_LOGI(WIFI_CONFIG_TAG, "DNS server started");
     return ESP_OK;
+
+exit:
+    if (s_dns_task_semaphore) {
+        vSemaphoreDelete(s_dns_task_semaphore);
+        s_dns_task_semaphore = NULL;
+    }
+    if (s_dns_socket >= 0) {
+        close(s_dns_socket);
+        s_dns_socket = -1;
+    }
+    return ret;
 }
 
 static void wifi_config_dns_server_stop(void)
 {
+    // Close socket first to signal task to exit
+    if (s_dns_socket >= 0) {
+        close(s_dns_socket);
+        s_dns_socket = -1;
+    }
+
     if (s_dns_task_handle && s_dns_task_semaphore) {
         TaskHandle_t task_handle = s_dns_task_handle;
-        // Wait for task to signal completion via semaphore
+        // Wait for task to signal completion via semaphore (task will exit when it detects socket is closed)
         if (xSemaphoreTake(s_dns_task_semaphore, pdMS_TO_TICKS(1000)) != pdTRUE) {
             // Timeout: task didn't exit in time, force delete
             ESP_LOGW(WIFI_CONFIG_TAG, "DNS task did not exit in time, forcing deletion");
@@ -142,10 +144,6 @@ static void wifi_config_dns_server_stop(void)
         s_dns_task_semaphore = NULL;
     }
 
-    if (s_dns_socket >= 0) {
-        close(s_dns_socket);
-        s_dns_socket = -1;
-    }
     ESP_LOGI(WIFI_CONFIG_TAG, "DNS server stopped");
 }
 
@@ -218,10 +216,7 @@ static esp_err_t wifi_config_start_softap(void)
 
     // Create AP netif
     s_ap_netif = esp_netif_create_default_wifi_ap();
-    if (!s_ap_netif) {
-        ESP_LOGE(WIFI_CONFIG_TAG, "Failed to create AP netif");
-        return ESP_FAIL;
-    }
+    ESP_RETURN_ON_FALSE(s_ap_netif != NULL, ESP_FAIL, WIFI_CONFIG_TAG, "Failed to create AP netif");
 
     // Set AP IP address to 192.168.4.1
     esp_netif_ip_info_t ip_info;
@@ -254,10 +249,8 @@ static esp_err_t wifi_config_start_softap(void)
     // Initialize WiFi if not already initialized
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ret = esp_wifi_init(&cfg);
-    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
-        ESP_LOGE(WIFI_CONFIG_TAG, "Failed to initialize WiFi: %s", esp_err_to_name(ret));
-        return ret;
-    }
+    ESP_RETURN_ON_FALSE(ret == ESP_OK || ret == ESP_ERR_INVALID_STATE, ret, WIFI_CONFIG_TAG,
+                        "Failed to initialize WiFi: %s", esp_err_to_name(ret));
 
     // Register event handlers
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_config_wifi_event_handler,
@@ -335,6 +328,8 @@ static void wifi_config_wifi_event_handler(void *arg, esp_event_base_t event_bas
             s_ap_records = malloc(sizeof(wifi_ap_record_t) * s_ap_count);
             if (s_ap_records) {
                 esp_wifi_scan_get_ap_records(&s_ap_count, s_ap_records);
+            } else {
+                ESP_LOGE(WIFI_CONFIG_TAG, "Failed to allocate memory for AP records");
             }
         }
 
@@ -393,17 +388,17 @@ static esp_err_t wifi_config_scan_handler(httpd_req_t *req)
         ESP_LOGE(WIFI_CONFIG_TAG, "Failed to start scan: %s", esp_err_to_name(ret));
         httpd_resp_set_status(req, "500 Internal Server Error");
         httpd_resp_send(req, "{\"error\":\"Failed to start scan\"}", HTTPD_RESP_USE_STRLEN);
-        return ESP_FAIL;
+        return ret;
     }
 
     // Wait for scan to complete using event group (max 10 seconds)
     EventBits_t bits =
         xEventGroupWaitBits(s_wifi_event_group, WIFI_SCAN_DONE_BIT, pdTRUE, pdFALSE, pdMS_TO_TICKS(10000));
     if (!(bits & WIFI_SCAN_DONE_BIT)) {
-        ESP_LOGW(WIFI_CONFIG_TAG, "Scan timeout after 5 seconds");
+        ESP_LOGW(WIFI_CONFIG_TAG, "Scan timeout after 10 seconds");
         httpd_resp_set_status(req, "500 Internal Server Error");
         httpd_resp_send(req, "{\"error\":\"Scan timeout\"}", HTTPD_RESP_USE_STRLEN);
-        return ESP_FAIL;
+        return ESP_ERR_TIMEOUT;
     }
 
     cJSON *root = cJSON_CreateObject();
@@ -421,6 +416,7 @@ static esp_err_t wifi_config_scan_handler(httpd_req_t *req)
     cJSON_AddItemToObject(root, "aps", aps);
 
     char *json_str = cJSON_Print(root);
+
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, json_str, strlen(json_str));
 
@@ -436,13 +432,13 @@ static esp_err_t wifi_config_submit_handler(httpd_req_t *req)
 
     if (buf_len > 1024) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Payload too large");
-        return ESP_FAIL;
+        return ESP_ERR_INVALID_ARG;
     }
 
     buf = malloc(buf_len + 1);
     if (!buf) {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to allocate memory");
-        return ESP_FAIL;
+        return ESP_ERR_NO_MEM;
     }
 
     int recv_len = httpd_req_recv(req, buf, buf_len);
@@ -450,10 +446,11 @@ static esp_err_t wifi_config_submit_handler(httpd_req_t *req)
         free(buf);
         if (recv_len == HTTPD_SOCK_ERR_TIMEOUT) {
             httpd_resp_send_408(req);
+            return ESP_ERR_TIMEOUT;
         } else {
             httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Failed to receive request");
+            return ESP_FAIL;
         }
-        return ESP_FAIL;
     }
     buf[recv_len] = '\0';
 
@@ -463,7 +460,7 @@ static esp_err_t wifi_config_submit_handler(httpd_req_t *req)
     buf = NULL;
     if (!json) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
-        return ESP_FAIL;
+        return ESP_ERR_INVALID_ARG;
     }
 
     cJSON *ssid_item = cJSON_GetObjectItemCaseSensitive(json, "ssid");
@@ -585,49 +582,38 @@ static void wifi_config_stop_webserver(void)
 
 esp_err_t esp_br_wifi_config_start(void)
 {
-    if (s_wifi_config_mode) {
-        ESP_LOGW(WIFI_CONFIG_TAG, "WiFi config mode already started");
-        return ESP_OK;
-    }
+    ESP_RETURN_ON_FALSE(!s_wifi_config_mode, ESP_OK, WIFI_CONFIG_TAG, "WiFi config mode already started");
+
+    esp_err_t ret = ESP_OK;
 
     // Create event group (for WiFi connection status if needed)
     if (!s_wifi_event_group) {
         s_wifi_event_group = xEventGroupCreate();
-        if (!s_wifi_event_group) {
-            ESP_LOGE(WIFI_CONFIG_TAG, "Failed to create event group");
-            return ESP_ERR_NO_MEM;
-        }
+        ESP_GOTO_ON_FALSE(s_wifi_event_group != NULL, ESP_ERR_NO_MEM, cleanup, WIFI_CONFIG_TAG,
+                          "Failed to create event group");
     }
 
     // Start SoftAP
-    esp_err_t ret = wifi_config_start_softap();
-    if (ret != ESP_OK) {
-        ESP_LOGE(WIFI_CONFIG_TAG, "Failed to start SoftAP");
-        if (s_wifi_event_group) {
-            vEventGroupDelete(s_wifi_event_group);
-            s_wifi_event_group = NULL;
-        }
-        return ret;
-    }
+    ESP_GOTO_ON_ERROR(wifi_config_start_softap(), cleanup, WIFI_CONFIG_TAG, "Failed to start SoftAP");
 
     // Start Web server
-    ret = wifi_config_start_webserver();
-    if (ret != ESP_OK) {
-        ESP_LOGE(WIFI_CONFIG_TAG, "Failed to start Web server");
-        // Rollback: stop SoftAP
-        wifi_config_stop_softap();
-        if (s_wifi_event_group) {
-            vEventGroupDelete(s_wifi_event_group);
-            s_wifi_event_group = NULL;
-        }
-        return ret;
-    }
+    ESP_GOTO_ON_ERROR(wifi_config_start_webserver(), cleanup_softap, WIFI_CONFIG_TAG, "Failed to start Web server");
 
     s_wifi_config_mode = true;
     ESP_LOGI(WIFI_CONFIG_TAG, "WiFi configuration mode started");
     ESP_LOGI(WIFI_CONFIG_TAG, "Access web interface at: http://192.168.4.1");
 
     return ESP_OK;
+
+cleanup_softap:
+    wifi_config_stop_softap();
+
+cleanup:
+    if (s_wifi_event_group) {
+        vEventGroupDelete(s_wifi_event_group);
+        s_wifi_event_group = NULL;
+    }
+    return ret;
 }
 
 esp_err_t esp_br_wifi_config_stop(void)

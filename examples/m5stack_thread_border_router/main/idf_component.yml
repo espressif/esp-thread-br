@@ -18,6 +18,7 @@ dependencies:
   espressif/m5stack_core_s3:
     version: "^1.1.0"
   lvgl/lvgl: "==8.4.0"
+  qrcode: "^0.1.0"
 
   ## Required IDF version
   idf:
