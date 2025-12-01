@@ -26,6 +26,9 @@
 #include "esp_vfs_eventfd.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#if CONFIG_OPENTHREAD_BR_SOFTAP_SETUP
+#include "esp_br_wifi_config.h"
+#endif
 #include "openthread/backbone_router_ftd.h"
 #include "openthread/border_router.h"
 #include "openthread/cli.h"
@@ -48,56 +51,116 @@
 #include "protocol_examples_common.h"
 #endif
 
+#if !CONFIG_EXAMPLE_CONNECT_WIFI && !CONFIG_EXAMPLE_CONNECT_ETHERNET
+#error No backbone netif!
+#endif
+
 #define TAG "esp_ot_br"
 
 static esp_openthread_platform_config_t s_openthread_platform_config;
 
+#if CONFIG_EXAMPLE_CONNECT_WIFI && CONFIG_OPENTHREAD_BR_AUTO_START
+/**
+ * @brief Save Wi-Fi configuration to NVS and connect
+ *
+ * @param ssid Wi-Fi SSID
+ * @param password Wi-Fi password (can be NULL for open network)
+ * @return true if connection successful, false otherwise
+ */
+static bool wifi_config_save_and_connect(const char *ssid, const char *password)
+{
+    if (esp_ot_wifi_connect(ssid, password) == ESP_OK) {
+        ESP_LOGI(TAG, "Connected to Wi-Fi: %s", ssid);
+
+        // Save to NVS
+        if (esp_ot_wifi_config_set_ssid(ssid) != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to save Wi-Fi SSID to NVS");
+            return false;
+        }
+
+        if (password && strlen(password) > 0) {
+            if (esp_ot_wifi_config_set_password(password) != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to save Wi-Fi password to NVS");
+                return false;
+            }
+        } else {
+            // Clear password for open network
+            if (esp_ot_wifi_config_set_password("") != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to clear Wi-Fi password in NVS");
+                return false;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+#endif
+
+#if CONFIG_OPENTHREAD_BR_AUTO_START
 static void ot_br_init(void *ctx)
 {
-#if CONFIG_OPENTHREAD_BR_AUTO_START
-#if CONFIG_EXAMPLE_CONNECT_WIFI || CONFIG_EXAMPLE_CONNECT_ETHERNET
-    bool wifi_or_ethernet_connected = false;
-#else
-#error No backbone netif!
-#endif
 #if CONFIG_EXAMPLE_CONNECT_WIFI
+    // Wi-Fi connection mode - two ways to get Wi-Fi parameters:
+    // 1. CONFIG_OPENTHREAD_BR_SOFTAP_SETUP: via SoftAP Web interface
+    // 2. CONFIG_EXAMPLE_WIFI_SSID: from Kconfig
     char wifi_ssid[32] = "";
     char wifi_password[64] = "";
+    bool has_nvs_wifi_config = false;
+
+    // Check if Wi-Fi configuration exists in NVS
     if (esp_ot_wifi_config_get_ssid(wifi_ssid) == ESP_OK) {
-        ESP_LOGI(TAG, "use the Wi-Fi config from NVS");
         esp_ot_wifi_config_get_password(wifi_password);
-    } else {
-        ESP_LOGI(TAG, "use the Wi-Fi config from Kconfig");
-        strcpy(wifi_ssid, CONFIG_EXAMPLE_WIFI_SSID);
-        strcpy(wifi_password, CONFIG_EXAMPLE_WIFI_PASSWORD);
+        has_nvs_wifi_config = true;
     }
-    if (esp_ot_wifi_connect(wifi_ssid, wifi_password) == ESP_OK) {
-        wifi_or_ethernet_connected = true;
+
+    if (has_nvs_wifi_config && esp_ot_wifi_connect(wifi_ssid, wifi_password) == ESP_OK) {
+        ESP_LOGI(TAG, "Connected to Wi-Fi: %s", wifi_ssid);
     } else {
-        ESP_LOGE(TAG, "Fail to connect to Wi-Fi, please try again manually");
-    }
+#if CONFIG_OPENTHREAD_BR_SOFTAP_SETUP
+        // SoftAP Wi-Fi configuration mode
+        esp_br_wifi_config_start();
+
+        // Wait for user to configure Wi-Fi via web interface (wait forever)
+        esp_br_wifi_config_get_configured_wifi(wifi_ssid, sizeof(wifi_ssid), wifi_password, sizeof(wifi_password), 0);
+
+        // Stop SoftAP mode
+        esp_br_wifi_config_stop();
+#else
+        // Standard Wi-Fi connection mode - get from Kconfig
+        strncpy(wifi_ssid, CONFIG_EXAMPLE_WIFI_SSID, sizeof(wifi_ssid) - 1);
+        wifi_ssid[sizeof(wifi_ssid) - 1] = '\0';
+        strncpy(wifi_password, CONFIG_EXAMPLE_WIFI_PASSWORD, sizeof(wifi_password) - 1);
+        wifi_password[sizeof(wifi_password) - 1] = '\0';
 #endif
-#if CONFIG_EXAMPLE_CONNECT_ETHERNET
+
+        // Connect to Wi-Fi and save to NVS
+        if (!wifi_config_save_and_connect(wifi_ssid, wifi_password)) {
+            // In auto-start mode, Wi-Fi must be configured and connected before initializing the OpenThread stack
+            ESP_LOGE(TAG, "Failed to connect to Wi-Fi: %s", wifi_ssid);
+            ESP_LOGE(TAG, "Rebooting ... to try again");
+            esp_restart();
+        }
+    }
+#elif CONFIG_EXAMPLE_CONNECT_ETHERNET
+    // Ethernet connection mode
     ESP_ERROR_CHECK(example_ethernet_connect());
-    wifi_or_ethernet_connected = true;
-#endif
-    if (wifi_or_ethernet_connected) {
-        esp_openthread_lock_acquire(portMAX_DELAY);
-        esp_openthread_set_backbone_netif(get_example_netif());
-        ESP_ERROR_CHECK(esp_openthread_border_router_init());
+#endif // CONFIG_EXAMPLE_CONNECT_WIFI || CONFIG_EXAMPLE_CONNECT_ETHERNET
+
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    esp_openthread_set_backbone_netif(get_example_netif());
+    ESP_ERROR_CHECK(esp_openthread_border_router_init());
 #if CONFIG_EXAMPLE_CONNECT_WIFI
-        esp_ot_wifi_border_router_init_flag_set(true);
+    esp_ot_wifi_border_router_init_flag_set(true);
 #endif
-        otOperationalDatasetTlvs dataset;
-        otError error = otDatasetGetActiveTlvs(esp_openthread_get_instance(), &dataset);
-        ESP_ERROR_CHECK(esp_openthread_auto_start((error == OT_ERROR_NONE) ? &dataset : NULL));
-        esp_openthread_lock_release();
-    } else {
-        ESP_LOGE(TAG, "Auto-start mode failed, please try to start manually");
-    }
-#endif // CONFIG_OPENTHREAD_BR_AUTO_START
+
+    otOperationalDatasetTlvs dataset;
+    otError error = otDatasetGetActiveTlvs(esp_openthread_get_instance(), &dataset);
+    ESP_ERROR_CHECK(esp_openthread_auto_start((error == OT_ERROR_NONE) ? &dataset : NULL));
+    esp_openthread_lock_release();
+
     vTaskDelete(NULL);
 }
+#endif // CONFIG_OPENTHREAD_BR_AUTO_START
 
 static void ot_task_worker(void *ctx)
 {
@@ -125,7 +188,10 @@ static void ot_task_worker(void *ctx)
     esp_openthread_cli_create_task();
     esp_openthread_lock_release();
 
+#if CONFIG_OPENTHREAD_BR_AUTO_START
     xTaskCreate(ot_br_init, "ot_br_init", 6144, NULL, 4, NULL);
+#endif
+
     // Run the main loop
     esp_openthread_launch_mainloop();
 

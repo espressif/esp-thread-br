@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>M5Stack Thread Border Router - Wi-Fi Configuration</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <style type="text/css">
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #fff5e6;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(255, 140, 0, 0.2);
+        }
+
+        h1 {
+            color: #ff8c00;
+            margin-top: 0;
+            margin-bottom: 5px;
+            text-align: center;
+            font-size: 18px;
+        }
+
+        h2 {
+            color: #ff8c00;
+            margin-top: 0;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: normal;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #ff8c00;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #ff8c00;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background-color: #ff7700;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .message {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .info {
+            color: #666;
+            font-size: 14px;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .scan-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+        }
+
+        .scan-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .scan-button {
+            padding: 8px 16px;
+            background-color: #ff8c00;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .scan-button:hover {
+            background-color: #ff7700;
+        }
+
+        .scan-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .scan-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .scan-item:hover {
+            background-color: #fff5e6;
+        }
+
+        .scan-item:last-child {
+            border-bottom: none;
+        }
+
+        .scan-ssid {
+            font-weight: bold;
+            flex: 1;
+        }
+
+        .scan-rssi {
+            color: #666;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        .scan-lock {
+            color: #dc3545;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>M5Stack Thread Border Router</h1>
+        <h2>Wi-Fi Configuration</h2>
+        <form id="wifiForm">
+            <div class="form-group">
+                <label for="ssid">Wi-Fi SSID:</label>
+                <input type="text" id="ssid" name="ssid" required autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" autocomplete="off">
+            </div>
+            <button type="submit" id="submitBtn">Save Wi-Fi Configuration</button>
+            <div id="message" class="message"></div>
+        </form>
+        <div class="info">
+            The device will connect to the configured Wi-Fi network after saving.
+        </div>
+        <div class="scan-section">
+            <div class="scan-header">
+                <label>Available Networks:</label>
+                <button type="button" class="scan-button" id="scanBtn">Scan</button>
+            </div>
+            <div class="scan-list" id="scanList">
+                <div style="padding: 20px; text-align: center; color: #666;">Click "Scan" to search for networks</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('wifiForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const ssid = document.getElementById('ssid').value.trim();
+            const password = document.getElementById('password').value;
+            const submitBtn = document.getElementById('submitBtn');
+            const messageDiv = document.getElementById('message');
+
+            if (!ssid) {
+                showMessage('Please enter Wi-Fi SSID', 'error');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+            messageDiv.style.display = 'none';
+
+            try {
+                const response = await fetch('/submit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        ssid: ssid,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showMessage('Configuration saved! Device is connecting to Wi-Fi...', 'success');
+                    submitBtn.textContent = 'Connecting...';
+                } else {
+                    showMessage('Error: ' + (data.error || 'Failed to save configuration'), 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Save Wi-Fi Configuration';
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Wi-Fi Configuration';
+            }
+        });
+
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.className = 'message ' + type;
+            messageDiv.style.display = 'block';
+        }
+
+        // Scan for Wi-Fi networks
+        async function scanNetworks() {
+            const scanBtn = document.getElementById('scanBtn');
+            const scanList = document.getElementById('scanList');
+
+            scanBtn.disabled = true;
+            scanBtn.textContent = 'Scanning...';
+            scanList.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">Scanning...</div>';
+
+            try {
+                const response = await fetch('/scan');
+                const data = await response.json();
+
+                if (data.aps && data.aps.length > 0) {
+                    scanList.innerHTML = '';
+                    // Sort by RSSI (strongest first)
+                    data.aps.sort((a, b) => b.rssi - a.rssi);
+
+                    data.aps.forEach(ap => {
+                        const item = document.createElement('div');
+                        item.className = 'scan-item';
+                        item.onclick = () => {
+                            document.getElementById('ssid').value = ap.ssid;
+                            document.getElementById('password').focus();
+                        };
+
+                        const ssid = document.createElement('span');
+                        ssid.className = 'scan-ssid';
+                        ssid.textContent = ap.ssid || '(Hidden)';
+
+                        const info = document.createElement('span');
+                        info.style.display = 'flex';
+                        info.style.alignItems = 'center';
+
+                        const rssi = document.createElement('span');
+                        rssi.className = 'scan-rssi';
+                        rssi.textContent = ap.rssi + ' dBm';
+
+                        if (ap.authmode !== 0) {
+                            const lock = document.createElement('span');
+                            lock.className = 'scan-lock';
+                            lock.textContent = '🔒';
+                            info.appendChild(lock);
+                        }
+
+                        info.appendChild(rssi);
+                        item.appendChild(ssid);
+                        item.appendChild(info);
+                        scanList.appendChild(item);
+                    });
+                } else {
+                    scanList.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">No networks found</div>';
+                }
+            } catch (error) {
+                scanList.innerHTML = '<div style="padding: 20px; text-align: center; color: #dc3545;">Error: ' + error.message + '</div>';
+            }
+
+            scanBtn.disabled = false;
+            scanBtn.textContent = 'Scan';
+        }
+
+        // Auto-scan on page load
+        document.addEventListener('DOMContentLoaded', function () {
+            scanNetworks();
+        });
+
+        // Manual scan button
+        document.getElementById('scanBtn').addEventListener('click', scanNetworks);
+    </script>
+</body>
+
+</html>
