@@ -13,5 +13,5 @@
    web-gui
    trel
    home_assistant
-
+   dhcpv6_pd
 
