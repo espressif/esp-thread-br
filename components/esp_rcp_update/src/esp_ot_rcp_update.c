@@ -26,7 +26,7 @@ void esp_ot_try_update_rcp(const char *running_rcp_version)
 {
     char internal_rcp_version[ESP_RCP_VERSION_MAX_SIZE];
     if (running_rcp_version) {
-        ESP_LOGI(TAG, "Running  RCP Version: %s", running_rcp_version);
+        ESP_LOGI(TAG, "Running RCP Version: %s", running_rcp_version);
     }
     if (esp_rcp_load_version_in_storage(internal_rcp_version, sizeof(internal_rcp_version)) == ESP_OK) {
         ESP_LOGI(TAG, "Internal RCP Version: %s", internal_rcp_version);
