@@ -17,6 +17,8 @@ dependencies:
     path: ${IDF_PATH}/examples/common_components/protocol_examples_common
   espressif/m5stack_core_s3:
     version: "^1.1.0"
+  espressif/esp_lcd_touch:
+    version: "~1.1.0"
   lvgl/lvgl: "==8.4.0"
   qrcode: "^0.1.0"
 
