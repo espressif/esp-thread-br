@@ -40,6 +40,9 @@ void esp_ot_try_update_rcp(const char *running_rcp_version);
  * @note The registered handlers rely on esp_rcp_update_init, and therefore
  *       esp_rcp_update_init must be called before any handler is triggered.
  *       However, the registration itself does not require a specific call order.
+ *       This helper installs a set of default error handlers and requires no
+ *       user parameters. For custom behavior, skip this helper and register
+ *       your own handlers via the lower-level APIs instead.
  */
 void esp_ot_register_rcp_handler(void);
 
@@ -47,7 +50,9 @@ void esp_ot_register_rcp_handler(void);
  * @brief Triggers an RCP update if the running RCP version does not match
  *        the version stored in flash.
  *
- * @note This function must be called after esp_rcp_update_init.
+ * @note This function must be called after esp_rcp_update_init, which prepares
+ *       the update flow, and after esp_openthread_init, which ensures the
+ *       OpenThread stack and its RCP version API are available.
  */
 void esp_ot_update_rcp_if_different(void);
 
