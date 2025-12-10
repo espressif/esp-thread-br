@@ -1,4 +1,4 @@
-version: "1.5.4"
+version: "1.6.0"
 description: Espressif RCP Update Component for Thread Border Router and Zigbee Gateway
 url: https://github.com/espressif/esp-thread-br/tree/main/components/esp_rcp_update
 dependencies:
