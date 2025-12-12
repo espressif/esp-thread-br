@@ -7,31 +7,40 @@ To start running some of the examples available in this Codelab, the following r
 Hardware Requirements
 ---------------------
 
-The table below shows the device requirements for each example in this codelab:
+The table below shows the common device requirements for each example in this codelab:
 
-+-----------------------------------------------------------+-----------------------+--------+---------+---------------+
-| Devices required for example:                             | 3.1, 3.2, and 3.3     | 3.4    | 3.5     | 3.6           |
-+-----------------------------------------------------------+-----------------------+--------+---------+---------------+
-|                                                           | Bi-directional IPv6   | NAT64  | Web GUI | Thread Radio  |
-|                                                           |                       |        |         |               |
-|                                                           | Connectivity,         |        |         | Encapsulation |
-|                                                           |                       |        |         |               |
-|                                                           | Multicast Forwarding, |        |         | Link (TREL)   |
-|                                                           |                       |        |         |               |
-|                                                           | Service Discovery     |        |         |               |
-+===========================================================+=======================+========+=========+===============+
-| ESP Thread Border Router (BR)                             | Yes                   | Yes    | Yes     | Yes           |
-+-----------------------------------------------------------+-----------------------+--------+---------+---------------+
-| Thread CLI device (e.g. ESP32-H2)                         | Yes                   | Yes    | \-      | Yes           |
-+-----------------------------------------------------------+-----------------------+--------+---------+---------------+
-| Linux Host Machine                                        | Yes                   | \-     | Yes     | \-            |
-+-----------------------------------------------------------+-----------------------+--------+---------+---------------+
-| TREL enabled Wi-Fi device (e.g. ESP32-S3)                 | \-                    | \-     | \-      | Yes           |
-|                                                           |                       |        |         |               |
-| *\* does not need to have built-in 802.15.4 capabilities* |                       |        |         |               |
-+-----------------------------------------------------------+-----------------------+--------+---------+---------------+
++---------------------------------------------+--------------------+-------------------+--------------------+
+| Devices required for example:               | ESP Thread         | Thread CLI device | Linux Host Machine |
+|                                             |                    |                   |                    |
+|                                             | Border Router (BR) | (e.g. ESP32-H2)   |                    |
++=============================================+====================+===================+====================+
+| 3.1. Bi-directional IPv6 Connectivity       | Yes                | Yes               | Yes                |
++---------------------------------------------+--------------------+-------------------+--------------------+
+| 3.2. Multicast Forwarding                   | Yes                | Yes               | Yes                |
++---------------------------------------------+--------------------+-------------------+--------------------+
+| 3.3. Service Discovery                      | Yes                | Yes               | Yes                |
++---------------------------------------------+--------------------+-------------------+--------------------+
+| 3.4. NAT64                                  | Yes                | Yes               | \-                 |
++---------------------------------------------+--------------------+-------------------+--------------------+
+| 3.5. WEB GUI                                | Yes                | \-                | Yes                |
++---------------------------------------------+--------------------+-------------------+--------------------+
+| 3.6. Thread Radio Encapsulation Link (TREL) | Yes                | Yes               | \-                 |
++---------------------------------------------+--------------------+-------------------+--------------------+
+| 3.7. Home Assistant Integration             | Yes                | \-                | \-                 |
++---------------------------------------------+--------------------+-------------------+--------------------+
+| 3.8. DHCPv6 Prefix Delegation (PD)          | Yes                | Yes               | Yes                |
++---------------------------------------------+--------------------+-------------------+--------------------+
 
-In addition, access credentials for a 2.4GHz Wi-Fi network (SSID and password) are also required.
+Some examples will require specific additional devices as listed below:
+
+- 3.6. Thread Radio Encapsulation Link (TREL)
+    - TREL enabled Wi-Fi device (e.g. ESP32-S3) 
+      *\* does not need to have built-in 802.15.4 capabilities*
+- 3.7. Home Assistant Integration
+    - Home Assistant Hub
+    - Smartphone with Home Assistant App installed
+
+Finally, access credentials for a 2.4GHz Wi-Fi network (SSID and password) are also required.
 
 - Note: to run the ``curl http://www.espressif.com`` command in NAT64 example, this Wi-Fi network must be connected to the internet. 
 
