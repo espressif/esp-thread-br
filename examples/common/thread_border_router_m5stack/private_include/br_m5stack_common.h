@@ -18,8 +18,6 @@ extern "C" {
 #define BUTTON_DEFAULT_HEIGHT 60
 #define BUTTON_DEFAULT_WIDTH 120
 
-typedef void (*br_m5stack_kb_callback_t)(const char *, void *);
-
 typedef char br_m5stack_err_msg_t[128];
 
 #define BR_M5STACK_GOTO_ON_FALSE(x, goto_tag, msg, ...)             \
@@ -47,10 +45,6 @@ typedef char br_m5stack_err_msg_t[128];
 
 void br_m5stack_delete_page_from_button(lv_event_t *e);
 
-void br_m5stack_hidden_page_from_button(lv_event_t *e);
-
-void br_m5stack_display_page_from_button(lv_event_t *e);
-
 void br_m5stack_create_base(void);
 
 lv_obj_t *br_m5stack_create_button(lv_coord_t w, lv_coord_t h, lv_event_cb_t event_cb, lv_event_code_t filter,
@@ -66,8 +60,6 @@ void br_m5stack_add_esp_tiny_logo(lv_obj_t *page);
 lv_obj_t *br_m5stack_create_blank_page(lv_obj_t *parent);
 
 void br_m5stack_add_btn_to_page(lv_obj_t *page, lv_obj_t *btn, lv_align_t align, lv_coord_t x, lv_coord_t y);
-
-void br_m5stack_create_keyboard(lv_obj_t *page, br_m5stack_kb_callback_t callback, void *user_data, bool only_num);
 
 lv_obj_t *br_m5stack_create_warn(char *warning, uint32_t delay_ms);
 

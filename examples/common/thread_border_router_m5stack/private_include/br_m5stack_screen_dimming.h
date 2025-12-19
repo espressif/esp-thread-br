@@ -13,15 +13,15 @@
 extern "C" {
 #endif
 
-void br_m5stack_bsp_init(void);
+void setup_inactivity_monitor(void);
 
-void br_m5stack_display_init(void);
+void add_touch_event_handler(lv_obj_t *obj);
 
-void br_m5stack_create_ui(void);
+void set_main_page_reference(lv_obj_t *main_page);
 
-void br_m5stack_show_main_page(void);
+void enable_screen_dimming(void);
 
-lv_obj_t *br_m5stack_get_main_page(void);
+void disable_screen_dimming(void);
 
 #ifdef __cplusplus
 } /* extern "C" */
