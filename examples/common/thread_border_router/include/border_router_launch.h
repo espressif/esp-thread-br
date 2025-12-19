@@ -15,7 +15,7 @@ extern "C" {
 #include "esp_openthread_border_router.h"
 #include "esp_rcp_update.h"
 
-void launch_openthread_border_router(const esp_openthread_platform_config_t *config,
+void launch_openthread_border_router(const esp_openthread_config_t *config,
                                      const esp_rcp_update_config_t *update_config);
 
 #ifdef __cplusplus

@@ -16,10 +16,6 @@
 
 #include "esp_openthread_types.h"
 
-#if CONFIG_EXTERNAL_COEX_ENABLE
-#include "esp_coexist.h"
-#endif
-
 #define RCP_FIRMWARE_DIR "/spiffs/ot_rcp"
 
 #if CONFIG_OPENTHREAD_RADIO_SPINEL_UART
@@ -86,43 +82,12 @@
     }
 #endif
 
-#if CONFIG_OPENTHREAD_CONSOLE_TYPE_UART
-#error Console UART is not available on M5Stack. Use USB Serial JTAG for console output.
-#elif CONFIG_OPENTHREAD_CONSOLE_TYPE_USB_SERIAL_JTAG
-#define ESP_OPENTHREAD_DEFAULT_HOST_CONFIG()                        \
-    {                                                               \
-        .host_connection_mode = HOST_CONNECTION_MODE_CLI_USB,       \
-        .host_usb_config = USB_SERIAL_JTAG_DRIVER_CONFIG_DEFAULT(), \
+#define ESP_OPENTHREAD_DEFAULT_HOST_CONFIG()               \
+    {                                                      \
+        .host_connection_mode = HOST_CONNECTION_MODE_NONE, \
     }
-#endif
 
 #define ESP_OPENTHREAD_DEFAULT_PORT_CONFIG()                                            \
     {                                                                                   \
         .storage_partition_name = "nvs", .netif_queue_size = 10, .task_queue_size = 10, \
     }
-
-#if CONFIG_EXTERNAL_COEX_ENABLE
-#if CONFIG_EXTERNAL_COEX_WIRE_TYPE == EXTERNAL_COEXIST_WIRE_1
-#define ESP_OPENTHREAD_DEFAULT_EXTERNAL_COEX_CONFIG() \
-    {                                                 \
-        .request = CONFIG_EXTERNAL_COEX_REQUEST_PIN,  \
-    }
-#elif CONFIG_EXTERNAL_COEX_WIRE_TYPE == EXTERNAL_COEXIST_WIRE_2
-#define ESP_OPENTHREAD_DEFAULT_EXTERNAL_COEX_CONFIG()                                         \
-    {                                                                                         \
-        .request = CONFIG_EXTERNAL_COEX_REQUEST_PIN, .grant = CONFIG_EXTERNAL_COEX_GRANT_PIN, \
-    }
-#elif CONFIG_EXTERNAL_COEX_WIRE_TYPE == EXTERNAL_COEXIST_WIRE_3
-#define ESP_OPENTHREAD_DEFAULT_EXTERNAL_COEX_CONFIG()                                               \
-    {                                                                                               \
-        .request = CONFIG_EXTERNAL_COEX_REQUEST_PIN, .priority = CONFIG_EXTERNAL_COEX_PRIORITY_PIN, \
-        .grant = CONFIG_EXTERNAL_COEX_GRANT_PIN,                                                    \
-    }
-#elif CONFIG_EXTERNAL_COEX_WIRE_TYPE == EXTERNAL_COEXIST_WIRE_4
-#define ESP_OPENTHREAD_DEFAULT_EXTERNAL_COEX_CONFIG()                                               \
-    {                                                                                               \
-        .request = CONFIG_EXTERNAL_COEX_REQUEST_PIN, .priority = CONFIG_EXTERNAL_COEX_PRIORITY_PIN, \
-        .grant = CONFIG_EXTERNAL_COEX_GRANT_PIN, .tx_line = CONFIG_EXTERNAL_COEX_TX_LINE_PIN,       \
-    }
-#endif
-#endif // CONFIG_EXTERNAL_COEX_ENABLE

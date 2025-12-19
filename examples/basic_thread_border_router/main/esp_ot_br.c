@@ -15,6 +15,7 @@
 #include "esp_netif.h"
 #include "esp_openthread.h"
 #include "esp_openthread_border_router.h"
+#include "esp_openthread_netif_glue.h"
 #include "esp_openthread_types.h"
 #include "esp_ot_config.h"
 #include "esp_ot_ota_commands.h"
@@ -28,10 +29,6 @@
 
 #include "border_router_launch.h"
 #include "esp_br_web.h"
-
-#if CONFIG_EXTERNAL_COEX_ENABLE
-#include "esp_coexist.h"
-#endif
 
 #define TAG "esp_ot_br"
 
@@ -55,15 +52,6 @@ static esp_err_t init_spiffs(void)
     return ESP_OK;
 }
 
-#if CONFIG_EXTERNAL_COEX_ENABLE
-static void ot_br_external_coexist_init(void)
-{
-    esp_external_coex_gpio_set_t gpio_pin = ESP_OPENTHREAD_DEFAULT_EXTERNAL_COEX_CONFIG();
-    esp_external_coex_set_work_mode(EXTERNAL_COEX_LEADER_ROLE);
-    ESP_ERROR_CHECK(esp_enable_extern_coex_gpio_pin(CONFIG_EXTERNAL_COEX_WIRE_TYPE, gpio_pin));
-}
-#endif /* CONFIG_EXTERNAL_COEX_ENABLE */
-
 void app_main(void)
 {
     // Used eventfds:
@@ -84,10 +72,14 @@ void app_main(void)
         .max_fds = max_eventfd,
     };
 
-    esp_openthread_platform_config_t platform_config = {
-        .radio_config = ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG(),
-        .host_config = ESP_OPENTHREAD_DEFAULT_HOST_CONFIG(),
-        .port_config = ESP_OPENTHREAD_DEFAULT_PORT_CONFIG(),
+    esp_openthread_config_t openthread_config = {
+        .netif_config = ESP_NETIF_DEFAULT_OPENTHREAD(),
+        .platform_config =
+            {
+                .radio_config = ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG(),
+                .host_config = ESP_OPENTHREAD_DEFAULT_HOST_CONFIG(),
+                .port_config = ESP_OPENTHREAD_DEFAULT_PORT_CONFIG(),
+            },
     };
     esp_rcp_update_config_t rcp_update_config = ESP_OPENTHREAD_RCP_UPDATE_CONFIG();
     ESP_ERROR_CHECK(esp_vfs_eventfd_register(&eventfd_config));
@@ -102,10 +94,6 @@ void app_main(void)
 #error Currently we do not support a manual way to connect ETH, if you want to use ETH, please enable OPENTHREAD_BR_AUTO_START.
 #endif
 
-#if CONFIG_EXTERNAL_COEX_ENABLE
-    ot_br_external_coexist_init();
-#endif // CONFIG_EXTERNAL_COEX_ENABLE
-
     ESP_ERROR_CHECK(mdns_init());
     ESP_ERROR_CHECK(mdns_hostname_set("esp-ot-br"));
 #if CONFIG_OPENTHREAD_CLI_OTA
@@ -116,5 +104,5 @@ void app_main(void)
     esp_br_web_start("/spiffs");
 #endif
 
-    launch_openthread_border_router(&platform_config, &rcp_update_config);
+    launch_openthread_border_router(&openthread_config, &rcp_update_config);
 }

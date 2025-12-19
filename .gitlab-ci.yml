@@ -12,7 +12,7 @@ variables:
     CI_DOCKER_REGISTRY: "ciregistry.espressif.cn:8443"
     ESP_THREAD_BR_PATH: "$CI_PROJECT_DIR"
     CI_TOOLS_PATH: "$CI_PROJECT_DIR/tools/ci"
-    ESP_ENV_IMAGE: "$CI_DOCKER_REGISTRY/esp-env-v6.0:2"
+    ESP_ENV_IMAGE: "$CI_DOCKER_REGISTRY/esp-env-v6.1:1"
     ESP_IDF_HTTP: "https://gitlab-ci-token:${CI_JOB_TOKEN}@${ESP_GITLAB}/espressif/esp-idf.git"
 
 .submodule_update: &submodule_update
@@ -124,7 +124,7 @@ build_examples:
 
 build_examples_m5stack:
     stage: build
-    image: espressif/idf:v5.4.2
+    image: espressif/idf:v5.5.2
     script:
         - *submodule_update
         - *build_m5stack_thread_border_router

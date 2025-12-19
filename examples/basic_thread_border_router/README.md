@@ -14,7 +14,7 @@ Please refer to [ESP Thread Border Router Hardware](../../README.md##Hardware-Pl
 
 Refer to [ESP-IDF Get Started](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/get-started/index.html).
 
-Currently, it is recommended to use ESP-IDF [v5.4.2](https://github.com/espressif/esp-idf/tree/v5.4.2) release.
+Currently, it is recommended to use ESP-IDF [v5.5.2](https://github.com/espressif/esp-idf/tree/v5.5.2) release.
 
 ### Configure the project
 
