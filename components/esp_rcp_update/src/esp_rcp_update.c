@@ -115,10 +115,7 @@ static esp_loader_error_t flash_binary(FILE *firmware, size_t size, size_t addre
 
     ESP_LOGI(TAG, "Erasing flash (this may take a while)...");
     err = esp_loader_flash_start(address, size, sizeof(payload));
-    if (err != ESP_LOADER_SUCCESS) {
-        ESP_LOGE(TAG, "Erasing flash failed with error %d.", err);
-        return err;
-    }
+    ESP_RETURN_ON_FALSE(err == ESP_LOADER_SUCCESS, err, TAG, "Failed to erase flash, error: %d", err);
     ESP_LOGI(TAG, "Start programming");
 
     size_t binary_size = size;
@@ -127,13 +124,12 @@ static esp_loader_error_t flash_binary(FILE *firmware, size_t size, size_t addre
     ESP_LOGI(TAG, "binary_size %u", binary_size);
     while (size > 0) {
         size_t to_read = size < sizeof(payload) ? size : sizeof(payload);
-        fread(payload, 1, to_read, firmware);
+        size_t bytes_read = fread(payload, 1, to_read, firmware);
+        ESP_RETURN_ON_FALSE(bytes_read == to_read, ESP_LOADER_ERROR_FAIL, TAG, "read failed, read: %d target: %d",
+                            bytes_read, to_read);
 
         err = esp_loader_flash_write(payload, to_read);
-        if (err != ESP_LOADER_SUCCESS) {
-            ESP_LOGE(TAG, "Packet could not be written! Error %d.", err);
-            return err;
-        }
+        ESP_RETURN_ON_FALSE(err == ESP_LOADER_SUCCESS, err, TAG, "Packet could not be written! Error %d", err);
 
         size -= to_read;
         written += to_read;
@@ -147,10 +143,7 @@ static esp_loader_error_t flash_binary(FILE *firmware, size_t size, size_t addre
     ESP_LOGI(TAG, "Finished programming");
 
     err = esp_loader_flash_verify();
-    if (err != ESP_LOADER_SUCCESS) {
-        ESP_LOGE(TAG, "MD5 does not match. err: %d", err);
-        return err;
-    }
+    ESP_RETURN_ON_FALSE(err == ESP_LOADER_SUCCESS, err, TAG, "MD5 does not match. err: %d", err);
     ESP_LOGI(TAG, "Flash verified");
 
     return ESP_LOADER_SUCCESS;

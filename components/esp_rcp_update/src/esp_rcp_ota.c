@@ -17,7 +17,7 @@
 #include <sys/queue.h>
 
 #define IMAGE_HEADER_MAX_LEN sizeof(esp_rcp_subfile_info_t) * MAX_SUBFILE_INFO
-#define OTA_MAX_WRITE_SIZE 16
+#define OTA_MAX_WRITE_SIZE (1024)
 
 typedef struct rcp_ota_entry_ {
     esp_rcp_ota_handle_t handle;
@@ -220,6 +220,7 @@ static esp_err_t receive_rcp_fw(const uint8_t *data, size_t size, rcp_ota_entry_
             entry->rcp_fp = NULL;
         }
         entry->state = ESP_RCP_OTA_STATE_FINISHED;
+        ESP_LOGI(TAG, "The rcp firmware downloading is finished");
     }
     return ESP_OK;
 }
