@@ -36,10 +36,8 @@
 #include "lwip/sockets.h"
 
 #define WIFI_CONFIG_TAG "wifi_config"
-#define WIFI_CONNECTED_BIT BIT0
-#define WIFI_FAIL_BIT BIT1
-#define WIFI_SCAN_DONE_BIT BIT2
-#define WIFI_CONFIGURED_BIT BIT3
+#define WIFI_SCAN_DONE_BIT BIT0
+#define WIFI_CONFIGURED_BIT BIT1
 #define DNS_PORT 53
 #define MAX_SSID_LEN 32
 #define MAX_PASSWORD_LEN 64
@@ -278,15 +276,13 @@ static void wifi_config_stop_softap(void)
         s_wifi_event_handler_instance = NULL;
     }
 
-    // Destroy AP netif before stopping WiFi
+    esp_wifi_stop();
+    esp_wifi_deinit();
+
     if (s_ap_netif) {
         esp_netif_destroy(s_ap_netif);
         s_ap_netif = NULL;
     }
-
-    // Stop WiFi - this will stop both AP and STA if in APSTA mode
-    // Note: We don't change mode here, just stop WiFi. The caller will set mode to STA if needed.
-    esp_wifi_stop();
 
     ESP_LOGI(WIFI_CONFIG_TAG, "SoftAP stopped");
 }
@@ -305,16 +301,6 @@ static void wifi_config_wifi_event_handler(void *arg, esp_event_base_t event_bas
         ESP_LOGI(WIFI_CONFIG_TAG, "Station " MACSTR " left, AID=%d", MAC2STR(event->mac), event->aid);
         break;
     }
-    case WIFI_EVENT_STA_CONNECTED:
-        if (s_wifi_event_group) {
-            xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-        }
-        break;
-    case WIFI_EVENT_STA_DISCONNECTED:
-        if (s_wifi_event_group) {
-            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
-        }
-        break;
     case WIFI_EVENT_SCAN_DONE: {
         wifi_event_sta_scan_done_t *event = (wifi_event_sta_scan_done_t *)event_data;
         ESP_LOGI(WIFI_CONFIG_TAG, "Scan done, number: %d", event->number);
@@ -622,6 +608,7 @@ esp_err_t esp_br_wifi_config_stop(void)
         return ESP_OK;
     }
 
+    esp_netif_dhcps_stop(s_ap_netif);
     wifi_config_stop_webserver();
     wifi_config_stop_softap();
 
@@ -639,10 +626,7 @@ esp_err_t esp_br_wifi_config_stop(void)
     // Clear configured WiFi info when stopping
     s_configured_ssid[0] = '\0';
     s_configured_password[0] = '\0';
-    // Clear configured bit when stopping
-    if (s_wifi_event_group) {
-        xEventGroupClearBits(s_wifi_event_group, WIFI_CONFIGURED_BIT);
-    }
+
     ESP_LOGI(WIFI_CONFIG_TAG, "WiFi configuration mode stopped");
     return ESP_OK;
 }

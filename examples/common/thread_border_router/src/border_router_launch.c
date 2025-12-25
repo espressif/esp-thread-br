@@ -13,6 +13,7 @@
 
 #include "esp_check.h"
 #include "esp_log.h"
+#include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_openthread.h"
 #include "esp_openthread_border_router.h"
@@ -155,7 +156,24 @@ static void ot_br_init(void *ctx)
 
     otOperationalDatasetTlvs dataset;
     otError error = otDatasetGetActiveTlvs(esp_openthread_get_instance(), &dataset);
-    ESP_ERROR_CHECK(esp_openthread_auto_start((error == OT_ERROR_NONE) ? &dataset : NULL));
+    if (error != OT_ERROR_NONE) {
+        // No existing dataset, create a random one
+        otOperationalDataset new_dataset;
+        error = otDatasetCreateNewNetwork(esp_openthread_get_instance(), &new_dataset);
+        assert(error == OT_ERROR_NONE);
+
+        // Set network name to ESP-BR-<MAC address>
+        uint8_t mac[6];
+        if (esp_read_mac(mac, ESP_MAC_BASE) == ESP_OK) {
+            char network_name[OT_NETWORK_NAME_MAX_SIZE + 1];
+            snprintf(network_name, sizeof(network_name), "ESP-BR-%02X%02X", mac[4], mac[5]);
+            memcpy(new_dataset.mNetworkName.m8, network_name, strlen(network_name) + 1);
+            new_dataset.mComponents.mIsNetworkNamePresent = true;
+        }
+        otDatasetConvertToTlvs(&new_dataset, &dataset);
+        ESP_LOGI(TAG, "Created new random Thread dataset");
+    }
+    ESP_ERROR_CHECK(esp_openthread_auto_start(&dataset));
     esp_openthread_lock_release();
 
     vTaskDelete(NULL);
