@@ -164,6 +164,7 @@ static esp_err_t download_ota_image(esp_http_client_config_t *config)
         ESP_GOTO_ON_FALSE(update_partition != NULL, ESP_ERR_NOT_FOUND, exit, TAG, "Failed to find ota partition");
         ESP_GOTO_ON_ERROR(esp_ota_begin(update_partition, OTA_WITH_SEQUENTIAL_WRITES, &host_ota_handle), exit, TAG,
                           "Failed to begin host OTA");
+        ESP_LOGI(TAG, "Start writing the border router firmware");
         if (br_fist_write_ptr && br_first_write_size > 0) {
             ESP_GOTO_ON_ERROR(esp_ota_write(host_ota_handle, br_fist_write_ptr, br_first_write_size), exit, TAG,
                               "Failed to write ota");
@@ -184,6 +185,7 @@ static esp_err_t download_ota_image(esp_http_client_config_t *config)
         ESP_GOTO_ON_ERROR(ret, exit, TAG, "Failed to end host OTA");
         ESP_GOTO_ON_ERROR(esp_ota_set_boot_partition(esp_ota_get_next_update_partition(NULL)), exit, TAG,
                           "Failed to set boot partition");
+        ESP_LOGI(TAG, "The border router firmware writing is finished");
     }
     ret = esp_rcp_ota_end(rcp_ota_handle);
     if (ret != ESP_OK) {
