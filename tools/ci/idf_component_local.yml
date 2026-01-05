@@ -13,6 +13,8 @@ dependencies:
     path: ${ESP_THREAD_BR_PATH}/examples/common/thread_border_router
   protocol_examples_common:
     path: ${IDF_PATH}/examples/common_components/protocol_examples_common
+  ot_examples_common:
+    path: ${IDF_PATH}/examples/openthread/ot_common_components/ot_examples_common
 
   ## Required IDF version
   idf:

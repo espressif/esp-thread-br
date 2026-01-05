@@ -11,7 +11,7 @@ Clone the `esp-idf <https://github.com/espressif/esp-idf>`_ and the `esp-thread-
 
 Refer to the specific tags for each stable release at `esp-thread-br releases <https://github.com/espressif/esp-thread-br/releases>`_.
 
-Follow the steps below to obtain the latest esp-thread-br master branch and the recommended ESP-IDF version `v5.4.2 <https://github.com/espressif/esp-idf/tree/v5.4.2>`_ release:
+Follow the steps below to obtain the latest esp-thread-br master branch and the recommended ESP-IDF version `v5.5.2 <https://github.com/espressif/esp-idf/tree/v5.5.2>`_ release:
 
 .. code-block:: bash
 
@@ -23,7 +23,7 @@ Follow the steps below to obtain the latest esp-thread-br master branch and the 
 
 .. code-block:: bash
 
-   git checkout v5.4.2
+   git checkout v5.5.2
 
 .. code-block:: bash
 
