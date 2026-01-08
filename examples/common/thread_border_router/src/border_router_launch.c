@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2021-2022 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2021-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: CC0-1.0
  *
@@ -203,6 +203,7 @@ void launch_openthread_border_router(const esp_openthread_config_t *config,
 #if CONFIG_OPENTHREAD_CLI_ESP_EXTENSION
     esp_cli_custom_command_init();
 #endif
+    ot_register_external_commands();
 #if CONFIG_OPENTHREAD_BR_AUTO_START
     xTaskCreate(ot_br_init, "ot_br_init", 6144, NULL, 4, NULL);
 #endif
