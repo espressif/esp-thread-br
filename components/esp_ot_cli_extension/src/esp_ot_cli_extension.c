@@ -11,7 +11,6 @@
 #include "esp_ot_dns64.h"
 #include "esp_ot_heap_diag.h"
 #include "esp_ot_ip.h"
-#include "esp_ot_iperf.h"
 #include "esp_ot_loglevel.h"
 #include "esp_ot_nvs_diag.h"
 #include "esp_ot_ota_commands.h"
@@ -31,7 +30,6 @@ static const otCliCommand kCommands[] = {
 #endif // CONFIG_OPENTHREAD_DNS64_CLIENT
     {"heapdiag", esp_ot_process_heap_diag},
     {"ip", esp_ot_process_ip},
-    {"iperf", esp_ot_process_iperf},
     {"loglevel", esp_ot_process_logset},
     {"mcast", esp_ot_process_mcast_group},
 #if CONFIG_OPENTHREAD_NVS_DIAG

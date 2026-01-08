@@ -1,8 +1,6 @@
-version: "1.5.0"
+version: "2.0.0"
 description: Espressif OpenThread CLI Extension
 url: https://github.com/espressif/esp-thread-br/tree/main/components/esp_ot_cli_extension
 dependencies:
   idf:
     version: ">=5.0"
-  espressif/iperf:
-    version: "^0.1.0"

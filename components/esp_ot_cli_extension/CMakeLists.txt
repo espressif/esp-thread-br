@@ -2,7 +2,6 @@ set(srcs    "src/esp_ot_cli_extension.c"
             "src/esp_ot_curl.c"
             "src/esp_ot_heap_diag.c"
             "src/esp_ot_ip.c"
-            "src/esp_ot_iperf.c"
             "src/esp_ot_loglevel.c"
             "src/esp_ot_tcp_socket.c"
             "src/esp_ot_udp_socket.c")
@@ -35,7 +34,7 @@ set(include "include")
 
 idf_component_register(SRCS "${srcs}"
                     INCLUDE_DIRS "${include}"
-                    PRIV_REQUIRES lwip openthread iperf esp_netif esp_wifi http_parser esp_http_client esp_coex heap mbedtls nvs_flash esp_eth)
+                    PRIV_REQUIRES lwip openthread esp_netif esp_wifi http_parser esp_http_client esp_coex heap mbedtls nvs_flash esp_eth)
 
 if(CONFIG_OPENTHREAD_CLI_OTA)
     idf_component_optional_requires(PRIVATE esp_br_http_ota)
