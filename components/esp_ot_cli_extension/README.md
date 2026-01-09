@@ -13,7 +13,6 @@ To enable OpenThread extension commands, the following Kconfig option needs to b
 * [dns64server](#dns64server)
 * [heapdiag](#heapdiag)
 * [ip](#ip)
-* [iperf](#iperf)
 * [loglevel](#loglevel)
 * [mcast](#mcast)
 * [nvsdiag](#nvsdiag)
@@ -122,74 +121,6 @@ Done
 ```
 
 **Note: Currently the ip commands only support adding or deleting the addresses of openthread interface and Wi-Fi interface.**
-
-### iperf
-
-Iperf is a tool for performing TCP or UDP throughput on the Thread network.
-
-For running iperf, you need to have two Thread devices on the same network.
-
-* General Options
-
-```bash
-> iperf
----iperf parameter---
--s                  :     server mode, only receive
--u                  :     upd mode
--V                  :     use IPV6 address
--c <addr>           :     client mode, only transmit
--i <interval>       :     seconds between periodic bandwidth reports
--t <time>           :     time in seconds to transmit for (default 10 secs)
--p <port>           :     server port to listen on/connect to
--l <len_send_buf>   :     the length of send buffer
--f <output_format>  :     the output format of the report (Mbit/sec, Kbit/sec, bit/sec; default Mbit/sec)
----example---
-create a tcp server :     iperf -V -s -i 3 -p 5001 -t 60 -f M
-create a udp client :     iperf -V -c <addr> -u -i 3 -t 60 -p 5001 -l 512 -f B
-Done
-```
-
-* Typical usage
-
-For measuring the TCP throughput, first create an iperf service on one node:
-```bash
-> iperf -V -s -t 20 -i 3 -p 5001
-Done
-```
-
-Then create an iperf client connecting to the service on another node. Note that only the [ML-EID](https://openthread.io/guides/thread-primer/ipv6-addressing#unicast_address_types) address can be used for iperf.
-
-```bash
-> ipaddr mleid
-fdde:ad00:beef:0:a7c6:6311:9c8c:271b
-Done
-
-> iperf -V -c fdde:ad00:beef:0:a7c6:6311:9c8c:271b -t 20 -i 1 -p 5001 -l 85
-Done
-        Interval Bandwidth
-   0-   1 sec       0.05 Mbits/sec
-   1-   2 sec       0.05 Mbits/sec
-   2-   3 sec       0.05 Mbits/sec
-   3-   4 sec       0.05 Mbits/sec
-   4-   5 sec       0.05 Mbits/sec
-...
-   19-   20 sec       0.05 Mbits/sec
-   0-   20 sec       0.05 Mbits/sec
-```
-
-For measuring the UDP throughput, first create an iperf service similarly:
-
-```bash
-> iperf -V -u -s -t 20 -i 3 -p 5001
-Done
-```
-
-Then create an iperf client:
-
-```bash
-> iperf -V -u -c fdde:ad00:beef:0:a7c6:6311:9c8c:271b -t 20 -i 1 -p 5001 -l 85
-Done
-```
 
 ### loglevel
 
