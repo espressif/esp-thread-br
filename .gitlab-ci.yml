@@ -35,6 +35,14 @@ variables:
   - ./install.sh
   - . ./export.sh
 
+.setup_idf_v55: &setup_idf_v55
+  - cd $CI_PROJECT_DIR
+  - git clone --depth=1 -b release/v5.5 ${ESP_IDF_HTTP}
+  - cd esp-idf
+  - git submodule update --init --depth=1
+  - ./install.sh
+  - . ./export.sh
+
 .build_basic_thread_border_router: &build_basic_thread_border_router
   - cd $IDF_PATH/examples/openthread/ot_rcp
   - idf.py set-target esp32h2
@@ -124,9 +132,10 @@ build_examples:
 
 build_examples_m5stack:
     stage: build
-    image: espressif/idf:v5.5.2
+    image: $CI_DOCKER_REGISTRY/esp-env-v5.5:3
     script:
         - *submodule_update
+        - *setup_idf_v55
         - *build_m5stack_thread_border_router
     tags:
         - build
