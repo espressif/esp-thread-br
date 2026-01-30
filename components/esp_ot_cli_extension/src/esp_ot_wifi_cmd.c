@@ -163,7 +163,7 @@ static esp_err_t wifi_config_print(void)
         if (strlen(password_str) > 0) {
             otCliOutputFormat("Wi-Fi password: %s\n", password_str);
         } else {
-            otCliOutputFormat("None password\n", password_str);
+            otCliOutputFormat("None password\n");
         }
     }
     return ESP_OK;
