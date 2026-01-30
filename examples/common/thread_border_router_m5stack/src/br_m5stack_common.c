@@ -6,6 +6,8 @@
  */
 
 #include "br_m5stack_common.h"
+#include "br_m5stack_layout.h"
+#include "br_m5stack_screen_dimming.h"
 
 #include "esp_check.h"
 #include "esp_err.h"
@@ -16,15 +18,10 @@
 #include "bsp/esp-bsp.h"
 #include "core/lv_obj_tree.h"
 
-typedef struct {
-    lv_obj_t *ta;
-    void *user_data;
-} br_m5stack_kb_context_t;
-
-static br_m5stack_kb_callback_t br_m5stack_kb_callback = NULL;
-static br_m5stack_kb_context_t kb_context;
 static lv_obj_t *s_base_page = NULL;
 static lv_obj_t *s_warning_page = NULL;
+static lv_obj_t *s_factoryreset_page = NULL;
+static lv_timer_t *s_factoryreset_timer = NULL;
 
 void br_m5stack_delete_page_from_button(lv_event_t *e)
 {
@@ -38,37 +35,23 @@ void br_m5stack_delete_page_from_button(lv_event_t *e)
     page = lv_obj_get_parent(btn);
     ESP_GOTO_ON_FALSE(page, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to get the parent page of button for deleting");
 
-    lv_obj_del(page);
+    // If deleting the factory reset page, return to main page
+    if (page == s_factoryreset_page) {
+        // Cancel the timer if it exists
+        if (s_factoryreset_timer) {
+            lv_timer_del(s_factoryreset_timer);
+            s_factoryreset_timer = NULL;
+        }
+        s_factoryreset_page = NULL;
+        br_m5stack_delete_page(page);
+        br_m5stack_show_main_page();
+    } else {
+        br_m5stack_delete_page(page);
+    }
     btn = NULL;
 
 exit:
     BR_M5STACK_DELETE_OBJ_IF_EXIST(btn);
-}
-
-void br_m5stack_hidden_page_from_button(lv_event_t *e)
-{
-    esp_err_t ret = ESP_OK;
-    (void)ret;
-    lv_obj_t *btn = NULL;
-    lv_obj_t *page = NULL;
-
-    btn = lv_event_get_target(e);
-    ESP_GOTO_ON_FALSE(btn, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to get the target button for hiding");
-    page = lv_obj_get_parent(btn);
-    ESP_GOTO_ON_FALSE(page, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to get the parent page of button for hiding");
-
-    br_m5stack_hidden_page(page);
-    btn = NULL;
-
-exit:
-    BR_M5STACK_DELETE_OBJ_IF_EXIST(btn);
-}
-
-void br_m5stack_display_page_from_button(lv_event_t *e)
-{
-    lv_obj_t *page = lv_event_get_user_data(e);
-    ESP_RETURN_ON_FALSE(page, , BR_M5STACK_TAG, "Failed to get the page for display");
-    br_m5stack_display_page(page);
 }
 
 void br_m5stack_add_esp_tiny_logo(lv_obj_t *page)
@@ -122,6 +105,8 @@ lv_obj_t *br_m5stack_create_button(lv_coord_t w, lv_coord_t h, lv_event_cb_t eve
     lv_obj_set_width(label, w - 10);
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
 
+    add_touch_event_handler(btn);
+
 exit:
     if (ret != ESP_OK) {
         BR_M5STACK_DELETE_OBJ_IF_EXIST(btn);
@@ -138,6 +123,8 @@ lv_obj_t *br_m5stack_create_label(lv_obj_t *parent, const char *txt, const lv_fo
     lv_obj_set_style_text_color(label, color, LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(label, font, LV_PART_MAIN);
     lv_obj_align(label, align, x, y);
+
+    add_touch_event_handler(label);
 
     return label;
 }
@@ -156,6 +143,12 @@ lv_obj_t *br_m5stack_create_blank_page(lv_obj_t *parent)
     lv_obj_center(new_page);
     lv_obj_set_style_pad_all(new_page, 0, LV_PART_MAIN);
 
+    add_touch_event_handler(new_page);
+    // Disable dimming when creating overlay pages (pages on lv_layer_top)
+    if (parent == lv_layer_top()) {
+        disable_screen_dimming();
+    }
+
     return new_page;
 }
 
@@ -165,71 +158,25 @@ void br_m5stack_add_btn_to_page(lv_obj_t *page, lv_obj_t *btn, lv_align_t align,
     lv_obj_align(btn, align, x, y);
 }
 
-static void kb_event_cb(lv_event_t *e)
-{
-    lv_obj_t *kb = lv_event_get_target(e);
-    ESP_RETURN_ON_FALSE(kb, , BR_M5STACK_TAG, "Failed to handle keyboard event");
-    br_m5stack_kb_context_t *context = (br_m5stack_kb_context_t *)lv_event_get_user_data(e);
-    lv_obj_t *ta = context->ta;
-    lv_obj_t *kb_base_page = lv_obj_get_parent(kb);
-
-    lv_textarea_set_one_line(ta, true);
-
-    if (e->code == LV_EVENT_READY) {
-        char input_str[128];
-        strcpy(input_str, lv_textarea_get_text(ta));
-        lv_obj_del(kb_base_page);
-        if (br_m5stack_kb_callback) {
-            br_m5stack_kb_callback(input_str, context->user_data);
-            br_m5stack_kb_callback = NULL;
-        }
-    } else if (e->code == LV_EVENT_CANCEL) {
-        br_m5stack_kb_callback = NULL;
-        lv_obj_del(kb_base_page);
-    }
-}
-
-void br_m5stack_create_keyboard(lv_obj_t *page, br_m5stack_kb_callback_t callback, void *user_data, bool only_num)
-{
-    esp_err_t ret = ESP_OK;
-    lv_obj_t *kb_base_page = NULL;
-    lv_obj_t *ta = NULL;
-    lv_obj_t *kb = NULL;
-
-    kb_base_page = br_m5stack_create_blank_page(page);
-    ESP_GOTO_ON_FALSE(kb_base_page, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create a page for keyboard");
-    ta = lv_textarea_create(kb_base_page);
-    ESP_GOTO_ON_FALSE(ta, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create a textbox");
-    kb = lv_keyboard_create(kb_base_page);
-    ESP_GOTO_ON_FALSE(kb, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create a keyboard");
-
-    lv_obj_set_size(ta, 280, 20);
-    lv_obj_align(ta, LV_ALIGN_TOP_MID, 0, 15);
-    if (only_num) {
-        lv_keyboard_set_mode(kb, LV_KEYBOARD_MODE_NUMBER);
-    }
-    lv_obj_set_size(kb, LV_PCT(100), LV_PCT(70));
-    lv_obj_align(kb, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_keyboard_set_textarea(kb, ta);
-
-    kb_context.ta = ta;
-    kb_context.user_data = user_data;
-    lv_obj_add_event_cb(kb, kb_event_cb, LV_EVENT_VALUE_CHANGED, (void *)(&kb_context));
-    lv_obj_add_event_cb(kb, kb_event_cb, LV_EVENT_READY, (void *)(&kb_context));
-    lv_obj_add_event_cb(kb, kb_event_cb, LV_EVENT_CANCEL, (void *)(&kb_context));
-    br_m5stack_kb_callback = callback;
-
-exit:
-    if (ret != ESP_OK) {
-        BR_M5STACK_DELETE_OBJ_IF_EXIST(kb_base_page);
-    }
-}
-
 static void warning_page_cb(lv_timer_t *timer)
 {
     lv_obj_del(s_warning_page);
     s_warning_page = NULL;
     lv_timer_del(timer);
+    // Re-enable dimming when warning page is deleted (back to main page)
+    enable_screen_dimming();
+}
+
+static void factoryreset_page_cb(lv_timer_t *timer)
+{
+    // Check if page still exists (might have been deleted manually)
+    if (s_factoryreset_page) {
+        br_m5stack_delete_page(s_factoryreset_page);
+        s_factoryreset_page = NULL;
+    }
+    s_factoryreset_timer = NULL;
+    lv_timer_del(timer);
+    br_m5stack_show_main_page();
 }
 
 lv_obj_t *br_m5stack_create_warn(char *warning, uint32_t delay_ms)
@@ -247,6 +194,8 @@ lv_obj_t *br_m5stack_create_warn(char *warning, uint32_t delay_ms)
         lv_timer_create(warning_page_cb, delay_ms, NULL);
     }
 
+    add_touch_event_handler(s_warning_page);
+
 exit:
     if (ret != ESP_OK) {
         BR_M5STACK_DELETE_OBJ_IF_EXIST(s_warning_page);
@@ -256,6 +205,13 @@ exit:
 
 void br_m5stack_delete_page(lv_obj_t *page)
 {
+    // Check if we're deleting an overlay page and should re-enable dimming
+    lv_obj_t *main_page = br_m5stack_get_main_page();
+    bool is_overlay_page = (page != main_page && lv_obj_get_parent(page) == lv_layer_top());
+    if (is_overlay_page) {
+        // Re-enable dimming when deleting overlay pages (back to main page)
+        enable_screen_dimming();
+    }
     lv_obj_del(page);
 }
 
@@ -269,6 +225,12 @@ void br_m5stack_display_page(lv_obj_t *page)
 {
     lv_obj_move_foreground(page);
     lv_obj_clear_flag(page, LV_OBJ_FLAG_HIDDEN);
+    // Enable dimming when displaying the main page
+    if (page == br_m5stack_get_main_page()) {
+        enable_screen_dimming();
+    } else {
+        disable_screen_dimming();
+    }
 }
 
 // Factory reset functions
@@ -301,29 +263,38 @@ exit:
 static void br_m5stack_factoryreset_confirm(lv_event_t *e)
 {
     esp_err_t ret = ESP_OK;
-    lv_obj_t *factoryreset_page = NULL;
     lv_obj_t *label = NULL;
     lv_obj_t *yes_btn = NULL;
     lv_obj_t *no_btn = NULL;
+    const uint32_t timeout_ms = 10000; // 10 seconds timeout
 
-    factoryreset_page = br_m5stack_create_blank_page(lv_layer_top());
-    ESP_GOTO_ON_FALSE(factoryreset_page, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create the factoryreset page");
+    s_factoryreset_page = br_m5stack_create_blank_page(lv_layer_top());
+    ESP_GOTO_ON_FALSE(s_factoryreset_page, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create the factoryreset page");
 
-    label = br_m5stack_create_label(factoryreset_page, "Are you sure to execute factory reset?", &lv_font_montserrat_16,
-                                    lv_color_black(), LV_ALIGN_CENTER, 0, -20);
+    label = br_m5stack_create_label(s_factoryreset_page, "Are you sure you want to factory reset?",
+                                    &lv_font_montserrat_16, lv_color_black(), LV_ALIGN_CENTER, 0, -20);
     ESP_GOTO_ON_FALSE(label, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create the label for factoryreset page");
 
     yes_btn = br_m5stack_create_button(100, 50, br_m5stack_do_factoryreset, LV_EVENT_CLICKED, "Yes", NULL);
     ESP_GOTO_ON_FALSE(yes_btn, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create the yes button for factoryreset page");
-    br_m5stack_add_btn_to_page(factoryreset_page, yes_btn, LV_ALIGN_LEFT_MID, 40, 60);
+    br_m5stack_add_btn_to_page(s_factoryreset_page, yes_btn, LV_ALIGN_LEFT_MID, 40, 60);
 
     no_btn = br_m5stack_create_button(100, 50, br_m5stack_delete_page_from_button, LV_EVENT_CLICKED, "No", NULL);
     ESP_GOTO_ON_FALSE(no_btn, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create the no button for factoryreset page");
-    br_m5stack_add_btn_to_page(factoryreset_page, no_btn, LV_ALIGN_RIGHT_MID, -40, 60);
+    br_m5stack_add_btn_to_page(s_factoryreset_page, no_btn, LV_ALIGN_RIGHT_MID, -40, 60);
+
+    // Create timer to automatically close the factory reset page after timeout
+    s_factoryreset_timer = lv_timer_create(factoryreset_page_cb, timeout_ms, NULL);
+    ESP_GOTO_ON_FALSE(s_factoryreset_timer, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create factoryreset timer");
 
 exit:
     if (ret != ESP_OK) {
-        BR_M5STACK_DELETE_OBJ_IF_EXIST(factoryreset_page);
+        if (s_factoryreset_timer) {
+            lv_timer_del(s_factoryreset_timer);
+            s_factoryreset_timer = NULL;
+        }
+        BR_M5STACK_DELETE_OBJ_IF_EXIST(s_factoryreset_page);
+        s_factoryreset_page = NULL;
     }
 }
 
@@ -332,5 +303,8 @@ lv_obj_t *br_m5stack_create_factoryreset_button(lv_obj_t *page)
     lv_obj_t *btn =
         br_m5stack_create_button(130, 50, br_m5stack_factoryreset_confirm, LV_EVENT_CLICKED, "factoryreset", NULL);
     ESP_RETURN_ON_FALSE(btn, NULL, BR_M5STACK_TAG, "Failed to create factoryreset button");
+
+    add_touch_event_handler(btn);
+
     return btn;
 }

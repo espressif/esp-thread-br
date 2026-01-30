@@ -8,6 +8,7 @@
 #include "br_m5stack_layout.h"
 #include "br_m5stack_common.h"
 #include "br_m5stack_epskc_page.h"
+#include "br_m5stack_screen_dimming.h"
 #if CONFIG_OPENTHREAD_BR_SOFTAP_SETUP
 #include "esp_br_wifi_config.h"
 #endif
@@ -27,6 +28,11 @@
 #endif
 
 lv_obj_t *s_main_page = NULL;
+
+lv_obj_t *br_m5stack_get_main_page(void)
+{
+    return s_main_page;
+}
 
 #if CONFIG_OPENTHREAD_BR_SOFTAP_SETUP
 // Forward declaration
@@ -64,10 +70,14 @@ void br_m5stack_create_ui(void)
     lv_obj_t *epskc_btn = NULL;
     lv_obj_t *factoryreset_btn = NULL;
 
+    setup_inactivity_monitor();
+
     br_m5stack_add_esp_tiny_logo(lv_layer_top());
 
     s_main_page = br_m5stack_create_blank_page(lv_scr_act());
     ESP_GOTO_ON_FALSE(s_main_page, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create the main page");
+
+    set_main_page_reference(s_main_page);
 
     lv_obj_set_style_pad_all(s_main_page, 1, LV_PART_MAIN);
     lv_obj_set_style_pad_top(s_main_page, 0, LV_PART_MAIN);
