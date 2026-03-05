@@ -18,7 +18,7 @@ This example requires the [M5Stack Thread Border Router](https://shop.m5stack.co
 
 ### IDF Version Required
 
-This example requires [IDF v5.5.1](https://github.com/espressif/esp-idf/tree/v5.5.1). It may not be compatible with older or newer versions of IDF.
+This example requires [IDF v5.5.4](https://github.com/espressif/esp-idf/tree/v5.5.4). It may not be compatible with older or newer versions of IDF.
 
 ### Configure the Project
 
