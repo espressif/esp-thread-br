@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2022 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2022-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -487,9 +487,14 @@ static otError get_openthread_available_networks(void)
     otError ret = OT_ERROR_NONE;
     uint32_t scanChannels = 0;
     esp_openthread_lock_acquire(portMAX_DELAY);
+    otInstance *ins = esp_openthread_get_instance();
+    if (!otIp6IsEnabled(ins)) {
+        ESP_GOTO_ON_FALSE(OT_ERROR_NONE == (ret = otIp6SetEnabled(ins, true)), ret, exit, API_TAG,
+                          "Failed to enable IPv6 interface for scanning");
+    }
     ESP_GOTO_ON_FALSE(OT_ERROR_NONE ==
-                          (ret = otThreadDiscover(esp_openthread_get_instance(), scanChannels, OT_PANID_BROADCAST,
-                                                  false, false, &handle_active_scan_event, NULL)),
+                          (ret = otThreadDiscover(ins, scanChannels, OT_PANID_BROADCAST, false, false,
+                                                  &handle_active_scan_event, NULL)),
                       ret, exit, API_TAG, "Failed to discover network");
 exit:
     esp_openthread_lock_release();
@@ -646,12 +651,17 @@ otError handle_openthread_join_network_request(const cJSON *request, cJSON *log)
 
         esp_openthread_lock_acquire(portMAX_DELAY);
 
+        ERROR_EXIT(otThreadSetEnabled(ins, false), exit, API_TAG, "Failed to stop Thread");
         ERROR_EXIT(otIp6SetEnabled(ins, false), exit, API_TAG, "Failed to set ifconfig down");
-        ERROR_EXIT(otDatasetCreateNewNetwork(ins, &dataset), exit, API_TAG, "Failed to create new network");
 
+        memset(&dataset, 0, sizeof(otOperationalDataset));
         dataset.mChannel = list->network->channel;
+        dataset.mComponents.mIsChannelPresent = true;
         dataset.mPanId = list->network->panid;
+        dataset.mComponents.mIsPanIdPresent = true;
         dataset.mNetworkKey = param.networkKey;
+        dataset.mComponents.mIsNetworkKeyPresent = true;
+
         ERROR_EXIT(otDatasetSetActive(ins, &dataset), exit, API_TAG, "Failed to active dataset");
         ERROR_EXIT(otIp6SetEnabled(ins, true), exit, API_TAG, "Failed to set ifconfig up");
     } else if ((!memcmp(param.credentialType, CREDENTIAL_TYPE_PSKD, sizeof(CREDENTIAL_TYPE_PSKD)))) {
