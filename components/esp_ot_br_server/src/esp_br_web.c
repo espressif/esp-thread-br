@@ -43,7 +43,7 @@
 #define SCRATCH_BUFSIZE 1024 /* Scratch buffer size */
 #define VFS_PATH_MAXNUM 15
 #define SERVER_IPV4_LEN 16
-#define FILE_CHUNK_SIZE 1024
+#define FILE_CHUNK_SIZE 4096
 #define WEB_TAG "obtr_web"
 
 /*-----------------------------------------------------
@@ -80,7 +80,7 @@ typedef struct request_url {
     uint16_t port;
     char file_name[FILENAME_MAX_SIZE];
     char file_path[FILEPATH_MAX_SIZE];
-} reqeust_url_t;
+} request_url_t;
 
 /*-----------------------------------------------------
  Note：Http Server Thread REST API
@@ -219,6 +219,10 @@ static esp_err_t esp_otbr_delete_network_prefix_post_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_commission_post_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_topology_get_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_current_node_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_ping_post_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_ipaddr_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_add_ipaddr_post_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_delete_ipaddr_post_handler(httpd_req_t *req);
 
 static httpd_uri_t s_web_gui_handlers[] = {
     {
@@ -274,6 +278,30 @@ static httpd_uri_t s_web_gui_handlers[] = {
         .method = HTTP_GET,
         .handler = esp_otbr_current_node_get_handler,
         .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_PING_PATH,
+        .method = HTTP_POST,
+        .handler = esp_otbr_ping_post_handler,
+        .user_ctx = &s_server.data,
+    },
+    {
+        .uri = ESP_OT_REST_API_IPADDR_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_ipaddr_get_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_ADD_IPADDR_PATH,
+        .method = HTTP_POST,
+        .handler = esp_otbr_add_ipaddr_post_handler,
+        .user_ctx = &s_server.data,
+    },
+    {
+        .uri = ESP_OT_REST_API_DELETE_IPADDR_PATH,
+        .method = HTTP_POST,
+        .handler = esp_otbr_delete_ipaddr_post_handler,
+        .user_ctx = &s_server.data,
     },
 };
 
@@ -358,7 +386,7 @@ static esp_err_t httpd_send_packet(httpd_req_t *req, cJSON *root)
 {
     esp_err_t ret = ESP_OK;
     ESP_RETURN_ON_FALSE(root, ESP_FAIL, WEB_TAG, "Invalid Argument");
-    char *packet = cJSON_Print(root);
+    char *packet = cJSON_PrintUnformatted(root);
     ESP_RETURN_ON_FALSE(packet, ESP_FAIL, WEB_TAG, "Invalid Packet");
     ESP_LOGD(WEB_TAG, "Properties: %s\r\n", packet);
     ESP_RETURN_ON_FALSE(packet, ESP_FAIL, WEB_TAG, "Invalid Pesponse");
@@ -404,7 +432,32 @@ static esp_err_t esp_otbr_network_diagnostics_get_handler(httpd_req_t *req)
     esp_err_t ret = ESP_OK;
     cJSON *response = handle_ot_resource_network_diagnostics_request();
     ESP_RETURN_ON_FALSE(response, ESP_FAIL, WEB_TAG, "Failed to handle openthread diagnostics request");
-    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+
+    /* Stream the JSON array in chunks to avoid allocating the entire
+       serialized string in RAM at once (can be 30-50KB for large networks). */
+    ESP_GOTO_ON_ERROR(httpd_resp_set_type(req, "application/json"), exit, WEB_TAG, "Failed to set content type");
+
+    int array_size = cJSON_GetArraySize(response);
+    ESP_GOTO_ON_ERROR(httpd_resp_sendstr_chunk(req, "["), exit, WEB_TAG, "Failed to send chunk");
+
+    for (int i = 0; i < array_size; i++) {
+        cJSON *detached = cJSON_DetachItemFromArray(response, 0);
+        char *chunk = cJSON_PrintUnformatted(detached);
+        cJSON_Delete(detached);
+        if (chunk) {
+            if (i > 0) {
+                ESP_GOTO_ON_ERROR(httpd_resp_sendstr_chunk(req, ","), exit, WEB_TAG, "Failed to send chunk");
+            }
+            esp_err_t send_err = httpd_resp_sendstr_chunk(req, chunk);
+            cJSON_free(chunk);
+            ESP_GOTO_ON_ERROR(send_err, exit, WEB_TAG, "Failed to send chunk");
+        }
+    }
+
+    ESP_GOTO_ON_ERROR(httpd_resp_sendstr_chunk(req, "]"), exit, WEB_TAG, "Failed to send chunk");
+    /* Signal end of chunked response */
+    httpd_resp_sendstr_chunk(req, NULL);
+
 exit:
     cJSON_Delete(response);
     return ret;
@@ -721,7 +774,7 @@ static esp_err_t esp_otbr_network_join_post_handler(httpd_req_t *req)
     ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
     ESP_GOTO_ON_FALSE(!err, ESP_FAIL, exit, WEB_TAG, "Failed to JOIN openthread network");
     ESP_LOGI(WEB_TAG, "<================== Join Thread Network ====================>");
-    ESP_LOGI(WEB_TAG, "Join successfully !"); /* successfully */
+    ESP_LOGI(WEB_TAG, "Join request submitted, attaching...");
     ESP_LOGI(WEB_TAG, "<==========================================================>");
 exit:
     cJSON_Delete(request);
@@ -853,6 +906,86 @@ exit:
 }
 
 /**
+ * @brief The API handles a ping request to an IPv6 address.
+ *
+ * @param[in] req The request from http_client (JSON with "address", optional "count" and "size").
+ * @return
+ *      -   ESP_OK                      : On success
+ *      -   ESP_FAIL                    : On failure
+ */
+static esp_err_t esp_otbr_ping_post_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *request = httpd_request_convert2_json(req, cJSON_Object);
+    ESP_RETURN_ON_FALSE(request, ESP_FAIL, WEB_TAG, "Failed to parse the ping request");
+
+    cJSON *result = handle_openthread_ping_request(request);
+    cJSON *error = result ? cJSON_CreateNumber((double)OT_ERROR_NONE) : cJSON_CreateNumber((double)OT_ERROR_FAILED);
+    cJSON *message = result ? cJSON_CreateString("Ping: Success") : cJSON_CreateString("Ping: Failure");
+    cJSON *response = pack_response(error, result, message);
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+    ESP_GOTO_ON_FALSE(result, ESP_FAIL, exit, WEB_TAG, "Failed to execute ping");
+    ESP_LOGI(WEB_TAG, "<====================== Ping ==============================>");
+    ESP_LOGI(WEB_TAG, "Ping completed");
+    ESP_LOGI(WEB_TAG, "<==========================================================>");
+exit:
+    cJSON_Delete(request);
+    cJSON_Delete(response);
+    return ret;
+}
+
+static esp_err_t esp_otbr_ipaddr_get_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *result = handle_openthread_ipaddr_list_request();
+    cJSON *error = result ? cJSON_CreateNumber((double)OT_ERROR_NONE) : cJSON_CreateNumber((double)OT_ERROR_FAILED);
+    cJSON *message = result ? cJSON_CreateString("OK") : cJSON_CreateString("Failed to list addresses");
+    cJSON *response = pack_response(error, result, message);
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to respond %s", req->uri);
+exit:
+    cJSON_Delete(response);
+    return ret;
+}
+
+static esp_err_t esp_otbr_add_ipaddr_post_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *request = httpd_request_convert2_json(req, cJSON_Object);
+    ESP_RETURN_ON_FALSE(request, ESP_FAIL, WEB_TAG, "Failed to parse ipaddr add request");
+
+    cJSON *result = handle_openthread_add_ipaddr_request(request);
+    cJSON *status = cJSON_GetObjectItem(result, "status");
+    bool ok = status && status->valuestring && strcmp(status->valuestring, "ok") == 0;
+    cJSON *error = cJSON_CreateNumber(ok ? (double)OT_ERROR_NONE : (double)OT_ERROR_FAILED);
+    cJSON *message = cJSON_CreateString(ok ? "Address added" : "Failed to add address");
+    cJSON *response = pack_response(error, result, message);
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to respond %s", req->uri);
+exit:
+    cJSON_Delete(request);
+    cJSON_Delete(response);
+    return ret;
+}
+
+static esp_err_t esp_otbr_delete_ipaddr_post_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *request = httpd_request_convert2_json(req, cJSON_Object);
+    ESP_RETURN_ON_FALSE(request, ESP_FAIL, WEB_TAG, "Failed to parse ipaddr delete request");
+
+    cJSON *result = handle_openthread_delete_ipaddr_request(request);
+    cJSON *status = cJSON_GetObjectItem(result, "status");
+    bool ok = status && status->valuestring && strcmp(status->valuestring, "ok") == 0;
+    cJSON *error = cJSON_CreateNumber(ok ? (double)OT_ERROR_NONE : (double)OT_ERROR_FAILED);
+    cJSON *message = cJSON_CreateString(ok ? "Address removed" : "Failed to remove address");
+    cJSON *response = pack_response(error, result, message);
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to respond %s", req->uri);
+exit:
+    cJSON_Delete(request);
+    cJSON_Delete(response);
+    return ret;
+}
+
+/**
  * @brief The API provides an entry to collect the topology of Thread node, packs and sends it to @param req.
  *
  * @param[in] req The request from http_client.
@@ -868,16 +1001,39 @@ static esp_err_t esp_otbr_network_topology_get_handler(httpd_req_t *req)
     ESP_RETURN_ON_FALSE(req, ESP_FAIL, WEB_TAG, "Failed to parse the diagnostics of http request");
     esp_err_t ret = ESP_OK;
     cJSON *result = handle_ot_resource_network_diagnostics_request();
-    cJSON *error = result ? cJSON_CreateNumber((double)OT_ERROR_NONE) : cJSON_CreateNumber((double)OT_ERROR_FAILED);
-    cJSON *message = result ? cJSON_CreateString("Topology: Success") : cJSON_CreateString("Topology: Failure");
-    cJSON *response = pack_response(error, result, message);
-    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
-    ESP_GOTO_ON_FALSE(result, ESP_FAIL, exit, WEB_TAG, "Failed to get Thread Network Topology");
+    ESP_RETURN_ON_FALSE(result, ESP_FAIL, WEB_TAG, "Failed to get Thread Network Topology");
+
+    /* Stream the wrapped JSON response in chunks to avoid allocating the
+       entire serialized string in RAM at once (can be 30-50 KB for large networks).
+       Format: {"error":0,"result":[<item>,<item>,...],"message":"Topology: Success"} */
+    ESP_GOTO_ON_ERROR(httpd_resp_set_type(req, "application/json"), exit, WEB_TAG, "Failed to set content type");
+    ESP_GOTO_ON_ERROR(httpd_resp_sendstr_chunk(req, "{\"error\":0,\"result\":["), exit, WEB_TAG,
+                      "Failed to send chunk");
+
+    int array_size = cJSON_GetArraySize(result);
+    for (int i = 0; i < array_size; i++) {
+        cJSON *detached = cJSON_DetachItemFromArray(result, 0);
+        char *chunk = cJSON_PrintUnformatted(detached);
+        cJSON_Delete(detached);
+        if (chunk) {
+            if (i > 0) {
+                ESP_GOTO_ON_ERROR(httpd_resp_sendstr_chunk(req, ","), exit, WEB_TAG, "Failed to send chunk");
+            }
+            esp_err_t send_err = httpd_resp_sendstr_chunk(req, chunk);
+            cJSON_free(chunk);
+            ESP_GOTO_ON_ERROR(send_err, exit, WEB_TAG, "Failed to send chunk");
+        }
+    }
+
+    ESP_GOTO_ON_ERROR(httpd_resp_sendstr_chunk(req, "],\"message\":\"Topology: Success\"}"), exit, WEB_TAG,
+                      "Failed to send chunk");
+    httpd_resp_sendstr_chunk(req, NULL); /* end chunked response */
+
     ESP_LOGI(WEB_TAG, "<==================== Thread Topology =====================>");
     ESP_LOGI(WEB_TAG, "Thread diagnostic Tlv Complete.");
     ESP_LOGI(WEB_TAG, "<==========================================================>");
 exit:
-    cJSON_Delete(response);
+    cJSON_Delete(result);
     return ret;
 }
 
@@ -942,6 +1098,7 @@ static esp_err_t favicon_get_handler(httpd_req_t *req)
     const size_t favicon_ico_size = (favicon_ico_end - favicon_ico_start);
 
     ESP_RETURN_ON_ERROR(httpd_resp_set_type(req, "image/x-icon"), WEB_TAG, "Failed to set http respond type");
+    httpd_resp_set_hdr(req, "Cache-Control", "public, max-age=3600");
     ESP_RETURN_ON_ERROR(httpd_resp_send(req, (const char *)favicon_ico_start, favicon_ico_size), WEB_TAG,
                         "Failed to send http respond");
     return ESP_OK;
@@ -958,20 +1115,21 @@ static esp_err_t favicon_get_handler(httpd_req_t *req)
  */
 static esp_err_t httpd_resp_send_spiffs_file(httpd_req_t *req, char *path)
 {
-    ESP_LOGI(WEB_TAG, "-------------------------------------------");
     ESP_LOGI(WEB_TAG, "Reading %s", path);
 
-    FILE *fp = fopen(path, "r"); // Open and read file
-
+    FILE *fp = fopen(path, "r");
     ESP_RETURN_ON_FALSE(fp, ESP_FAIL, WEB_TAG, "Failed to open %s file", path);
 
-    char buf[FILE_CHUNK_SIZE]; // the size of chunk
-    while (!feof(fp) && !ferror(fp)) {
-        fread(buf, FILE_CHUNK_SIZE - 1, 1, fp);
-        buf[FILE_CHUNK_SIZE - 1] = '\0';
-        httpd_resp_sendstr_chunk(req, buf);
-        memset(buf, 0, sizeof(buf));
-    };
+    char buf[FILE_CHUNK_SIZE];
+    size_t bytes_read;
+    while ((bytes_read = fread(buf, 1, sizeof(buf), fp)) > 0) {
+        if (httpd_resp_send_chunk(req, buf, bytes_read) != ESP_OK) {
+            fclose(fp);
+            /* Abort chunked transfer on send error */
+            httpd_resp_send_chunk(req, NULL, 0);
+            return ESP_FAIL;
+        }
+    }
     return fclose(fp) == 0 ? ESP_OK : ESP_FAIL;
 }
 
@@ -989,6 +1147,7 @@ static esp_err_t httpd_resp_send_spiffs_file(httpd_req_t *req, char *path)
  */
 static esp_err_t index_html_get_handler(httpd_req_t *req, char *path)
 {
+    httpd_resp_set_hdr(req, "Cache-Control", "public, max-age=600");
     ESP_RETURN_ON_ERROR(httpd_resp_send_spiffs_file(req, path), WEB_TAG, "Failed to send index html file");
     ESP_RETURN_ON_ERROR(httpd_resp_sendstr_chunk(req, NULL), WEB_TAG, "Failed to send http string chunk");
     return ESP_OK;
@@ -996,8 +1155,8 @@ static esp_err_t index_html_get_handler(httpd_req_t *req, char *path)
 
 static esp_err_t style_css_get_handler(httpd_req_t *req, char *path)
 {
-    // send content-type："text/css" in http-header
     ESP_RETURN_ON_ERROR(httpd_resp_set_type(req, "text/css"), WEB_TAG, "Failed to set http text/css type");
+    httpd_resp_set_hdr(req, "Cache-Control", "public, max-age=600");
     ESP_RETURN_ON_ERROR(httpd_resp_send_spiffs_file(req, path), WEB_TAG, "Failed to send css file");
     ESP_RETURN_ON_ERROR(httpd_resp_sendstr_chunk(req, NULL), WEB_TAG, "Failed to send http string chunk");
     return ESP_OK;
@@ -1005,9 +1164,9 @@ static esp_err_t style_css_get_handler(httpd_req_t *req, char *path)
 
 static esp_err_t script_js_get_handler(httpd_req_t *req, char *path)
 {
-    // send content-type："application/javascript" in http-header
     ESP_RETURN_ON_ERROR(httpd_resp_set_type(req, "application/javascript"), WEB_TAG,
                         "Failed to set http application/javascript type");
+    httpd_resp_set_hdr(req, "Cache-Control", "public, max-age=600");
     ESP_RETURN_ON_ERROR(httpd_resp_send_spiffs_file(req, path), WEB_TAG, "Failed to send js file");
     ESP_RETURN_ON_ERROR(httpd_resp_sendstr_chunk(req, NULL), WEB_TAG, "Failed to send http string chunk");
     return ESP_OK;
@@ -1021,10 +1180,10 @@ static esp_err_t script_js_get_handler(httpd_req_t *req, char *path)
  * @param[in] base_path A pointer points the base files path.
  * @return the valid information from @param parse_url
  */
-static reqeust_url_t parse_request_url_information(const char *uri, const struct http_parser_url *parse_url,
+static request_url_t parse_request_url_information(const char *uri, const struct http_parser_url *parse_url,
                                                    const char *base_path)
 {
-    reqeust_url_t ret = {
+    request_url_t ret = {
         .protocol = "http",
         .port = 80,
         .file_name = "",
@@ -1046,7 +1205,21 @@ static reqeust_url_t parse_request_url_information(const char *uri, const struct
 }
 
 /**
+ * @brief Check if a string ends with the given suffix.
+ */
+static bool str_ends_with(const char *str, const char *suffix)
+{
+    size_t str_len = strlen(str);
+    size_t suffix_len = strlen(suffix);
+    if (suffix_len > str_len) {
+        return false;
+    }
+    return strcmp(str + str_len - suffix_len, suffix) == 0;
+}
+
+/**
  * @brief Verify and handle the client's default request, return corresponding file to client.
+ *        Routes files by extension: .html, .css, .js are served from SPIFFS.
  *
  * @param[in] req The request of http client.
  * @return
@@ -1065,7 +1238,7 @@ static esp_err_t default_urls_get_handler(httpd_req_t *req)
 
     struct http_parser_url url;
     ESP_RETURN_ON_ERROR(http_parser_parse_url(req->uri, strlen(req->uri), 0, &url), WEB_TAG, "Failed to parse url");
-    reqeust_url_t info =
+    request_url_t info =
         parse_request_url_information(req->uri, &url, ((http_server_data_t *)req->user_ctx)->base_path);
 
     ESP_LOGI(WEB_TAG, "-------------------------------------------");
@@ -1078,27 +1251,31 @@ static esp_err_t default_urls_get_handler(httpd_req_t *req)
             "Failed to send error code");
         return ESP_FAIL;
     }
+
+    /* Root path: serve index.html */
     if (strcmp(info.file_name, "/") == 0) {
-        // For root path, serve index.html directly
         char index_path[FILEPATH_MAX_SIZE];
         strcpy(index_path, ((http_server_data_t *)req->user_ctx)->base_path);
         strcat(index_path, "/index.html");
         return index_html_get_handler(req, index_path);
-    } else if (strcmp(info.file_name, "/index.html") == 0) {
-        return index_html_get_handler(req, info.file_path);
-    } else if (strcmp(info.file_name, "/static/style.css") == 0) {
-        return style_css_get_handler(req, info.file_path);
-    } else if (strcmp(info.file_name, "/static/restful.js") == 0) {
-        return script_js_get_handler(req, info.file_path);
-    } else if (strcmp(info.file_name, "/static/bootstrap.min.css") == 0) {
-        return script_js_get_handler(req, info.file_path);
-    } else if (strcmp(info.file_name, "/favicon.ico") == 0) {
-        return favicon_get_handler(req);
-    } else {
-        ESP_LOGE(WEB_TAG, "Failed to stat file : %s", info.file_path); /* Respond with 404 Not Found */
-        return NOT_FOUND_handler(req);
     }
-    return ESP_OK;
+
+    /* Favicon: served from embedded binary */
+    if (strcmp(info.file_name, "/favicon.ico") == 0) {
+        return favicon_get_handler(req);
+    }
+
+    /* Extension-based routing for SPIFFS files */
+    if (str_ends_with(info.file_name, ".html")) {
+        return index_html_get_handler(req, info.file_path);
+    } else if (str_ends_with(info.file_name, ".css")) {
+        return style_css_get_handler(req, info.file_path);
+    } else if (str_ends_with(info.file_name, ".js")) {
+        return script_js_get_handler(req, info.file_path);
+    }
+
+    ESP_LOGE(WEB_TAG, "Failed to stat file : %s", info.file_path); /* Respond with 404 Not Found */
+    return NOT_FOUND_handler(req);
 }
 
 #if CONFIG_SPIRAM
@@ -1144,7 +1321,11 @@ static httpd_handle_t *start_esp_br_http_server(const char *base_path, const cha
     config.max_resp_headers = (sizeof(s_resource_handlers) + sizeof(s_web_gui_handlers)) / sizeof(httpd_uri_t) + 2;
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8 * 1024;
+    config.max_open_sockets = 7;
+    config.lru_purge_enable = true;
     s_server.port = config.server_port;
+
+    esp_br_web_api_init();
 
     // start http_server
     ESP_RETURN_ON_FALSE(!httpd_start(&s_server.handle, &config), NULL, WEB_TAG, "Failed to start web server");

@@ -27,7 +27,7 @@ extern "C" {
 #define OPENTHREAD_INVALID_RLOC16 "0xffff"
 #define WPAN_STATUS_OFFLINE "offline"
 #define WPAN_STATUS_ASSOCIATED "associated"
-#define WPAN_STATUS_ASSICIATING "associating"
+#define WPAN_STATUS_ASSOCIATING "associating"
 #define NETWORK_PASSPHRASE_MAX_SIZE 64
 #define NETWORK_PSKD_MAX_SIZE 64
 #define CREDENTIAL_TYPE_NETWORK_KEY "networkKeyType"
@@ -109,7 +109,7 @@ typedef struct openthread_status {
 /*---------------------------------------------
         Discover Thread netWork
 -----------------------------------------------*/
-typedef struct thread_network_informaiton {
+typedef struct thread_network_information {
     uint16_t id;
     otNetworkName network_name;
     otExtendedPanId extended_panid;
@@ -166,7 +166,7 @@ typedef struct thread_diagnosticTlv_set {
     thread_diagnosticTlv_list_t *diagTlv_next;
 } thread_diagnosticTlv_set_t;
 
-typedef struct thread_node_informaiton {
+typedef struct thread_node_information {
     uint32_t role;
     uint32_t router_number;
     uint16_t rloc16;
@@ -175,7 +175,7 @@ typedef struct thread_node_informaiton {
     otIp6Address rloc_address;
     otLeaderData leader_data;
     otNetworkName network_name;
-} thread_node_informaiton_t;
+} thread_node_information_t;
 
 /*---------------------------------------------
                 Usual Method
@@ -186,8 +186,8 @@ esp_err_t string_to_hex(char str[], uint8_t hex[], size_t size);
 void otbr_properties_reset(openthread_properties_t *properties);
 cJSON *otbr_properties_struct_convert2_json(openthread_properties_t *properties);
 
-void avaiable_network_reset(thread_network_information_t *network);
-cJSON *avaiable_network_struct_convert2_json(thread_network_information_t *network);
+void available_network_reset(thread_network_information_t *network);
+cJSON *available_network_struct_convert2_json(thread_network_information_t *network);
 
 esp_err_t initialize_available_thread_networks_list(thread_network_list_t *list);
 esp_err_t append_available_thread_networks_list(thread_network_list_t *list, thread_network_information_t network);
@@ -208,10 +208,10 @@ esp_err_t initialize_thread_diagnosticTlv_set(thread_diagnosticTlv_set_t *set, c
 esp_err_t update_thread_diagnosticTlv_set(thread_diagnosticTlv_set_t *set, char *rloc16,
                                           thread_diagnosticTlv_list_t *list);
 void destroy_thread_diagnosticTlv_set(thread_diagnosticTlv_set_t *set);
-cJSON *dailnosticTlv_set_convert2_json(const thread_diagnosticTlv_set_t *set);
+cJSON *diagnosticTlv_set_convert2_json(const thread_diagnosticTlv_set_t *set);
 
-void thread_node_information_reset(thread_node_informaiton_t *node);
-cJSON *thread_node_struct_convert2_json(thread_node_informaiton_t *node);
+void thread_node_information_reset(thread_node_information_t *node);
+cJSON *thread_node_struct_convert2_json(thread_node_information_t *node);
 
 cJSON *Timestamp2Json(const otTimestamp aTimestamp);
 cJSON *SecurityPolicy2Json(const otSecurityPolicy aSecurityPolicy);

@@ -1,0 +1,74 @@
+<!--
+  SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+  SPDX-License-Identifier: Apache-2.0
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Thread Border Router - Commissioner</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+<nav class="nav" id="nav"></nav>
+<div class="container">
+    <h1 class="page-title">Commissioner</h1>
+    <p class="page-desc">Start the Thread commissioner to allow new devices to join the network.</p>
+
+    <div class="card section">
+        <div class="card-header">Thread Commissioner</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">
+            The commissioner authenticates and authorises new Thread devices (joiners) onto the network
+            using a pre-shared key for the device (PSKd).
+        </p>
+        <form id="commForm" onsubmit="return false">
+            <div class="form-group">
+                <label class="form-label">PSKd (Joiner Credential)</label>
+                <input class="form-input" name="pskd" type="text" value="J01NME" placeholder="e.g. J01NME">
+                <div class="form-hint">Pre-shared key that the joining device will use</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px">
+                <button type="button" class="btn btn-primary" onclick="startCommission()">Start Commissioner</button>
+                <span id="commStatus" style="font-size:13px"></span>
+            </div>
+        </form>
+    </div>
+
+</div>
+<div class="footer">Copyright &copy; 2026 Espressif Systems. All rights reserved.</div>
+<script src="/static/api.js"></script>
+<script>
+/* Disable page if Thread network is not connected */
+checkThreadState(function(role, connected) {
+    if (!connected) disableManagementPage();
+});
+
+function startCommission() {
+    var form = document.getElementById('commForm');
+    var pskd = form.pskd.value.trim();
+    if (!pskd) { showToast('Please enter a PSKd', 'error'); return; }
+
+    var status = document.getElementById('commStatus');
+    status.textContent = 'Starting...';
+    status.style.color = 'var(--primary)';
+
+    apiPost('/commission', { pskd: pskd }).then(function(res) {
+        if (res.error) {
+            status.textContent = res.message || 'Commissioner failed';
+            status.style.color = 'var(--danger)';
+            showToast('Commissioner failed', 'error');
+        } else {
+            status.textContent = 'Commissioner started';
+            status.style.color = 'var(--success)';
+            showToast('Commissioner started', 'success');
+        }
+    }).catch(function() {
+        status.textContent = 'Connection error';
+        status.style.color = 'var(--danger)';
+    });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,880 @@
+<!--
+  SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+  SPDX-License-Identifier: Apache-2.0
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Thread Border Router - Topology</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+<nav class="nav" id="nav"></nav>
+<div class="container">
+    <h1 class="page-title">Network Topology</h1>
+    <p class="page-desc">Visualize the Thread network mesh structure</p>
+
+    <div class="card section">
+        <div class="flex-between mb-16">
+            <div class="grid-3" style="display:flex;gap:24px;flex-wrap:wrap;font-size:13px">
+                <div><strong>Network:</strong> <span id="topo-name">-</span></div>
+                <div><strong>Leader:</strong> <span id="topo-leader">-</span></div>
+                <div><strong>Total Nodes:</strong> <span id="topo-nodes">-</span></div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="topoBtn" onclick="loadTopology()">Load Topology</button>
+        </div>
+
+        <div class="topo-container" id="topoContainer">
+            <svg class="topo-svg" id="topoSvg" viewBox="0 0 600 400" style="min-height:300px">
+                <text x="300" y="200" text-anchor="middle" fill="#999" font-size="14">Click "Load Topology" to visualize the network</text>
+            </svg>
+            <div class="topo-tooltip" id="topoTip"></div>
+        </div>
+
+        <!-- Legend -->
+        <div style="display:flex;gap:20px;margin-top:12px;font-size:12px;color:var(--text-light);flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:6px">
+                <svg width="16" height="16"><circle cx="8" cy="8" r="7" fill="#7e77f8" stroke="#484e46" stroke-width="1"/></svg>
+                Leader
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+                <svg width="16" height="16"><circle cx="8" cy="8" r="7" fill="#03e2dd" stroke="#484e46" stroke-width="1"/></svg>
+                Router
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+                <svg width="16" height="16"><circle cx="8" cy="8" r="6" fill="#aad4b0" stroke="#484e46" stroke-width="1" stroke-dasharray="2 1"/></svg>
+                Child
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+                <svg width="24" height="16"><line x1="0" y1="8" x2="24" y2="8" stroke="#c0b8b8" stroke-width="1.5"/></svg>
+                Router Link
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+                <svg width="24" height="16"><line x1="0" y1="8" x2="24" y2="8" stroke="#908484" stroke-width="1" stroke-dasharray="4 4"/></svg>
+                Parent-Child
+            </div>
+        </div>
+    </div>
+
+    <!-- Node detail panel -->
+    <div class="card section" id="nodeDetail" style="display:none">
+        <div class="card-header">Node Details</div>
+        <div id="nodeDetailContent"></div>
+
+        <!-- Inline ping -->
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+            <div style="font-weight:600;font-size:14px;margin-bottom:10px">Ping this node</div>
+            <div class="form-row" style="align-items:flex-end">
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Address</label>
+                    <select class="form-input" id="nodePingAddr"></select>
+                </div>
+                <div class="form-group" style="flex:0 0 80px">
+                    <label class="form-label">Count</label>
+                    <input class="form-input" id="nodePingCount" type="number" min="1" max="10" value="4">
+                </div>
+                <div class="form-group" style="flex:0 0 80px">
+                    <label class="form-label">Size</label>
+                    <input class="form-input" id="nodePingSize" type="number" min="4" max="512" value="32">
+                </div>
+                <div class="form-group" style="flex:0 0 auto">
+                    <button class="btn btn-primary btn-sm" id="nodePingBtn" onclick="pingNode()">Ping</button>
+                </div>
+            </div>
+            <div id="nodePingResults" class="hidden" style="margin-top:10px">
+                <div id="nodePingReplies" class="ping-output"></div>
+                <div id="nodePingSummary" class="mt-8"></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+<div class="footer">Copyright &copy; 2026 Espressif Systems. All rights reserved.</div>
+<script src="/static/api.js"></script>
+<script>
+/* Disable page if Thread network is not connected */
+checkThreadState(function(role, connected) {
+    if (!connected) disableManagementPage();
+});
+
+var _meshLocalPrefix = ''; /* e.g. "fdde:ad00:beef:0" – derived from BR RLOC */
+
+function intToHex(num, len) {
+    var s = num.toString(16);
+    while (s.length < len) s = '0' + s;
+    return s;
+}
+
+/* Derive mesh-local /64 prefix from a full RLOC address string.
+   Example: "fdde:ad00:beef:0:0:ff:fe00:7800" → "fdde:ad00:beef:0" */
+function extractMeshPrefix(rlocAddr) {
+    if (!rlocAddr) return '';
+    /* Expand :: shorthand for reliable splitting */
+    var parts = rlocAddr.split(':');
+    /* We only need the first 4 groups for a /64 prefix */
+    if (parts.length >= 4) return parts.slice(0, 4).join(':');
+    return '';
+}
+
+/* Build an RLOC address from mesh-local prefix and RLOC16.
+   Format: <prefix>::ff:fe00:<rloc16> */
+function buildRlocAddress(prefix, rloc16) {
+    if (!prefix) return '';
+    var hex = intToHex(rloc16, 4);
+    return prefix + ':0:ff:fe00:' + hex;
+}
+
+function renderTopologyFromData(nodeRes, diagRes) {
+    if (!nodeRes || nodeRes.error || !nodeRes.result || !diagRes || diagRes.error || !diagRes.result) return false;
+    if (nodeRes.result.RlocAddress) {
+        _meshLocalPrefix = extractMeshPrefix(nodeRes.result.RlocAddress);
+    }
+    buildTopology(nodeRes.result, diagRes.result);
+    return true;
+}
+
+function loadTopology() {
+    var btn = document.getElementById('topoBtn');
+    btn.disabled = true;
+    btn.textContent = 'Loading...';
+    showLoading(true);
+
+    Promise.all([
+        apiGet('/node_information'),
+        apiGet('/topology')
+    ]).then(function(results) {
+        btn.disabled = false;
+        btn.textContent = 'Reload';
+        showLoading(false);
+
+        if (!renderTopologyFromData(results[0], results[1])) {
+            showToast('Failed to load topology data', 'error');
+        }
+    }).catch(function() {
+        btn.disabled = false;
+        btn.textContent = 'Reload';
+        showLoading(false);
+        showToast('Connection error', 'error');
+    });
+}
+
+/* Restore from cache if available */
+(function() {
+    var cachedNode = getCached('/node_information');
+    var cachedDiag = getCached('/topology');
+    if (cachedNode && cachedDiag) {
+        if (renderTopologyFromData(cachedNode, cachedDiag)) {
+            document.getElementById('topoBtn').textContent = 'Reload';
+        }
+    }
+})();
+
+function buildTopology(nodeInfo, diagData) {
+    var nodes = [];
+    var links = [];
+    var nodeMap = {};
+    var count = 0;
+    var i, j, d, ln, rloc, child;
+
+    /* Pre-process diagnostic data: convert numeric values to hex strings */
+    for (i = 0; i < diagData.length; i++) {
+        d = diagData[i];
+        d._routeId = '0x' + intToHex(d.Rloc16 >> 10, 2);
+        d._rloc16Str = '0x' + intToHex(d.Rloc16, 4);
+        if (d.LeaderData) {
+            d._leaderId = '0x' + intToHex(d.LeaderData.LeaderRouterId, 2);
+        }
+        if (d.Route && d.Route.RouteData) {
+            for (j = 0; j < d.Route.RouteData.length; j++) {
+                d.Route.RouteData[j]._routeId = '0x' + intToHex(d.Route.RouteData[j].RouteId, 2);
+            }
+        }
+    }
+
+    /* Build router/leader nodes */
+    for (i = 0; i < diagData.length; i++) {
+        d = diagData[i];
+        if (!d.ChildTable) continue; /* Only routers have ChildTable */
+
+        rloc = parseInt(d._rloc16Str, 16).toString(16);
+        nodeMap[rloc] = count;
+
+        var role = (d._routeId === d._leaderId) ? 'Leader' : 'Router';
+        nodes.push({
+            rloc16: d._rloc16Str,
+            extAddr: d.ExtAddress || '',
+            role: role,
+            diag: d
+        });
+        count++;
+    }
+
+    var routerCount = count;
+    document.getElementById('topo-name').textContent = nodeInfo.NetworkName || '-';
+    if (nodeInfo.LeaderData) {
+        document.getElementById('topo-leader').textContent = '0x' + nodeInfo.LeaderData.LeaderRouterId.toString(16);
+    }
+    /* Total node count will be updated after children are added */
+
+    /* Build router-router links */
+    var src = 0;
+    for (i = 0; i < diagData.length; i++) {
+        d = diagData[i];
+        if (!d.ChildTable) continue;
+
+        if (d.Route && d.Route.RouteData) {
+            for (j = 0; j < d.Route.RouteData.length; j++) {
+                ln = d.Route.RouteData[j];
+                rloc = (parseInt(ln._routeId, 16) << 10).toString(16);
+                if (rloc in nodeMap) {
+                    var dist = nodeMap[rloc];
+                    if (src < dist) {
+                        links.push({
+                            source: src,
+                            target: dist,
+                            type: 'router',
+                            quality: ln.LinkQualityIn || 1
+                        });
+                    }
+                }
+            }
+        }
+
+        /* Build router-child links */
+        for (j = 0; j < d.ChildTable.length; j++) {
+            child = d.ChildTable[j];
+            var parentRloc = parseInt(d._rloc16Str, 16).toString(16);
+            var childRloc16 = parseInt(d._rloc16Str, 16) + child.ChildId;
+
+            nodes.push({
+                rloc16: '0x' + intToHex(childRloc16, 4),
+                extAddr: '',
+                role: 'Child',
+                diag: null
+            });
+            links.push({
+                source: nodeMap[parentRloc],
+                target: count,
+                type: 'child',
+                quality: 1
+            });
+            count++;
+        }
+        src++;
+    }
+
+    var childCount = nodes.length - routerCount;
+    document.getElementById('topo-nodes').textContent = nodes.length + ' (' + routerCount + ' Routers + ' + childCount + ' Children)';
+
+    if (nodes.length === 0) {
+        showToast('No nodes found in topology', 'info');
+        return;
+    }
+
+    renderGraph(nodes, links);
+}
+
+function renderGraph(nodes, links) {
+    /* Separate routers/leader from children */
+    var routers = [];
+    var children = [];
+    var routerLinks = [];
+    var childLinks = [];
+    var i, j;
+
+    for (i = 0; i < nodes.length; i++) {
+        if (nodes[i].role === 'Child') children.push(i);
+        else routers.push(i);
+    }
+    for (i = 0; i < links.length; i++) {
+        if (links[i].type === 'child') childLinks.push(links[i]);
+        else routerLinks.push(links[i]);
+    }
+
+    /* Scale canvas to node count */
+    var routerCount = routers.length;
+    var scale = Math.max(1, Math.sqrt(nodes.length / 6));
+    var W = Math.round(Math.max(600, 300 * scale));
+    var H = Math.round(Math.max(400, 200 * scale));
+    var pad = 60;
+
+    var svg = document.getElementById('topoSvg');
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.innerHTML = '';
+
+    /* Invisible background rect so clicks on empty space are captured */
+    var bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bgRect.setAttribute('width', W);
+    bgRect.setAttribute('height', H);
+    bgRect.setAttribute('fill', 'transparent');
+    svg.appendChild(bgRect);
+
+    var cx = W / 2, cy = H / 2;
+
+    /* --- Phase 1: Force-directed layout for routers only --- */
+    /* Count children per router — routers with more children need more space */
+    var routerChildCount = {}; /* node index → child count */
+    for (i = 0; i < childLinks.length; i++) {
+        var pIdx = childLinks[i].source;
+        routerChildCount[pIdx] = (routerChildCount[pIdx] || 0) + 1;
+    }
+    /* Compute a "radius weight" per router: 1 (no children) up to ~2.5 (many) */
+    var routerWeight = {};
+    for (i = 0; i < routers.length; i++) {
+        var cc = routerChildCount[routers[i]] || 0;
+        routerWeight[routers[i]] = 1 + Math.sqrt(cc) * 0.5;
+    }
+
+    /* Reserve outer zone for children; routers stay in inner zone */
+    /* Shrink margin as router count grows — more routers need more room */
+    var marginPct = Math.max(0.08, 0.22 - routerCount * 0.006);
+    var routerMargin = Math.round(Math.max(pad, Math.min(W, H) * marginPct));
+    var rIdx = {}; /* node index → router-local index */
+    for (i = 0; i < routers.length; i++) {
+        rIdx[routers[i]] = i;
+        nodes[routers[i]].x = cx + (Math.random() - 0.5) * W * 0.3;
+        nodes[routers[i]].y = cy + (Math.random() - 0.5) * H * 0.3;
+    }
+
+    var routerArea = (W - 2 * routerMargin) * (H - 2 * routerMargin);
+    var k = Math.sqrt(routerArea / Math.max(routerCount, 1)) * 0.8;
+    var iterations = Math.min(300, 80 + routerCount * 15);
+    var temp, dx, dy, dist, force, fx, fy;
+
+    /* Weaken attraction for dense/full-mesh graphs */
+    var maxLinks = routerCount * (routerCount - 1) / 2;
+    var density = maxLinks > 0 ? routerLinks.length / maxLinks : 0;
+    var attractScale = 1 / (1 + density * 3);
+
+    for (var iter = 0; iter < iterations; iter++) {
+        temp = (1 - iter / iterations) * 0.8 + 0.01;
+
+        for (i = 0; i < routers.length; i++) {
+            nodes[routers[i]].fx = 0;
+            nodes[routers[i]].fy = 0;
+        }
+
+        /* Repulsive forces — weighted by child count.
+           Two routers with many children repel more strongly so their
+           child clusters don't overlap. */
+        for (i = 0; i < routers.length; i++) {
+            for (j = i + 1; j < routers.length; j++) {
+                var ni = nodes[routers[i]], nj = nodes[routers[j]];
+                var wi = routerWeight[routers[i]], wj = routerWeight[routers[j]];
+                dx = ni.x - nj.x;
+                dy = ni.y - nj.y;
+                dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
+                force = (k * k * (wi + wj) * 0.5) / dist;
+                fx = (dx / dist) * force;
+                fy = (dy / dist) * force;
+                ni.fx += fx; ni.fy += fy;
+                nj.fx -= fx; nj.fy -= fy;
+            }
+        }
+
+        /* Attractive forces along router-router links (scaled by density) */
+        for (i = 0; i < routerLinks.length; i++) {
+            var s = nodes[routerLinks[i].source];
+            var t = nodes[routerLinks[i].target];
+            dx = t.x - s.x;
+            dy = t.y - s.y;
+            dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
+            force = (dist * dist) / k * attractScale;
+            fx = (dx / dist) * force;
+            fy = (dy / dist) * force;
+            s.fx += fx; s.fy += fy;
+            t.fx -= fx; t.fy -= fy;
+        }
+
+        /* Centering force */
+        for (i = 0; i < routers.length; i++) {
+            var rn = nodes[routers[i]];
+            rn.fx += (cx - rn.x) * 0.1;
+            rn.fy += (cy - rn.y) * 0.1;
+        }
+
+        /* Apply forces — clamp to inner router zone */
+        for (i = 0; i < routers.length; i++) {
+            var rn = nodes[routers[i]];
+            var disp = Math.sqrt(rn.fx * rn.fx + rn.fy * rn.fy) || 0.1;
+            var maxMove = k * temp;
+            rn.x += (rn.fx / disp) * Math.min(disp, maxMove);
+            rn.y += (rn.fy / disp) * Math.min(disp, maxMove);
+            rn.x = Math.max(routerMargin, Math.min(W - routerMargin, rn.x));
+            rn.y = Math.max(routerMargin, Math.min(H - routerMargin, rn.y));
+        }
+    }
+
+    /* Post-layout: enforce minimum separation scaled by combined weight */
+    var usableW = W - 2 * routerMargin, usableH = H - 2 * routerMargin;
+    var baseMinDist = k * 0.35;
+    for (var pass = 0; pass < 30; pass++) {
+        for (i = 0; i < routers.length; i++) {
+            for (j = i + 1; j < routers.length; j++) {
+                var ni = nodes[routers[i]], nj = nodes[routers[j]];
+                var wi = routerWeight[routers[i]], wj = routerWeight[routers[j]];
+                var minDist = baseMinDist * (wi + wj) * 0.5;
+                dx = ni.x - nj.x;
+                dy = ni.y - nj.y;
+                dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
+                if (dist < minDist) {
+                    var push = (minDist - dist) / 2;
+                    var ux = (dx / dist) * push;
+                    var uy = (dy / dist) * push;
+                    ni.x += ux; ni.y += uy;
+                    nj.x -= ux; nj.y -= uy;
+                }
+            }
+        }
+        for (i = 0; i < routers.length; i++) {
+            var rn = nodes[routers[i]];
+            rn.x = Math.max(routerMargin, Math.min(W - routerMargin, rn.x));
+            rn.y = Math.max(routerMargin, Math.min(H - routerMargin, rn.y));
+        }
+    }
+
+    /* --- Phase 2: Place children radially around their parent --- */
+    /* Group children by parent */
+    var parentChildren = {}; /* parent node index → [child node index, ...] */
+    for (i = 0; i < childLinks.length; i++) {
+        var pIdx = childLinks[i].source;
+        var cIdx = childLinks[i].target;
+        if (!parentChildren[pIdx]) parentChildren[pIdx] = [];
+        parentChildren[pIdx].push(cIdx);
+    }
+
+    var childPad = 20; /* children can be closer to edges than routers */
+    var childRadius = Math.max(50, Math.min(k * 0.6, baseMinDist * 0.85));
+    for (var pKey in parentChildren) {
+        var pNode = nodes[pKey];
+        var kids = parentChildren[pKey];
+        var count = kids.length;
+
+        /* Find angle away from other routers to bias child placement outward */
+        var awayX = 0, awayY = 0;
+        for (i = 0; i < routers.length; i++) {
+            if (routers[i] == pKey) continue;
+            var other = nodes[routers[i]];
+            dx = pNode.x - other.x;
+            dy = pNode.y - other.y;
+            dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            awayX += dx / dist;
+            awayY += dy / dist;
+        }
+        var baseAngle = Math.atan2(awayY, awayX);
+
+        /* Spread children in an arc centered on the "away" direction */
+        var arcSpan = Math.min(Math.PI * 1.5, count * 0.5);
+        for (i = 0; i < count; i++) {
+            var angle = baseAngle + (i - (count - 1) / 2) * (arcSpan / Math.max(count - 1, 1));
+            var r = childRadius + (count > 4 ? (i % 2) * 15 : 0); /* stagger rows if many children */
+            nodes[kids[i]].x = pNode.x + Math.cos(angle) * r;
+            nodes[kids[i]].y = pNode.y + Math.sin(angle) * r;
+        }
+    }
+
+    /* --- Phase 3: Push apart overlapping children --- */
+    var minChildDist = 40;
+    for (var pass = 0; pass < 20; pass++) {
+        for (i = 0; i < children.length; i++) {
+            for (j = i + 1; j < children.length; j++) {
+                var ci = nodes[children[i]], cj = nodes[children[j]];
+                dx = ci.x - cj.x;
+                dy = ci.y - cj.y;
+                dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
+                if (dist < minChildDist) {
+                    var push = (minChildDist - dist) / 2;
+                    var ux = (dx / dist) * push;
+                    var uy = (dy / dist) * push;
+                    ci.x += ux; ci.y += uy;
+                    cj.x -= ux; cj.y -= uy;
+                }
+            }
+        }
+    }
+
+    /* Clamp all children to viewBox */
+    for (i = 0; i < children.length; i++) {
+        var cn = nodes[children[i]];
+        cn.x = Math.max(childPad, Math.min(W - childPad, cn.x));
+        cn.y = Math.max(childPad, Math.min(H - childPad, cn.y));
+    }
+
+    /* --- Draw --- */
+    /* Per-node adjacency: nodeLinks[i] = [link index, ...] */
+    var nodeLinks = {};
+    for (i = 0; i < nodes.length; i++) nodeLinks[i] = [];
+
+    /* Per-node neighbor set (for fast lookup during hover) */
+    var neighbors = {};
+    for (i = 0; i < nodes.length; i++) neighbors[i] = {};
+
+    /* Draw links — router links very light, child links subtle */
+    var linkEls = [];
+    for (i = 0; i < links.length; i++) {
+        var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', nodes[links[i].source].x);
+        line.setAttribute('y1', nodes[links[i].source].y);
+        line.setAttribute('x2', nodes[links[i].target].x);
+        line.setAttribute('y2', nodes[links[i].target].y);
+        if (links[i].type === 'child') {
+            line.setAttribute('stroke', '#908484');
+            line.setAttribute('stroke-dasharray', '4 4');
+            line.setAttribute('stroke-width', '1');
+            line.setAttribute('stroke-opacity', '0.5');
+        } else {
+            line.setAttribute('stroke', '#c0b8b8');
+            line.setAttribute('stroke-width', '1');
+            line.setAttribute('stroke-opacity', '0.2');
+        }
+        svg.appendChild(line);
+        linkEls.push(line);
+        nodeLinks[links[i].source].push(i);
+        nodeLinks[links[i].target].push(i);
+        neighbors[links[i].source][links[i].target] = true;
+        neighbors[links[i].target][links[i].source] = true;
+    }
+
+    var rLeader = 16;
+    var rRouter = 14;
+    var rChild  = 8;
+    var fontSize = 11;
+    var labelGap = 26;
+    var labelGapChild = 18;
+
+    /* Draw nodes — collect <g> elements for hover fade */
+    var tip = document.getElementById('topoTip');
+    var container = document.getElementById('topoContainer');
+    var nodeEls = []; /* nodeEls[i] = <g> element for node i */
+    var circleEls = []; /* circleEls[i] = <circle> element for node i */
+
+    for (i = 0; i < nodes.length; i++) {
+        var n = nodes[i];
+        var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.style.transition = 'opacity 0.15s';
+
+        var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', n.x);
+        circle.setAttribute('cy', n.y);
+
+        if (n.role === 'Leader') {
+            circle.setAttribute('r', rLeader);
+            circle.setAttribute('fill', '#7e77f8');
+            circle.setAttribute('stroke', '#484e46');
+            circle.setAttribute('stroke-width', '1.5');
+        } else if (n.role === 'Router') {
+            circle.setAttribute('r', rRouter);
+            circle.setAttribute('fill', '#03e2dd');
+            circle.setAttribute('stroke', '#484e46');
+            circle.setAttribute('stroke-width', '1');
+        } else {
+            circle.setAttribute('r', rChild);
+            circle.setAttribute('fill', '#aad4b0');
+            circle.setAttribute('stroke', '#484e46');
+            circle.setAttribute('stroke-width', '1');
+            circle.setAttribute('stroke-dasharray', '2 1');
+        }
+        circle.style.cursor = 'pointer';
+        g.appendChild(circle);
+
+        /* RLOC16 label */
+        var label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('x', n.x);
+        label.setAttribute('y', n.y + (n.role === 'Child' ? labelGapChild : labelGap));
+        label.setAttribute('text-anchor', 'middle');
+        label.setAttribute('font-size', fontSize);
+        label.setAttribute('fill', '#666');
+        label.textContent = n.rloc16;
+        g.appendChild(label);
+
+        svg.appendChild(g);
+        nodeEls.push(g);
+        circleEls.push(circle);
+    }
+
+    /* --- Hover: fade everything except hovered node + its neighbors/links --- */
+    var pinnedIdx = -1; /* currently clicked/pinned node, -1 = none */
+    var selectionRing = null; /* SVG circle overlay for selected node */
+
+    function showSelectionRing(idx) {
+        removeSelectionRing();
+        var c = circleEls[idx];
+        var r = parseFloat(c.getAttribute('r'));
+        selectionRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        selectionRing.setAttribute('cx', c.getAttribute('cx'));
+        selectionRing.setAttribute('cy', c.getAttribute('cy'));
+        selectionRing.setAttribute('r', r + 3);
+        selectionRing.setAttribute('fill', 'none');
+        selectionRing.setAttribute('stroke', '#e53935');
+        selectionRing.setAttribute('stroke-width', '3');
+        selectionRing.style.pointerEvents = 'none';
+        svg.appendChild(selectionRing);
+    }
+
+    function removeSelectionRing() {
+        if (selectionRing && selectionRing.parentNode) {
+            selectionRing.parentNode.removeChild(selectionRing);
+        }
+        selectionRing = null;
+    }
+
+    function applyFocus(idx) {
+        var nb = neighbors[idx];
+        for (var ni = 0; ni < nodes.length; ni++) {
+            nodeEls[ni].style.opacity = (ni === idx || nb[ni]) ? '1' : '0.12';
+        }
+        for (var li = 0; li < linkEls.length; li++) {
+            linkEls[li].style.transition = 'opacity 0.15s';
+            linkEls[li].setAttribute('stroke-opacity', '0.05');
+        }
+        var ll = nodeLinks[idx];
+        for (var k = 0; k < ll.length; k++) {
+            var el = linkEls[ll[k]];
+            var lk = links[ll[k]];
+            if (lk.type === 'child') {
+                el.setAttribute('stroke-opacity', '0.8');
+                el.setAttribute('stroke', '#6a9e70');
+            } else {
+                el.setAttribute('stroke-opacity', '0.85');
+                el.setAttribute('stroke', '#908484');
+                el.setAttribute('stroke-width', '2');
+            }
+        }
+    }
+
+    function clearFocus() {
+        for (var ni = 0; ni < nodes.length; ni++) {
+            nodeEls[ni].style.opacity = '1';
+        }
+        for (var li = 0; li < linkEls.length; li++) {
+            var lk = links[li];
+            if (lk.type === 'child') {
+                linkEls[li].setAttribute('stroke-opacity', '0.5');
+                linkEls[li].setAttribute('stroke', '#908484');
+            } else {
+                linkEls[li].setAttribute('stroke-opacity', '0.2');
+                linkEls[li].setAttribute('stroke', '#c0b8b8');
+                linkEls[li].setAttribute('stroke-width', '1');
+            }
+        }
+    }
+
+    /* Attach events after all nodes are drawn */
+    for (i = 0; i < nodes.length; i++) {
+        (function(node, gEl, idx) {
+            gEl.addEventListener('mouseenter', function() {
+                if (pinnedIdx === -1) applyFocus(idx);
+            });
+            gEl.addEventListener('mouseleave', function() {
+                if (pinnedIdx === -1) clearFocus();
+            });
+            gEl.addEventListener('mousemove', function(e) {
+                var rect = container.getBoundingClientRect();
+                tip.textContent = node.rloc16 + ' (' + node.role + ')';
+                tip.style.left = (e.clientX - rect.left + 10) + 'px';
+                tip.style.top = (e.clientY - rect.top - 30) + 'px';
+                tip.style.display = 'block';
+            });
+            gEl.addEventListener('mouseout', function() {
+                tip.style.display = 'none';
+            });
+            gEl.addEventListener('click', function() {
+                if (pinnedIdx === idx) {
+                    /* Unpin — hide detail, restore normal view */
+                    pinnedIdx = -1;
+                    removeSelectionRing();
+                    clearFocus();
+                    hideNodeDetail();
+                } else {
+                    pinnedIdx = idx;
+                    applyFocus(idx);
+                    showSelectionRing(idx);
+                    showNodeDetail(node);
+                }
+            });
+        })(nodes[i], nodeEls[i], i);
+    }
+
+    /* Click on empty SVG space to deselect */
+    svg.addEventListener('click', function(e) {
+        if ((e.target === svg || e.target === bgRect) && pinnedIdx !== -1) {
+            pinnedIdx = -1;
+            removeSelectionRing();
+            clearFocus();
+            hideNodeDetail();
+        }
+    });
+
+    showToast('Topology loaded: ' + nodes.length + ' node(s)', 'success');
+}
+
+function hideNodeDetail() {
+    document.getElementById('nodeDetail').style.display = 'none';
+}
+
+function showNodeDetail(node) {
+    var panel = document.getElementById('nodeDetail');
+    var content = document.getElementById('nodeDetailContent');
+    panel.style.display = 'block';
+
+    var html = '<div class="info-row"><span class="info-label">RLOC16</span><span class="info-value">' + escapeHtml(node.rloc16) + '</span></div>';
+    html += '<div class="info-row"><span class="info-label">Role</span><span class="info-value">' + escapeHtml(node.role) + '</span></div>';
+    if (node.extAddr) {
+        html += '<div class="info-row"><span class="info-label">Extended Address</span><span class="info-value">' + escapeHtml(node.extAddr) + '</span></div>';
+    }
+
+    /* Collect pingable addresses for this node */
+    var addrs = [];
+
+    /* Derive RLOC address from mesh-local prefix + RLOC16 */
+    var rloc16Num = parseInt(node.rloc16, 16);
+    if (_meshLocalPrefix && !isNaN(rloc16Num)) {
+        addrs.push({addr: buildRlocAddress(_meshLocalPrefix, rloc16Num), label: 'RLOC'});
+    }
+
+    if (node.diag) {
+        var d = node.diag;
+        if (d.Mode) {
+            html += '<div class="info-row"><span class="info-label">Mode</span><span class="info-value">';
+            html += 'RxOnWhenIdle:' + (d.Mode.RxOnWhenIdle || 0);
+            html += ' FTD:' + (d.Mode.DeviceType || 0);
+            html += ' Network:' + (d.Mode.NetworkData || 0);
+            html += '</span></div>';
+        }
+        if (d.LeaderData) {
+            html += '<div class="info-row"><span class="info-label">Leader Router ID</span><span class="info-value">0x' + escapeHtml(intToHex(d.LeaderData.LeaderRouterId, 2)) + '</span></div>';
+            html += '<div class="info-row"><span class="info-label">Partition ID</span><span class="info-value">' + escapeHtml(d.LeaderData.PartitionId) + '</span></div>';
+        }
+        if (d.IP6AddressList && d.IP6AddressList.length) {
+            html += '<div class="info-row"><span class="info-label">IPv6 Addresses</span><span class="info-value" style="max-width:70%;font-size:11px">' + d.IP6AddressList.map(escapeHtml).join('<br>') + '</span></div>';
+
+            /* Add diagnostic addresses to ping list (skip duplicates of RLOC) */
+            for (var a = 0; a < d.IP6AddressList.length; a++) {
+                var ip = d.IP6AddressList[a];
+                var isDup = false;
+                for (var x = 0; x < addrs.length; x++) {
+                    if (addrs[x].addr === ip) { isDup = true; break; }
+                }
+                if (!isDup) {
+                    /* Identify address type for label */
+                    var lbl = 'IPv6';
+                    if (ip.indexOf('fe80') === 0) lbl = 'Link-Local';
+                    else if (ip.indexOf('ff') === 0) lbl = 'Multicast';
+                    else if (addrs.length > 0 && ip !== addrs[0].addr) lbl = 'Mesh-Local EID';
+                    addrs.push({addr: ip, label: lbl});
+                }
+            }
+        }
+        if (d.ChildTable && d.ChildTable.length > 0) {
+            html += '<div class="info-row"><span class="info-label">Children</span><span class="info-value">' + d.ChildTable.length + '</span></div>';
+        }
+    }
+    content.innerHTML = html;
+
+    /* Populate ping address dropdown */
+    var sel = document.getElementById('nodePingAddr');
+    sel.innerHTML = '';
+    for (var i = 0; i < addrs.length; i++) {
+        var opt = document.createElement('option');
+        opt.value = addrs[i].addr;
+        opt.textContent = addrs[i].addr + '  (' + addrs[i].label + ')';
+        sel.appendChild(opt);
+    }
+    if (addrs.length === 0) {
+        var opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '(no address available)';
+        sel.appendChild(opt);
+    }
+
+    /* Reset previous ping results */
+    document.getElementById('nodePingResults').classList.add('hidden');
+    document.getElementById('nodePingReplies').innerHTML = '';
+    document.getElementById('nodePingSummary').innerHTML = '';
+    document.getElementById('nodePingBtn').disabled = (addrs.length === 0);
+
+    /* Scroll to detail panel */
+    panel.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+}
+
+function pingNode() {
+    var addr = document.getElementById('nodePingAddr').value;
+    if (!addr) { showToast('No address selected', 'error'); return; }
+
+    var count = parseInt(document.getElementById('nodePingCount').value) || 4;
+    var size = parseInt(document.getElementById('nodePingSize').value) || 32;
+    if (count < 1) count = 1;
+    if (count > 10) count = 10;
+    if (size < 4) size = 4;
+    if (size > 512) size = 512;
+
+    var btn = document.getElementById('nodePingBtn');
+    var resultsEl = document.getElementById('nodePingResults');
+    var repliesEl = document.getElementById('nodePingReplies');
+    var summaryEl = document.getElementById('nodePingSummary');
+
+    btn.disabled = true;
+    btn.textContent = 'Pinging...';
+    resultsEl.classList.remove('hidden');
+    repliesEl.innerHTML = '<div class="text-center"><div class="spinner" style="width:20px;height:20px;margin:6px auto"></div>'
+        + '<div class="text-muted" style="font-size:12px">Pinging ' + escapeHtml(addr) + '...</div></div>';
+    summaryEl.innerHTML = '';
+
+    apiPost('/ping', {address: addr, count: count, size: size}).then(function(data) {
+        btn.disabled = false;
+        btn.textContent = 'Ping';
+
+        if (data.error !== 0 || !data.result) {
+            repliesEl.innerHTML = '<div class="ping-line ping-timeout">' + escapeHtml(data.message || 'Ping failed') + '</div>';
+            return;
+        }
+
+        var r = data.result;
+        var replies = r.replies || [];
+        var stats = r.statistics || {};
+
+        /* Render replies */
+        if (replies.length === 0) {
+            repliesEl.innerHTML = '<div class="ping-line ping-timeout">No replies received (100% loss)</div>';
+        } else {
+            var html = '';
+            for (var i = 0; i < replies.length; i++) {
+                var p = replies[i];
+                html += '<div class="ping-line ping-ok">'
+                    + escapeHtml(p.size) + ' bytes from <strong>' + escapeHtml(p.from) + '</strong>: '
+                    + 'seq=' + escapeHtml(p.seq) + ' hlim=' + escapeHtml(p.hlim) + ' time=' + escapeHtml(p.rtt) + 'ms</div>';
+            }
+            repliesEl.innerHTML = html;
+        }
+
+        /* Render summary */
+        var sent = stats.sent || 0;
+        var recv = stats.received || 0;
+        var loss = stats.loss_percent !== undefined ? stats.loss_percent.toFixed(1) : '?';
+        var badgeClass = recv === sent ? 'badge-success' : (recv === 0 ? 'badge-danger' : 'badge-warning');
+
+        var sh = '<div class="ping-summary">';
+        sh += '<div class="info-row"><span class="info-label">Packets</span>'
+            + '<span class="info-value">' + sent + ' sent, ' + recv + ' received</span></div>';
+        sh += '<div class="info-row"><span class="info-label">Packet Loss</span>'
+            + '<span class="info-value"><span class="badge ' + badgeClass + '">' + loss + '%</span></span></div>';
+        if (recv > 0 && stats.rtt_min !== undefined) {
+            sh += '<div class="info-row"><span class="info-label">RTT (min / avg / max)</span>'
+                + '<span class="info-value">' + stats.rtt_min + ' / ' + stats.rtt_avg + ' / ' + stats.rtt_max + ' ms</span></div>';
+        }
+        sh += '</div>';
+        summaryEl.innerHTML = sh;
+
+    }).catch(function() {
+        btn.disabled = false;
+        btn.textContent = 'Ping';
+        repliesEl.innerHTML = '<div class="ping-line ping-timeout">Connection error — could not reach device.</div>';
+        showToast('Connection error', 'error');
+    });
+}
+</script>
+</body>
+</html>
