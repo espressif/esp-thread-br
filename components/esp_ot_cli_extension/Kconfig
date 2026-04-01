@@ -23,9 +23,8 @@ menu "OpenThread Extension CLI"
         default n
 
     config OPENTHREAD_RCP_COMMAND
-        bool "Enable rcp control command of border router"
-        depends on OPENTHREAD_CLI_ESP_EXTENSION && OPENTHREAD_BORDER_ROUTER && AUTO_UPDATE_RCP
-        default y if AUTO_UPDATE_RCP
+        bool "Enable rcp control command of OpenThread host"
+        depends on OPENTHREAD_CLI_ESP_EXTENSION && (OPENTHREAD_RADIO_SPINEL_UART || OPENTHREAD_RADIO_SPINEL_SPI)
 
     config OPENTHREAD_RCP_CLI
         bool "Enable rcp control via cli commands"
