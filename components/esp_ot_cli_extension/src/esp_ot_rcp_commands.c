@@ -11,7 +11,9 @@
 #include "esp_check.h"
 #include "esp_openthread_border_router.h"
 #include "esp_ot_cli_extension.h"
+#if CONFIG_AUTO_UPDATE_RCP
 #include "esp_rcp_update.h"
+#endif
 #include "openthread/cli.h"
 
 #if CONFIG_OPENTHREAD_RCP_CLI
@@ -47,17 +49,19 @@ static esp_err_t join_args(char *out, size_t out_len, uint8_t start, uint8_t arg
 otError esp_openthread_process_rcp_command(void *aContext, uint8_t aArgsLength, char *aArgs[])
 {
     if (aArgsLength == 0) {
-        otCliOutputFormat("---otrcp parameter---\n");
-        otCliOutputFormat("update               :    process updating the rcp\n");
-#if CONFIG_OPENTHREAD_RCP_CLI
-        otCliOutputFormat("<text>               :    send command to be run on rcp\n");
+        otCliOutputFormat("---otrcp commands---\n");
+#if CONFIG_AUTO_UPDATE_RCP
+        otCliOutputFormat("update:\n");
+        otCliOutputFormat("  desc    : process updating the rcp\n");
+        otCliOutputFormat("  example : otrcp update\n");
 #endif
-        otCliOutputFormat("---example---\n");
-        otCliOutputFormat("update the ot rcp    :    otrcp update\n");
 #if CONFIG_OPENTHREAD_RCP_CLI
-        otCliOutputFormat("run help cmd on rcp  :    otrcp help\n");
+        otCliOutputFormat("<text>:\n");
+        otCliOutputFormat("  desc    : send command to be run on rcp\n");
+        otCliOutputFormat("  example : otrcp help\n");
 #endif
     } else if (strcmp(aArgs[0], "update") == 0) {
+#if CONFIG_AUTO_UPDATE_RCP
         otInstance *ins = esp_openthread_get_instance();
         ESP_RETURN_ON_FALSE(otThreadGetDeviceRole(ins) == OT_DEVICE_ROLE_DISABLED, OT_ERROR_INVALID_STATE,
                             OT_EXT_CLI_TAG, "Thread is not disabled");
@@ -73,6 +77,9 @@ otError esp_openthread_process_rcp_command(void *aContext, uint8_t aArgsLength, 
         vTaskDelay(pdMS_TO_TICKS(1000));
         ESP_RETURN_ON_FALSE(esp_openthread_rcp_init() == ESP_OK, OT_ERROR_FAILED, OT_EXT_CLI_TAG,
                             "Fail to initialize RCP");
+#else
+        otCliOutputFormat("invalid commands\n");
+#endif
     } else {
 #if CONFIG_OPENTHREAD_RCP_CLI
         char buf[256];
