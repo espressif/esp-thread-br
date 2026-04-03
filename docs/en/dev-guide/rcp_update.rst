@@ -4,7 +4,7 @@
 
 The ESP Thread Border Router SDK supports a feature for updating RCP firmware from the Host SoC. This process can be automated by enabling the ``AUTO_UPDATE_RCP`` option in the menuconfig.
 
-Additionally, a CLI command (``otrcp update``) is available to promptly initiate the RCP update process. The command will be supported by enabling ``OPENTHREAD_RCP_COMMAND`` option.
+Additionally, a CLI command (``ot otrcp update``) is available to promptly initiate the RCP update process. The command will be supported by enabling ``OPENTHREAD_RCP_COMMAND`` option.
 
 2.4.1. RCP Image
 ----------------
@@ -52,4 +52,4 @@ After starting the border router, update the RCP using the following command:
 
 .. code-block:: bash
 
-     otrcp update
+     ot otrcp update

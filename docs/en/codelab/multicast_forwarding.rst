@@ -27,7 +27,7 @@ First, join the multicast group on the Thread CLI device:
 
 .. code-block::
 
-   mcast join ff04::123
+   ot mcast join ff04::123
 
 
 Now you can ping Thread CLI device on your Linux Host:
@@ -53,11 +53,11 @@ First, join the multicast group and create a UDP socket on the Thread CLI device
 
 .. code-block::
 
-	> mcast join ff04::123
+	> ot mcast join ff04::123
 	Done
-	> udp open
+	> ot udp open
 	Done
-	> udp bind :: 5083
+	> ot udp bind :: 5083
 	Done
 
 
@@ -91,11 +91,11 @@ On the Thread CLI device, the message will be printed:
 
 .. code-block::
 
-	> mcast join ff04::123
+	> ot mcast join ff04::123
 	Done
-	> udp open
+	> ot udp open
 	Done
-	> udp bind :: 5083
+	> ot udp bind :: 5083
 	Done
 	5 bytes from fd11:1111:1122:2222:4a9e:272e:6a50:cf61 56024 hello
 
@@ -133,21 +133,21 @@ After launching the script and the Thread CLI device will be able to send UDP me
 
 .. code-block::
 
-	udp open
+	ot udp open
 
 
 .. code-block::
 
-	udp send ff04::123 5083 hello
+	ot udp send ff04::123 5083 hello
 
 
 You will get a result ``Done`` after executing each of the commands, the expected output is below:
 
 .. code-block::
 
-	> udp open
+	> ot udp open
 	Done
-	> udp send ff04::123 5083 hello
+	> ot udp send ff04::123 5083 hello
 	Done
 
 On the Linux Host machine, the message will be printed:

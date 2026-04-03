@@ -24,41 +24,41 @@ Using this command line to set host name:
 
 .. code-block::
 
-   srp client host name thread-device
+   ot srp client host name thread-device
 
 
 Using this command line to set host address, you can set default address with ``auto``:
 
 .. code-block::
 
-   srp client host address auto
+   ot srp client host address auto
 
 
 Using this command line to set parameter of the service:
 
 .. code-block::
 
-   srp client service add thread-service _test._tcp,_sub1,_sub2 12345 1 1 0778797a3d58595a
+   ot srp client service add thread-service _test._tcp,_sub1,_sub2 12345 1 1 0778797a3d58595a
 
 
 Using this command line to enable the service:
 
 .. code-block::
 
-    srp client autostart enable
+    ot srp client autostart enable
 
 
 You will get a result ``Done`` after executing each of the commands, the expected output is below:
 
 .. code-block::
 
-   > srp client host name thread-device
+   > ot srp client host name thread-device
    Done
-   > srp client host address auto
+   > ot srp client host address auto
    Done
-   > srp client service add thread-service _test._tcp,_sub1,_sub2 12345 1 1 0778797a3d58595a
+   > ot srp client service add thread-service _test._tcp,_sub1,_sub2 12345 1 1 0778797a3d58595a
    Done
-   > srp client autostart enable
+   > ot srp client autostart enable
    Done
 
 
@@ -66,14 +66,14 @@ You can execute this command on the Border Router to resolve the service:
 
 .. code-block::
 
-    srp server service
+    ot srp server service
 
 
 The service can be found on the Border Router:
 
 .. code-block::
 
-    > srp server service
+    > ot srp server service
     thread-service._test._tcp.default.service.arpa.
         deleted: false
         subtypes: _sub2,_sub1
@@ -135,14 +135,14 @@ Then get the Border Router's Mesh-Local Endpoint Identifier, and configure it on
 
 .. code-block::
 
-    ipaddr mleid
+    ot ipaddr mleid
 
 
 You will get: 
 
 .. code-block::
 
-    > ipaddr mleid
+    > ot ipaddr mleid
     fdde:ad00:beef:0:f891:287:866:776
     Done
 
@@ -150,14 +150,14 @@ On the Thread CLI device:
 
 .. code-block::
 
-    dns config fdde:ad00:beef:0:f891:287:866:776
+    ot dns config fdde:ad00:beef:0:f891:287:866:776
 
 
 You will get:
 
 .. code-block::
 
-    > dns config fd9b:347f:93f7:1:1003:8f00:bcc1:3038
+    > ot dns config fd9b:347f:93f7:1:1003:8f00:bcc1:3038
     Done
 
 
@@ -165,16 +165,16 @@ The service can be resolved on the Thread CLI device by executing this command:
 
 .. code-block::
 
-    dns service wifi-service _test._tcp.default.service.arpa.
+    ot dns service wifi-service _test._tcp.default.service.arpa.
 
 
 The expected output on the Thread CLI device is below:
 
 .. code-block::
 
-    > dns config fdde:ad00:beef:0:f891:287:866:776
+    > ot dns config fdde:ad00:beef:0:f891:287:866:776
     Done
-    > dns service wifi-service _test._tcp.default.service.arpa.
+    > ot dns service wifi-service _test._tcp.default.service.arpa.
     DNS service resolution response for wifi-service for service _test._tcp.default.service.arpa.
     Port:22222, Priority:0, Weight:0, TTL:120
     Host:FA001388.default.service.arpa.

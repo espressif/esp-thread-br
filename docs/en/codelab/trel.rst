@@ -37,7 +37,7 @@ Obtain IPv6 address of Thread CLI device:
 
 .. code-block::
 
-    > ipaddr mleid
+    > ot ipaddr mleid
 
     fd14:c8eb:d14c:5fbe:b57e:1e02:a532:26d1
     Done
@@ -46,7 +46,7 @@ Obtain IPv6 address of Wi-Fi device:
 
 .. code-block::
 
-    > ipaddr mleid
+    > ot ipaddr mleid
 
     fd14:c8eb:d14c:5fbe:bd5e:16de:3183:694a
     Done
@@ -55,7 +55,7 @@ Ping Wi-Fi device from Thread CLI device:
 
 .. code-block::
 
-    > ping fd14:c8eb:d14c:5fbe:bd5e:16de:3183:694a
+    > ot ping fd14:c8eb:d14c:5fbe:bd5e:16de:3183:694a
 
     16 bytes from fd14:c8eb:d14c:5fbe:bd5e:16de:3183:694a: icmp_seq=1 hlim=255 time=122ms
     1 packets transmitted, 1 packets received. Packet loss = 0.0%. Round-trip min/avg/max = 122/122.0/122 ms.
@@ -65,7 +65,7 @@ Ping Thread CLI device from Wi-Fi device:
 
 .. code-block::
 
-    > ping fd14:c8eb:d14c:5fbe:b57e:1e02:a532:26d1
+    > ot ping fd14:c8eb:d14c:5fbe:b57e:1e02:a532:26d1
 
     16 bytes from fd14:c8eb:d14c:5fbe:b57e:1e02:a532:26d1: icmp_seq=1 hlim=255 time=562ms
     1 packets transmitted, 1 packets received. Packet loss = 0.0%. Round-trip min/avg/max = 562/562.0/562 ms.

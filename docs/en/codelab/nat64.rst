@@ -21,23 +21,23 @@ For visiting HTTP servers with domain names, the DNS server shall be first confi
 
 .. code-block:: bash
 
-    dns64server 8.8.8.8
+    ot dns64server 8.8.8.8
 
 
 Then you can use ``curl <website>`` command to get the data form the specific website(for example ``http://www.espressif.com``):
 
 .. code-block:: bash
 
-    curl http://www.espressif.com
+    ot curl http://www.espressif.com
 
 
 The Thread device will first resolve the host with UDP packets sent to the IPv4 DNS server. Then retrieve the page from the IPv4 HTTP server via TCP. The expected output is below:
 
 .. code-block:: bash
 
-    > dns64server 8.8.8.8
+    > ot dns64server 8.8.8.8
     Done
-    > curl http://www.espressif.com
+    > ot curl http://www.espressif.com
     Done
     > I (22289) HTTP_CLIENT: Body received in fetch header state, 0x3fcca6b7, 183
     <html>
