@@ -122,6 +122,11 @@ CONFIG_LV_COLOR_16_SWAP=y
 CONFIG_LV_MEM_CUSTOM=y
 
 #
+# Example Connection Configuration
+#
+CONFIG_EXAMPLE_WIFI_CONN_MAX_RETRY=-1
+
+#
 # http server
 #
 CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024

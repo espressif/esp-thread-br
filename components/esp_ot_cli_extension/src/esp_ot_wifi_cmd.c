@@ -104,10 +104,13 @@ static void handle_wifi_addr_init(void)
 static void handler_on_wifi_disconnect(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     wifi_conn_retry_nums++;
+#if CONFIG_EXAMPLE_WIFI_CONN_MAX_RETRY >= 0
     if (wifi_conn_retry_nums > CONFIG_EXAMPLE_WIFI_CONN_MAX_RETRY) {
         wifi_conn_retry_nums = 0;
         s_wifi_state = OT_WIFI_DISCONNECTED;
-    } else {
+    } else
+#endif
+    {
         s_wifi_state = OT_WIFI_RECONNECTING;
     }
 }
