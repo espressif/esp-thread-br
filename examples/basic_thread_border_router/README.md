@@ -14,7 +14,7 @@ Please refer to [ESP Thread Border Router Hardware](../../README.md##Hardware-Pl
 
 Refer to [ESP-IDF Get Started](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/get-started/index.html).
 
-Currently, it is recommended to use ESP-IDF [v5.5.2](https://github.com/espressif/esp-idf/tree/v5.5.2) release.
+Currently, it is recommended to use ESP-IDF [v5.5.4](https://github.com/espressif/esp-idf/tree/v5.5.4) release.
 
 ### Configure the project
 
@@ -282,3 +282,25 @@ I (576848) OT_STATE: netif up
 I(579858) OPENTHREAD:[N] Mle-----------: Role disabled -> detached
 Done
 ```
+
+## Troubleshooting
+
+If you are using the 4MB variant of the Thread Border Router board (h/w V1.2), you may try the following steps:
+
+1. Change the following options in `examples/basic_thread_border_router/sdkconfig.defaults`
+    - Replace `CONFIG_ESPTOOLPY_FLASHSIZE_8MB` with `CONFIG_ESPTOOLPY_FLASHSIZE_4MB`
+2. Change the OTA partitions to use 1500K instead of 2M each
+
+```
+nvs,        data, nvs,      , 0x6000,
+otadata,    data, ota,      , 0x2000,
+phy_init,   data, phy,      , 0x1000,
+ota_0,      app,  ota_0,    , 1500K,
+ota_1,      app,  ota_1,    , 1500K,
+web_storage,data, spiffs,   , 200K,
+rcp_fw,     data, spiffs,   , 640K,
+```
+
+If you find a need to reduce the binary size even further, please refer to [this link](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/api-guides/performance/size.html#reducing-overall-size).
+
+Because 4MB of flash is limited and may not be sufficient to support future feature releases (e.g. OTA with RCP updates), we recommend using the latest 8MB variant when developing a new product.
