@@ -83,3 +83,9 @@ Please follow the steps below:
    - Set `PIN_TO_RCP_TX` to `18` and `PIN_TO_RCP_RX` to `17` via menuconfig.
 
 After that, build and flash as usual. The example will then operate using the Unit Gateway H2.
+
+---
+
+<a href="https://espressif.github.io/esp-launchpad/?flashConfigURL=https://espressif.github.io/esp-thread-br/launchpad/launchpad.toml">
+    <img alt="Try it with ESP Launchpad" src="https://espressif.github.io/esp-launchpad/assets/try_with_launchpad.png" width="250" height="70">
+</a>
