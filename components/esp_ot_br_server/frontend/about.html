@@ -1,0 +1,126 @@
+<!--
+  SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+  SPDX-License-Identifier: Apache-2.0
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Thread Border Router - About</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+<nav class="nav" id="nav"></nav>
+<div class="container">
+
+    <div class="about-hero">
+        <div class="about-logo">
+            <img src="/favicon.ico" width="64" height="64" alt="Espressif">
+        </div>
+        <h1>Espressif Thread Border Router</h1>
+        <p>Built with ESP-IDF &amp; OpenThread by Espressif Systems</p>
+    </div>
+
+    <h2 class="section-title">Firmware Information</h2>
+    <div class="grid grid-2 section">
+        <div class="card">
+            <div class="card-header">ESP Thread BR</div>
+            <div class="info-row">
+                <span class="info-label">App Version</span>
+                <span class="info-value" id="ab-appver">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Project</span>
+                <span class="info-value" id="ab-proj">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Compiled</span>
+                <span class="info-value" id="ab-compile">-</span>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">ESP-IDF</div>
+            <div class="info-row">
+                <span class="info-label">Version</span>
+                <span class="info-value" id="ab-idf">-</span>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">OpenThread</div>
+            <div class="info-row">
+                <span class="info-label">Version</span>
+                <span class="info-value" id="ab-ot">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">API Version</span>
+                <span class="info-value" id="ab-otapi">-</span>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">RCP (Radio Co-Processor)</div>
+            <div class="info-row">
+                <span class="info-label">Version</span>
+                <span class="info-value" id="ab-rcp">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">IEEE EUI-64</span>
+                <span class="info-value" id="ab-eui">-</span>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="section-title">Resources</h2>
+    <div class="card section">
+        <ul class="link-list">
+            <li>
+                <span class="link-label">Espressif Home</span>
+                <a class="link-url" href="https://www.espressif.com" target="_blank" rel="noopener">espressif.com</a>
+            </li>
+            <li>
+                <span class="link-label">ESP Thread BR on GitHub</span>
+                <a class="link-url" href="https://github.com/espressif/esp-thread-br" target="_blank" rel="noopener">github.com/espressif/esp-thread-br</a>
+            </li>
+            <li>
+                <span class="link-label">ESP-IDF on GitHub</span>
+                <a class="link-url" href="https://github.com/espressif/esp-idf" target="_blank" rel="noopener">github.com/espressif/esp-idf</a>
+            </li>
+            <li>
+                <span class="link-label">ESP Thread BR Documentation</span>
+                <a class="link-url" href="https://docs.espressif.com/projects/esp-thread-br/en/latest/" target="_blank" rel="noopener">docs.espressif.com/projects/esp-thread-br</a>
+            </li>
+            <li>
+                <span class="link-label">ESP-IDF Documentation</span>
+                <a class="link-url" href="https://docs.espressif.com/projects/esp-idf/" target="_blank" rel="noopener">docs.espressif.com/projects/esp-idf</a>
+            </li>
+            <li>
+                <span class="link-label">OpenThread</span>
+                <a class="link-url" href="https://openthread.io" target="_blank" rel="noopener">openthread.io</a>
+            </li>
+        </ul>
+    </div>
+
+</div>
+<div class="footer">Copyright &copy; 2026 Espressif Systems. All rights reserved.</div>
+<script src="/static/api.js"></script>
+<script>
+function renderAbout(data) {
+    if (!data || data.error || !data.result) return;
+    var r = data.result;
+    document.getElementById('ab-appver').textContent = r['App:Version'] || '-';
+    document.getElementById('ab-proj').textContent = r['App:ProjectName'] || '-';
+    document.getElementById('ab-compile').textContent = r['App:CompileTime'] || '-';
+    document.getElementById('ab-idf').textContent = r['IDF:Version'] || '-';
+    document.getElementById('ab-ot').textContent = r['OpenThread:Version'] || '-';
+    document.getElementById('ab-otapi').textContent = r['OpenThread:Version API'] || '-';
+    document.getElementById('ab-rcp').textContent = r['RCP:Version'] || '-';
+    document.getElementById('ab-eui').textContent = r['RCP:EUI64'] || '-';
+}
+renderAbout(getCached('/get_properties'));
+apiGet('/get_properties').then(renderAbout).catch(function() {
+    showToast('Failed to connect to device', 'error');
+});
+</script>
+</body>
+</html>

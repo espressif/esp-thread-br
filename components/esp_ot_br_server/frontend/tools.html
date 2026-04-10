@@ -1,0 +1,166 @@
+<!--
+  SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+  SPDX-License-Identifier: Apache-2.0
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Thread Border Router - Tools</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+<nav class="nav" id="nav"></nav>
+<div class="container">
+    <h1 class="page-title">Tools</h1>
+    <p class="page-desc">Network diagnostics and utilities</p>
+
+    <!-- Ping Section -->
+    <div class="card section">
+        <div class="card-header">Ping (ICMPv6 Echo)</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">
+            Send ICMPv6 echo requests from the Thread Border Router to an IPv6 address on the Thread mesh or beyond.
+            <br>Tip: You can also ping nodes directly from the <a href="/topology.html" style="color:var(--primary)">Topology</a> page by clicking on a node.
+        </p>
+        <form id="pingForm" onsubmit="return false">
+            <div class="form-group">
+                <label class="form-label">Destination IPv6 Address *</label>
+                <input class="form-input" name="address" id="pingAddr" type="text"
+                       placeholder="e.g. fd11:22::1 or fe80::1" required>
+                <div class="form-hint">Enter a Thread mesh-local, link-local, or routable IPv6 address</div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Count</label>
+                    <input class="form-input" name="count" id="pingCount" type="number"
+                           min="1" max="10" value="4">
+                    <div class="form-hint">Number of echo requests (1–10)</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Payload Size (bytes)</label>
+                    <input class="form-input" name="size" id="pingSize" type="number"
+                           min="4" max="512" value="32">
+                    <div class="form-hint">Payload size excluding headers (4–512)</div>
+                </div>
+            </div>
+            <div class="flex-between">
+                <button type="button" class="btn btn-primary" id="pingBtn" onclick="startPing()">Ping</button>
+                <span id="pingStatus" style="font-size:13px"></span>
+            </div>
+        </form>
+    </div>
+
+    <!-- Ping Results -->
+    <div class="card section hidden" id="pingResults">
+        <div class="card-header">Ping Results</div>
+        <div id="pingReplies" class="ping-output"></div>
+        <div id="pingSummary" class="mt-16"></div>
+    </div>
+
+</div>
+<div class="footer">Copyright &copy; 2026 Espressif Systems. All rights reserved.</div>
+
+<script src="/static/api.js"></script>
+<script>
+/* Disable page if Thread network is not connected */
+checkThreadState(function(role, connected) {
+    if (!connected) disableManagementPage();
+});
+
+function startPing() {
+    var addr = document.getElementById('pingAddr').value.trim();
+    if (!addr) {
+        showToast('Please enter an IPv6 address', 'error');
+        return;
+    }
+    var count = parseInt(document.getElementById('pingCount').value) || 4;
+    var size = parseInt(document.getElementById('pingSize').value) || 32;
+
+    /* Clamp values */
+    if (count < 1) count = 1;
+    if (count > 10) count = 10;
+    if (size < 4) size = 4;
+    if (size > 512) size = 512;
+
+    var btn = document.getElementById('pingBtn');
+    var status = document.getElementById('pingStatus');
+    var results = document.getElementById('pingResults');
+    var repliesEl = document.getElementById('pingReplies');
+    var summaryEl = document.getElementById('pingSummary');
+
+    btn.disabled = true;
+    btn.textContent = 'Pinging...';
+    status.textContent = 'Sending ' + count + ' ping(s) to ' + addr + '...';
+    status.style.color = 'var(--primary)';
+
+    /* Show results area with spinner */
+    results.classList.remove('hidden');
+    repliesEl.innerHTML = '<div class="text-center"><div class="spinner" style="width:24px;height:24px;margin:8px auto"></div><div class="text-muted" style="font-size:13px">Waiting for replies...</div></div>';
+    summaryEl.innerHTML = '';
+
+    apiPost('/ping', {address: addr, count: count, size: size}).then(function(data) {
+        btn.disabled = false;
+        btn.textContent = 'Ping';
+
+        if (data.error !== 0 || !data.result) {
+            status.textContent = data.message || 'Ping failed';
+            status.style.color = 'var(--danger)';
+            repliesEl.innerHTML = '<div class="text-muted text-center">Ping failed – check the address and ensure the Thread network is active.</div>';
+            return;
+        }
+
+        var r = data.result;
+        var replies = r.replies || [];
+        var stats = r.statistics || {};
+
+        status.textContent = 'Completed';
+        status.style.color = 'var(--success)';
+
+        /* Render replies */
+        if (replies.length === 0) {
+            repliesEl.innerHTML = '<div class="ping-line ping-timeout">No replies received (100% loss)</div>';
+        } else {
+            var html = '';
+            for (var i = 0; i < replies.length; i++) {
+                var p = replies[i];
+                html += '<div class="ping-line ping-ok">'
+                    + escapeHtml(p.size) + ' bytes from <strong>' + escapeHtml(p.from) + '</strong>: '
+                    + 'seq=' + escapeHtml(p.seq) + ' hlim=' + escapeHtml(p.hlim) + ' time=' + escapeHtml(p.rtt) + 'ms'
+                    + '</div>';
+            }
+            repliesEl.innerHTML = html;
+        }
+
+        /* Render summary */
+        var sent = stats.sent || 0;
+        var recv = stats.received || 0;
+        var loss = stats.loss_percent !== undefined ? stats.loss_percent.toFixed(1) : '?';
+        var badgeClass = recv === sent ? 'badge-success' : (recv === 0 ? 'badge-danger' : 'badge-warning');
+
+        var summaryHtml = '<div class="ping-summary">';
+        summaryHtml += '<div class="info-row"><span class="info-label">Packets</span>'
+            + '<span class="info-value">' + sent + ' sent, ' + recv + ' received</span></div>';
+        summaryHtml += '<div class="info-row"><span class="info-label">Packet Loss</span>'
+            + '<span class="info-value"><span class="badge ' + badgeClass + '">' + loss + '%</span></span></div>';
+
+        if (recv > 0 && stats.rtt_min !== undefined) {
+            summaryHtml += '<div class="info-row"><span class="info-label">RTT (min/avg/max)</span>'
+                + '<span class="info-value">' + stats.rtt_min + ' / ' + stats.rtt_avg + ' / ' + stats.rtt_max + ' ms</span></div>';
+        }
+        summaryHtml += '</div>';
+        summaryEl.innerHTML = summaryHtml;
+
+    }).catch(function() {
+        btn.disabled = false;
+        btn.textContent = 'Ping';
+        status.textContent = 'Connection error';
+        status.style.color = 'var(--danger)';
+        repliesEl.innerHTML = '<div class="text-muted text-center">Failed to connect to the device.</div>';
+        showToast('Connection error', 'error');
+    });
+}
+</script>
+</body>
+</html>

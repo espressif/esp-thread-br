@@ -39,14 +39,14 @@ A global address will be assigned to the Thread CLI device. The Linux Host machi
 
 .. code-block::
 
-    ipaddr
+    ot ipaddr
 
 
 The command would produce the similar output:
 
 .. code-block::
 
-    > ipaddr
+    > ot ipaddr
     fd66:afad:575f:1:744d:573e:6e60:188a
     fd87:8205:4651:27c8:0:ff:fe00:0
     fd87:8205:4651:27c8:e65a:3138:745a:df06
@@ -58,14 +58,14 @@ The Linux Host reachable address is ``fd66:afad:575f:1:744d:573e:6e60:188a``, yo
 
 .. code-block:: bash
 
-    ping fd66:afad:575f:1:744d:573e:6e60:188a
+    ot ping fd66:afad:575f:1:744d:573e:6e60:188a
 
 
 You well get these output:
 
 .. code-block:: bash
 
-    $ ping fd66:afad:575f:1:744d:573e:6e60:188a
+    $ ot ping fd66:afad:575f:1:744d:573e:6e60:188a
 
     PING fd66:afad:575f:1:744d:573e:6e60:188a(fd66:afad:575f:1:744d:573e:6e60:188a) 56 data bytes
     64 bytes from fd66:afad:575f:1:744d:573e:6e60:188a: icmp_seq=1 ttl=254 time=187 ms

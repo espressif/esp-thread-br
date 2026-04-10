@@ -52,5 +52,5 @@ To download the image from the server and run the following command on the Borde
 
 .. code-block:: bash
 
-   ota download https://${HOST_URL}:8070/ota_with_rcp_image
+   ot ota download https://${HOST_URL}:8070/ota_with_rcp_image
 

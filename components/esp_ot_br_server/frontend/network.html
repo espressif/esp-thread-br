@@ -1,0 +1,377 @@
+<!--
+  SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+  SPDX-License-Identifier: Apache-2.0
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Thread Border Router - Network</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+<nav class="nav" id="nav"></nav>
+<div class="container">
+    <h1 class="page-title">Network Management</h1>
+    <p class="page-desc">Discover, join, or form Thread networks</p>
+
+    <!-- Scan Section -->
+    <div class="card section">
+        <div class="flex-between mb-16">
+            <div class="card-header" style="border:none;margin:0;padding:0">Discover Thread Networks</div>
+            <button class="btn btn-primary btn-sm" id="scanBtn" onclick="scanNetworks()">Scan</button>
+        </div>
+        <div id="scanStatus" class="text-muted mb-16" style="font-size:13px"></div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>No.</th>
+                        <th>Network Name</th>
+                        <th>Ext PAN ID</th>
+                        <th>PAN ID</th>
+                        <th>MAC Address</th>
+                        <th>Ch</th>
+                        <th>RSSI</th>
+                        <th>LQI</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="scanBody">
+                    <tr><td colspan="9" class="text-center text-muted">Click Scan to discover networks</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Form Network Section -->
+    <div class="card section">
+        <div class="card-header">Form New Network</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Create a new Thread network with custom parameters. Fields marked * are required.</p>
+        <form id="formNet" onsubmit="return false">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Network Name *</label>
+                    <input class="form-input" name="networkName" type="text" value="OpenThread-ESP" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Network Key * (32 hex chars)</label>
+                    <div class="input-toggle-wrap">
+                        <input class="form-input" name="networkKey" type="password" value="00112233445566778899aabbccddeeff" required>
+                        <button type="button" class="toggle-vis" onclick="toggleVis(this)" title="Show/Hide">&#x1F441;</button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">PAN ID * (0x prefix)</label>
+                    <input class="form-input" name="panId" type="text" value="0x1234" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Channel * (11-26)</label>
+                    <input class="form-input" name="channel" type="number" min="11" max="26" value="15" required>
+                </div>
+            </div>
+            <details style="margin-bottom:14px">
+                <summary style="cursor:pointer;font-size:13px;color:var(--primary);font-weight:600">Advanced Options</summary>
+                <div style="margin-top:12px">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Extended PAN ID (16 hex chars)</label>
+                            <input class="form-input" name="extPanId" type="text" value="1111111122222222">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Passphrase</label>
+                            <input class="form-input" name="passphrase" type="text" value="j01Nme">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">On-Mesh Prefix</label>
+                        <input class="form-input" name="prefix" type="text" value="fd11:22::">
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" name="defaultRoute" id="formDefRoute" checked>
+                        <label for="formDefRoute">Default Route</label>
+                    </div>
+                </div>
+            </details>
+            <div class="flex-between">
+                <button type="button" class="btn btn-primary" onclick="formNetwork()">Form Network</button>
+                <span id="formStatus" style="font-size:13px"></span>
+            </div>
+        </form>
+    </div>
+
+</div>
+<div class="footer">Copyright &copy; 2026 Espressif Systems. All rights reserved.</div>
+
+<!-- Join Modal -->
+<div class="modal-overlay" id="joinModal">
+    <div class="modal">
+        <h3 class="modal-title">Join Thread Network</h3>
+        <form id="joinForm" onsubmit="return false">
+            <input type="hidden" name="index" id="joinIndex">
+            <div class="form-group">
+                <label class="form-label">Credential Type</label>
+                <select class="form-select" name="credentialType" id="joinCredType" onchange="toggleCredType()">
+                    <option value="networkKeyType">Network Key</option>
+                    <option value="pskdType">PSKd</option>
+                </select>
+            </div>
+            <div class="form-group" id="joinKeyGroup">
+                <label class="form-label">Network Key (32 hex chars)</label>
+                <div class="input-toggle-wrap">
+                    <input class="form-input" name="networkKey" type="password" value="00112233445566778899aabbccddeeff">
+                    <button type="button" class="toggle-vis" onclick="toggleVis(this)" title="Show/Hide">&#x1F441;</button>
+                </div>
+            </div>
+            <div class="form-group hidden" id="joinPskdGroup">
+                <label class="form-label">PSKd</label>
+                <input class="form-input" name="pskd" type="text" placeholder="Enter PSKd">
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeJoinModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitJoin()">Join</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="/static/api.js"></script>
+<script>
+function toggleVis(btn) {
+    var inp = btn.previousElementSibling;
+    var show = inp.type === 'password';
+    inp.type = show ? 'text' : 'password';
+    btn.style.opacity = show ? '1' : '0.4';
+}
+
+/* ──── Blocking overlay (created dynamically, like showLoading) ──── */
+var _blockOv = null;
+
+function _ensureOverlay() {
+    if (_blockOv) return _blockOv;
+    var ov = document.createElement('div');
+    ov.id = 'blockingOverlay';
+    ov.className = 'blocking-overlay';
+    ov.innerHTML =
+        '<div class="blocking-card">' +
+            '<div class="spinner" id="blockSpinner"></div>' +
+            '<div class="blocking-title" id="blockTitle"></div>' +
+            '<div class="blocking-status" id="blockStatus"></div>' +
+            '<div class="blocking-hint" id="blockHint"></div>' +
+            '<div class="blocking-result" id="blockResult"></div>' +
+            '<button class="btn btn-primary" id="blockDismiss" onclick="dismissOverlay()">OK</button>' +
+        '</div>';
+    document.body.appendChild(ov);
+    _blockOv = ov;
+    return ov;
+}
+
+function showBlockingOverlay(title, status) {
+    var ov = _ensureOverlay();
+    document.getElementById('blockTitle').textContent = title;
+    document.getElementById('blockStatus').textContent = status || '';
+    document.getElementById('blockHint').textContent = 'This may take up to 60 seconds. Please do not navigate away.';
+    document.getElementById('blockResult').textContent = '';
+    document.getElementById('blockResult').className = 'blocking-result';
+    document.getElementById('blockSpinner').style.display = '';
+    document.getElementById('blockDismiss').style.display = 'none';
+    ov.classList.add('active');
+}
+function updateBlockingStatus(status) {
+    document.getElementById('blockStatus').textContent = status;
+}
+function finishBlocking(ok, msg) {
+    var r = document.getElementById('blockResult');
+    r.textContent = msg;
+    r.className = 'blocking-result ' + (ok ? 'ok' : 'fail');
+    document.getElementById('blockSpinner').style.display = 'none';
+    document.getElementById('blockHint').textContent = '';
+    document.getElementById('blockDismiss').style.display = 'inline-block';
+}
+function dismissOverlay() {
+    if (_blockOv) _blockOv.classList.remove('active');
+}
+
+/* ──── Scan ──── */
+function scanNetworks() {
+    var btn = document.getElementById('scanBtn');
+    var status = document.getElementById('scanStatus');
+    btn.disabled = true;
+    btn.textContent = 'Scanning...';
+    status.textContent = 'Scanning for Thread networks...';
+    document.getElementById('scanBody').innerHTML = '<tr><td colspan="9" class="text-center"><div class="spinner"></div></td></tr>';
+
+    apiGet('/available_network').then(function(data) {
+        btn.disabled = false;
+        btn.textContent = 'Scan';
+        if (data.error || !data.result) {
+            status.textContent = 'Scan failed: ' + (data.message || 'Unknown error');
+            status.style.color = 'var(--danger)';
+            document.getElementById('scanBody').innerHTML = '<tr><td colspan="9" class="text-center text-muted">Scan failed</td></tr>';
+            return;
+        }
+        var nets = data.result;
+        status.textContent = 'Found ' + nets.length + ' network(s)';
+        status.style.color = 'var(--success)';
+        if (nets.length === 0) {
+            document.getElementById('scanBody').innerHTML = '<tr><td colspan="9" class="text-center text-muted">No networks found</td></tr>';
+            return;
+        }
+        var html = '';
+        for (var i = 0; i < nets.length; i++) {
+            var n = nets[i];
+            html += '<tr>';
+            html += '<td>' + escapeHtml(n.id) + '</td>';
+            html += '<td>' + escapeHtml(n.nn) + '</td>';
+            html += '<td style="font-size:11px">' + escapeHtml(n.ep) + '</td>';
+            html += '<td>' + escapeHtml(n.pi) + '</td>';
+            html += '<td style="font-size:11px">' + escapeHtml(n.ha) + '</td>';
+            html += '<td>' + escapeHtml(n.ch) + '</td>';
+            html += '<td>' + escapeHtml(n.ri) + '</td>';
+            html += '<td>' + escapeHtml(n.li) + '</td>';
+            html += '<td><button class="btn btn-primary btn-sm" onclick="openJoinModal(' + n.id + ')">Join</button></td>';
+            html += '</tr>';
+        }
+        document.getElementById('scanBody').innerHTML = html;
+    }).catch(function() {
+        btn.disabled = false;
+        btn.textContent = 'Scan';
+        status.textContent = 'Network error';
+        status.style.color = 'var(--danger)';
+        document.getElementById('scanBody').innerHTML = '<tr><td colspan="9" class="text-center text-muted">Connection failed</td></tr>';
+    });
+}
+
+/* ──── Join ──── */
+function openJoinModal(idx) {
+    document.getElementById('joinIndex').value = idx;
+    document.getElementById('joinModal').classList.add('active');
+}
+
+function closeJoinModal() {
+    document.getElementById('joinModal').classList.remove('active');
+}
+
+function toggleCredType() {
+    var v = document.getElementById('joinCredType').value;
+    document.getElementById('joinKeyGroup').className = v === 'networkKeyType' ? 'form-group' : 'form-group hidden';
+    document.getElementById('joinPskdGroup').className = v === 'pskdType' ? 'form-group' : 'form-group hidden';
+}
+
+function submitJoin() {
+    var form = document.getElementById('joinForm');
+    var data = {
+        index: parseInt(document.getElementById('joinIndex').value),
+        credentialType: form.credentialType.value,
+        networkKey: form.networkKey.value,
+        pskd: form.pskd.value || ''
+    };
+    closeJoinModal();
+    showBlockingOverlay('Joining Thread Network', 'Submitting join request...');
+
+    apiPost('/join_network', data).then(function(res) {
+        if (res.error) {
+            finishBlocking(false, 'Join failed: ' + (res.message || 'Unknown error'));
+        } else {
+            updateBlockingStatus('Request accepted — attaching to network...');
+            pollJoinState();
+        }
+    }).catch(function() {
+        finishBlocking(false, 'Connection error — could not reach device');
+    });
+}
+
+var _joinPollTimer = null;
+var _joinPollCount = 0;
+var _joinPollMax = 30; /* poll for up to 60 s (30 × 2 s) */
+
+function pollJoinState() {
+    _joinPollCount = 0;
+    if (_joinPollTimer) clearInterval(_joinPollTimer);
+
+    _joinPollTimer = setInterval(function() {
+        _joinPollCount++;
+        if (_joinPollCount > _joinPollMax) {
+            clearInterval(_joinPollTimer);
+            _joinPollTimer = null;
+            finishBlocking(false, 'Timed out — device may still be trying to attach');
+            return;
+        }
+        apiGet('/node/state').then(function(state) {
+            var role = (typeof state === 'string') ? state : '';
+            updateBlockingStatus('Attaching to network... (' + (role || 'detached') + ')');
+            if (role === 'child' || role === 'router' || role === 'leader') {
+                clearInterval(_joinPollTimer);
+                _joinPollTimer = null;
+                finishBlocking(true, 'Joined successfully — role: ' + role);
+                document.getElementById('scanStatus').textContent = 'Joined — role: ' + role;
+                document.getElementById('scanStatus').style.color = 'var(--success)';
+            }
+        }).catch(function() { /* ignore transient fetch errors during attach */ });
+    }, 2000);
+}
+
+/* ──── Form Network ──── */
+function formNetwork() {
+    var form = document.getElementById('formNet');
+    var data = {
+        networkName: form.networkName.value,
+        networkKey: form.networkKey.value,
+        panId: form.panId.value,
+        channel: parseInt(form.channel.value),
+        extPanId: form.extPanId.value,
+        passphrase: form.passphrase.value,
+        prefix: form.prefix.value,
+        defaultRoute: form.defaultRoute.checked ? 1 : 0
+    };
+
+    showBlockingOverlay('Forming Thread Network', 'Submitting form request...');
+
+    apiPost('/form_network', data).then(function(res) {
+        if (res.error) {
+            finishBlocking(false, 'Formation failed: ' + (res.message || 'Unknown error'));
+        } else {
+            updateBlockingStatus('Request accepted — forming network...');
+            pollFormState();
+        }
+    }).catch(function() {
+        finishBlocking(false, 'Connection error — could not reach device');
+    });
+}
+
+var _formPollTimer = null;
+var _formPollCount = 0;
+var _formPollMax = 20; /* poll for up to 40 s (20 × 2 s) */
+
+function pollFormState() {
+    _formPollCount = 0;
+    if (_formPollTimer) clearInterval(_formPollTimer);
+
+    _formPollTimer = setInterval(function() {
+        _formPollCount++;
+        if (_formPollCount > _formPollMax) {
+            clearInterval(_formPollTimer);
+            _formPollTimer = null;
+            finishBlocking(false, 'Timed out — check device status');
+            return;
+        }
+        apiGet('/node/state').then(function(state) {
+            var role = (typeof state === 'string') ? state : '';
+            updateBlockingStatus('Forming network... (' + (role || 'detached') + ')');
+            if (role === 'leader' || role === 'router' || role === 'child') {
+                clearInterval(_formPollTimer);
+                _formPollTimer = null;
+                finishBlocking(true, 'Network formed — role: ' + role);
+                document.getElementById('formStatus').textContent = 'Network formed — role: ' + role;
+                document.getElementById('formStatus').style.color = 'var(--success)';
+            }
+        }).catch(function() { /* ignore transient errors */ });
+    }, 2000);
+}
+</script>
+</body>
+</html>

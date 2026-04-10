@@ -6,10 +6,12 @@
 
 #include "esp_br_web_base.h"
 #include "cJSON.h"
+#include "esp_app_desc.h"
 #include "esp_check.h"
 #include "esp_err.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "malloc.h"
 #include "stdint.h"
 #include "stdio.h"
@@ -125,7 +127,7 @@ cJSON *otbr_properties_struct_convert2_json(openthread_properties_t *properties)
     cJSON_AddStringToObject(root, "OpenThread:Version", properties->information.version);
     sprintf(format, "%d", properties->information.version_api);
     cJSON_AddStringToObject(root, "OpenThread:Version API", format);
-    cJSON_AddStringToObject(root, "RCP:State", otThreadDeviceRoleToString(properties->information.role));
+    cJSON_AddStringToObject(root, "Thread:Role", otThreadDeviceRoleToString(properties->information.role));
     hex_to_string(properties->information.PSKc.m8, format, sizeof(otPskc));
     cJSON_AddStringToObject(root, "OpenThread:PSKc", format);
 
@@ -139,18 +141,46 @@ cJSON *otbr_properties_struct_convert2_json(openthread_properties_t *properties)
 
     cJSON_AddStringToObject(root, "WPAN service", properties->wpan.service);
 
+    /* ESP-IDF version */
+    cJSON_AddStringToObject(root, "IDF:Version", esp_get_idf_version());
+
+    /* App / project info */
+    const esp_app_desc_t *app_desc = esp_app_get_description();
+    if (app_desc) {
+        cJSON_AddStringToObject(root, "App:Version", app_desc->version);
+        cJSON_AddStringToObject(root, "App:ProjectName", app_desc->project_name);
+        char compile_time[48];
+        snprintf(compile_time, sizeof(compile_time), "%s %s", app_desc->date, app_desc->time);
+        cJSON_AddStringToObject(root, "App:CompileTime", compile_time);
+    }
+
+    /* System diagnostics */
+    uint32_t uptime_sec = (uint32_t)(esp_timer_get_time() / 1000000);
+    uint32_t days = uptime_sec / 86400;
+    uint32_t hours = (uptime_sec % 86400) / 3600;
+    uint32_t mins = (uptime_sec % 3600) / 60;
+    uint32_t secs = uptime_sec % 60;
+    if (days > 0) {
+        snprintf(format, sizeof(format), "%lud %02lu:%02lu:%02lu", days, hours, mins, secs);
+    } else {
+        snprintf(format, sizeof(format), "%02lu:%02lu:%02lu", hours, mins, secs);
+    }
+    cJSON_AddStringToObject(root, "System:Uptime", format);
+    snprintf(format, sizeof(format), "%lu KB", (unsigned long)(esp_get_free_heap_size() / 1024));
+    cJSON_AddStringToObject(root, "System:FreeHeap", format);
+
     return root;
 }
 
 /*----------------------------------------------------------------------
                        Scan Thread netWork
 -----------------------------------------------------------------------*/
-void avaiable_network_reset(thread_network_information_t *network)
+void available_network_reset(thread_network_information_t *network)
 {
     memset(network, 0x00, sizeof(thread_network_information_t));
 }
 
-cJSON *avaiable_network_struct_convert2_json(thread_network_information_t *network)
+cJSON *available_network_struct_convert2_json(thread_network_information_t *network)
 {
     cJSON *root = cJSON_CreateObject();
 
@@ -358,7 +388,8 @@ esp_err_t network_join_param_json_convert2_struct(const cJSON *root, cJSON *log,
     }
 
     temp = cJSON_GetObjectItem(root, "prefix");
-    if (temp && temp->valuestring && strlen(temp->valuestring) + 1 < OT_IP6_PREFIX_STRING_SIZE) {
+    if (temp && temp->valuestring && strlen(temp->valuestring) > 0 &&
+        strlen(temp->valuestring) + 1 < OT_IP6_PREFIX_STRING_SIZE) {
         if (!strstr(temp->valuestring, "/")) {
             memcpy(param->prefix, temp->valuestring, strlen(temp->valuestring) + 1);
             strcat(param->prefix, "/64");
@@ -366,9 +397,8 @@ esp_err_t network_join_param_json_convert2_struct(const cJSON *root, cJSON *log,
             memcpy(param->prefix, temp->valuestring, strlen(temp->valuestring) + 1);
         }
     } else {
-        ESP_LOGW(BASE_TAG, "Error: Invalid Prefix");
-        cJSON_SetValuestring(log, "Error: Invalid Prefix");
-        return ESP_ERR_INVALID_ARG;
+        /* Prefix is optional for join — leave empty */
+        param->prefix[0] = '\0';
     }
 
     temp = cJSON_GetObjectItem(root, "defaultRoute");
@@ -626,7 +656,7 @@ static cJSON *ChildTableEntry2Json(const otNetworkDiagChildEntry aChildEntry)
     return childEntry;
 }
 
-cJSON *dailnosticTlv_set_convert2_json(const thread_diagnosticTlv_set_t *set)
+cJSON *diagnosticTlv_set_convert2_json(const thread_diagnosticTlv_set_t *set)
 {
     ESP_RETURN_ON_FALSE(set, NULL, BASE_TAG, "Invalid Diagnostic Set");
     cJSON *root = cJSON_CreateArray();
@@ -717,12 +747,12 @@ cJSON *dailnosticTlv_set_convert2_json(const thread_diagnosticTlv_set_t *set)
     return root;
 }
 
-void thread_node_information_reset(thread_node_informaiton_t *node)
+void thread_node_information_reset(thread_node_information_t *node)
 {
-    memset(node, 0x00, sizeof(thread_node_informaiton_t));
+    memset(node, 0x00, sizeof(thread_node_information_t));
 }
 
-cJSON *thread_node_struct_convert2_json(thread_node_informaiton_t *node)
+cJSON *thread_node_struct_convert2_json(thread_node_information_t *node)
 {
     cJSON *root = cJSON_CreateObject();
 

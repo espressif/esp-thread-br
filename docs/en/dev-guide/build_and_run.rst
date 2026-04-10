@@ -280,30 +280,30 @@ If disable ``OPENTHREAD_BR_AUTO_START`` option, you need to setup the network ma
 
 .. code-block::
 
-   wifi connect -s <ssid> -p <psk>
+   ot wifi connect -s <ssid> -p <psk>
 
 .. code-block::
 
-   dataset init new
+   ot dataset init new
 
 .. code-block::
 
-   dataset commit active
+   ot dataset commit active
 
 .. code-block::
 
-   ifconfig up
+   ot ifconfig up
 
 .. code-block::
 
-   thread start
+   ot thread start
 
 
 The BR device will connect to the Wi-Fi and then form a Thread network.
 
 .. code-block::
 
-   > wifi connect -s mywifi -p espressif
+   > ot wifi connect -s mywifi -p espressif
      ssid: mywifi
      psk: espressif
      I (5241) pp: pp rom version: e7ae62f
@@ -353,15 +353,15 @@ The BR device will connect to the Wi-Fi and then form a Thread network.
      I(8511) OPENTHREAD:[N] RoutingManager: Local on-link prefix: fdde:ad00:beef:cafe::/64
      wifi sta is connected successfully
      Done
-     > dataset init new
+     > ot dataset init new
      Done
-     > dataset commit active
+     > ot dataset commit active
      Done                                                                                                                                                                  I (12401) OPENTHREAD: NAT64 ready
-     > ifconfig up
+     > ot ifconfig up
      I (15451) OPENTHREAD: Platform UDP bound to port 49153
      Done
      I (15451) OT_STATE: netif up
-     > thread start
+     > ot thread start
      I(18201) OPENTHREAD:[N] Mle-----------: Role disabled -> detached
      Done
      > I(18521) OPENTHREAD:[N] Mle-----------: Attach attempt 1, AnyPartition reattaching with Active Dataset
@@ -395,14 +395,14 @@ First acquire the Thread network dataset on the Border Router:
 
 .. code-block::
 
-   dataset active -x
+   ot dataset active -x
 
 
 The network data will be printed on the Border Router:
 
 .. code-block::
 
-   > dataset active -x
+   > ot dataset active -x
    0e080000000000010000000300001335060004001fffe00208dead00beef00cafe0708fdfaeb6813db063b0510112233445566778899aabbccddeeff00030f4f70656e5468726561642d34396436010212340410104810e2315100afd6bc9215a6bfac530c0402a0f7f8
    Done
 
@@ -411,42 +411,42 @@ Commit the dataset on the CLI device with the acquired dataset:
 
 .. code-block::
 
-   dataset set active 0e080000000000010000000300001335060004001fffe00208dead00beef00cafe0708fdfaeb6813db063b0510112233445566778899aabbccddeeff00030f4f70656e5468726561642d34396436010212340410104810e2315100afd6bc9215a6bfac530c0402a0f7f8
+   ot dataset set active 0e080000000000010000000300001335060004001fffe00208dead00beef00cafe0708fdfaeb6813db063b0510112233445566778899aabbccddeeff00030f4f70656e5468726561642d34396436010212340410104810e2315100afd6bc9215a6bfac530c0402a0f7f8
 
 
 Set the network data active on the CLI device:
 
 .. code-block::
 
-   dataset commit active
+   ot dataset commit active
 
 
 Set up the network interface on the CLI device:
 
 .. code-block::
 
-   ifconfig up
+   ot ifconfig up
 
 
 Start the thread network on the CLI device:
 
 .. code-block::
 
-   thread start
+   ot thread start
 
 
 The CLI device will become a child or a router in the Thread network:
 
 .. code-block::
 
-   > dataset set active 0e080000000000010000000300001335060004001fffe00208dead00beef00cafe0708fdfaeb6813db063b0510112233445566778899aabbccddeeff00030f4f70656e5468726561642d34396436010212340410104810e2315100afd6bc9215a6bfac530c0402a0f7f8
+   > ot dataset set active 0e080000000000010000000300001335060004001fffe00208dead00beef00cafe0708fdfaeb6813db063b0510112233445566778899aabbccddeeff00030f4f70656e5468726561642d34396436010212340410104810e2315100afd6bc9215a6bfac530c0402a0f7f8
    Done
-   > dataset commit active
+   > ot dataset commit active
    Done
-   > ifconfig up
+   > ot ifconfig up
    Done
    I (1665530) OPENTHREAD: netif up
-   > thread start
+   > ot thread start
    I(1667730) OPENTHREAD:[N] Mle-----------: Role disabled -> detached
    Done
    > I(1669240) OPENTHREAD:[N] Mle-----------: RLOC16 5800 -> fffe

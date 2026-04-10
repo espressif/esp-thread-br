@@ -83,7 +83,7 @@ provided at runtime via:
 
 .. code-block::
 
-    > wifi connect -s <ssid> -p <psk>
+    > ot wifi connect -s <ssid> -p <psk>
 
 Network Topology
 ----------------
@@ -110,7 +110,7 @@ ESP Thread BR join network
 
 .. code-block::
 
-    > wifi state
+    > ot wifi state
     connected
     Done
 
@@ -118,16 +118,16 @@ ESP Thread BR join network
 
 .. code-block::
 
-    > ifconfig up
+    > ot ifconfig up
     Done
-    > thread start
+    > ot thread start
     Done
 
 4. Check that the ESP Thread BR device has assumed the role of LEADER in the Thread network:
 
 .. code-block::
 
-    > state
+    > ot state
     leader
     Done
 
@@ -135,7 +135,7 @@ ESP Thread BR join network
 
 .. code-block::
 
-    > dataset active -x
+    > ot dataset active -x
     0e080000000000010000000300001835060004001fffe00208fe7bb701f5f1125d0708fd75cbde7c6647bd0510b3914792d44f45b6c7d76eb9306eec94030f4f70656e5468726561642d35383332010258320410e35c581af5029b054fc904a24c2b27700c0402a0fff8
 
 Thread CLI device join network
@@ -146,17 +146,17 @@ Thread CLI device join network
 
 .. code-block::
 
-    > dataset set active 0e080000000000010000000300001835060004001fffe00208fe7bb701f5f1125d0708fd75cbde7c6647bd0510b3914792d44f45b6c7d76eb9306eec94030f4f70656e5468726561642d35383332010258320410e35c581af5029b054fc904a24c2b27700c0402a0fff8
-    > ifconfig up
+    > ot dataset set active 0e080000000000010000000300001835060004001fffe00208fe7bb701f5f1125d0708fd75cbde7c6647bd0510b3914792d44f45b6c7d76eb9306eec94030f4f70656e5468726561642d35383332010258320410e35c581af5029b054fc904a24c2b27700c0402a0fff8
+    > ot ifconfig up
     Done
-    > thread start
+    > ot thread start
     Done
 
 3. Check that the Thread CLI device has joined the Thread network and assumed the role of ROUTER or CHILD:
 
 .. code-block::
 
-    > state
+    > ot state
     router # child is also a valid state
     Done
 
@@ -168,7 +168,7 @@ TREL enabled Wi-Fi device join network
 
 .. code-block::
 
-    > wifi state
+    > ot wifi state
     connected
     Done
 
@@ -176,16 +176,16 @@ TREL enabled Wi-Fi device join network
 
 .. code-block::
 
-    > dataset set active 0e080000000000010000000300001835060004001fffe00208fe7bb701f5f1125d0708fd75cbde7c6647bd0510b3914792d44f45b6c7d76eb9306eec94030f4f70656e5468726561642d35383332010258320410e35c581af5029b054fc904a24c2b27700c0402a0fff8
-    > ifconfig up
+    > ot dataset set active 0e080000000000010000000300001835060004001fffe00208fe7bb701f5f1125d0708fd75cbde7c6647bd0510b3914792d44f45b6c7d76eb9306eec94030f4f70656e5468726561642d35383332010258320410e35c581af5029b054fc904a24c2b27700c0402a0fff8
+    > ot ifconfig up
     Done
-    > thread start
+    > ot thread start
     Done
 
 4. Check that the Thread CLI device has joined the Thread network and assumed the role of ROUTER or CHILD:
 
 .. code-block::
 
-    > state
+    > ot state
     router # child is also a valid state
     Done

@@ -10,7 +10,7 @@ Espressif Thread Border Router solution is based on the combination of Espressif
 
    ESP-Thread-Border-Router Software Components
 
-This solution has obtained the Thread 1.3 `Certified Component Certificate <https://www.espressif.com/sites/default/files/Espressif%20Thread%20Border%20Router%20Thread%20V1.3%20Interoperability%20Certification.pdf>`_ issued by the Thread Group, complying with the latest Thread 1.3 standard, and supporting Matter application scenario.
+This solution has obtained the Thread 1.4 `Certified Component Certificate <https://documentation.espressif.com/Espressif%20Thread%20Border%20Router%20Thread%20V1.4%20Interoperability%20Certification.pdf>`_ issued by the Thread Group, complying with the latest Thread 1.4 standard, and supporting Matter application scenario.
 
 It provides the following features:
 

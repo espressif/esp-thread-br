@@ -77,18 +77,18 @@ Configure the ESP Thread Border Router to act as a DHCPv6 PD client. This can be
 
 .. code-block::
 
-    > br pd enable
+    > ot br pd enable
     Done
 
 Verify that the Border Router has requested and received a prefix delegation:
 
 .. code-block::
 
-    > br pd state
+    > ot br pd state
     running
     Done
 
-    > br pd omrprefix
+    > ot br pd omrprefix
     2001:db8:1:3::/64 lifetime:3120 preferred:3000
     Done
 

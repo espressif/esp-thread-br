@@ -15,6 +15,11 @@ extern "C" {
 #include "esp_http_server.h"
 #include "openthread/error.h"
 
+/**
+ * @brief Initialize web API semaphores. Must be called once before handling any HTTP requests.
+ */
+void esp_br_web_api_init(void);
+
 /*---------------------------------------------------------------------
             ESP Thread Border Router Wer Server REST API
 ----------------------------------------------------------------------*/
@@ -41,6 +46,10 @@ extern "C" {
 #define ESP_OT_REST_API_FORM_NETWORK_PATH "/form_network"
 #define ESP_OT_REST_API_ADD_NETWORK_PREFIX_PATH "/add_prefix"
 #define ESP_OT_REST_API_DELETE_NETWORK_PREFIX_PATH "/delete_prefix"
+#define ESP_OT_REST_API_PING_PATH "/ping"
+#define ESP_OT_REST_API_IPADDR_PATH "/ipaddr"
+#define ESP_OT_REST_API_ADD_IPADDR_PATH "/add_ipaddr"
+#define ESP_OT_REST_API_DELETE_IPADDR_PATH "/delete_ipaddr"
 /* To implement in the future */
 #define ESP_OT_REST_API_COMMISSION_PATH "/commission"
 #define ESP_OT_REST_API_NETWORK "/networks"
@@ -249,6 +258,39 @@ cJSON *handle_openthread_available_network_request(void);
  * @return The cJSON Object type of Thread network properties.
  */
 cJSON *handle_openthread_network_properties_request(void);
+
+/**
+ * @brief Handle a ping request to an IPv6 address using the OpenThread ping sender.
+ *
+ * @param[in] request   A cJSON object containing "address" (IPv6 string), and optionally
+ *                      "size" (payload bytes, default 32) and "count" (number of pings, default 4).
+ *
+ * @return A cJSON object with "replies" array and "statistics" summary, or NULL on failure.
+ */
+cJSON *handle_openthread_ping_request(const cJSON *request);
+
+/**
+ * @brief List all unicast IPv6 addresses on the Thread interface.
+ *
+ * @return A cJSON array of address objects, or NULL on failure.
+ */
+cJSON *handle_openthread_ipaddr_list_request(void);
+
+/**
+ * @brief Add a unicast IPv6 address to the Thread interface.
+ *
+ * @param[in] request   A cJSON object containing "address" (IPv6 string).
+ * @return A cJSON object with status, or NULL on failure.
+ */
+cJSON *handle_openthread_add_ipaddr_request(const cJSON *request);
+
+/**
+ * @brief Remove a unicast IPv6 address from the Thread interface.
+ *
+ * @param[in] request   A cJSON object containing "address" (IPv6 string).
+ * @return A cJSON object with status, or NULL on failure.
+ */
+cJSON *handle_openthread_delete_ipaddr_request(const cJSON *request);
 
 #ifdef __cplusplus
 }

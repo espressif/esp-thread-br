@@ -34,10 +34,27 @@
 #include "openthread/instance.h"
 #include "openthread/ip6.h"
 #include "openthread/netdata.h"
+#include "openthread/ping_sender.h"
 #include "openthread/server.h"
 #include "openthread/thread_ftd.h"
 
 #define API_TAG "web_api"
+
+/* Forward declarations for semaphores initialized in esp_br_web_api_init() */
+static SemaphoreHandle_t s_discover_done_semaphore;
+static SemaphoreHandle_t s_join_done_semaphore;
+static SemaphoreHandle_t s_diagnostic_semaphore;
+static SemaphoreHandle_t s_ping_done_semaphore;
+static SemaphoreHandle_t s_ping_mutex;
+
+void esp_br_web_api_init(void)
+{
+    s_discover_done_semaphore = xSemaphoreCreateBinary();
+    s_join_done_semaphore = xSemaphoreCreateBinary();
+    s_diagnostic_semaphore = xSemaphoreCreateMutex();
+    s_ping_done_semaphore = xSemaphoreCreateBinary();
+    s_ping_mutex = xSemaphoreCreateMutex();
+}
 
 static const char s_ot_state[5][10] = {"disabled", "detached", "child", "router", "leader"};
 
@@ -398,7 +415,7 @@ static esp_err_t get_openthread_wpan_properties(otInstance *ins, thread_wpan_sta
     if (!strcmp(role, "disabled")) {
         memcpy(wpan->service, WPAN_STATUS_OFFLINE, sizeof(WPAN_STATUS_OFFLINE));
     } else if (!strcmp(role, "detached")) {
-        memcpy(wpan->service, WPAN_STATUS_ASSICIATING, sizeof(WPAN_STATUS_ASSICIATING));
+        memcpy(wpan->service, WPAN_STATUS_ASSOCIATING, sizeof(WPAN_STATUS_ASSOCIATING));
     } else {
         memcpy(wpan->service, WPAN_STATUS_ASSOCIATED, sizeof(WPAN_STATUS_ASSOCIATED));
     }
@@ -448,7 +465,7 @@ exit:
 ----------------------------------------------------------------------*/
 static thread_network_list_t *s_networkList = NULL;
 static uint8_t s_networkList_count = 0;
-static SemaphoreHandle_t s_discover_done_semaphore = NULL;
+/* s_discover_done_semaphore is initialized in esp_br_web_api_init() */
 
 static void build_availableNetworks_list(otActiveScanResult *result)
 {
@@ -501,7 +518,7 @@ exit:
     return ret;
 }
 
-cJSON *handle_openthread_available_network_request()
+cJSON *handle_openthread_available_network_request(void)
 {
     otError ret = OT_ERROR_NONE;
     cJSON *networks = cJSON_CreateArray();
@@ -513,18 +530,16 @@ cJSON *handle_openthread_available_network_request()
 
     initialize_available_thread_networks_list(s_networkList);
 
-    if (!s_discover_done_semaphore)
-        s_discover_done_semaphore = xSemaphoreCreateBinary(); /* create a binary semaphore */
     ESP_GOTO_ON_FALSE(!get_openthread_available_networks(), OT_ERROR_FAILED, exit, API_TAG,
                       "Failed to get thread network list");
-    xSemaphoreTake(s_discover_done_semaphore, portMAX_DELAY); /* wait for scanning to be over */
+    xSemaphoreTake(s_discover_done_semaphore, portMAX_DELAY);
 
     ESP_GOTO_ON_FALSE(s_networkList, OT_ERROR_INVALID_ARGS, exit, API_TAG, "Invalid network list");
 
     thread_network_list_t *head = s_networkList->next; /* skip head node */
 
     while (head != NULL) {
-        cJSON *node = avaiable_network_struct_convert2_json(head->network);
+        cJSON *node = available_network_struct_convert2_json(head->network);
         cJSON_AddItemToArray(networks, node);
         head = head->next;
     }
@@ -589,6 +604,7 @@ exit:
                        join thread network
 ----------------------------------------------------------------------*/
 static otError s_join_state = OT_ERROR_NONE;
+/* s_join_done_semaphore is initialized in esp_br_web_api_init() */
 
 /**
  * @brief The function is the callback of otJoinerStart()
@@ -605,6 +621,9 @@ static void join_network_handler(otError error, void *context)
     default:
         ESP_LOGI(API_TAG, "Join failed [%s]", otThreadErrorToString(error));
         break;
+    }
+    if (s_join_done_semaphore) {
+        xSemaphoreGive(s_join_done_semaphore);
     }
 }
 
@@ -665,6 +684,8 @@ otError handle_openthread_join_network_request(const cJSON *request, cJSON *log)
         ERROR_EXIT(otDatasetSetActive(ins, &dataset), exit, API_TAG, "Failed to active dataset");
         ERROR_EXIT(otIp6SetEnabled(ins, true), exit, API_TAG, "Failed to set ifconfig up");
     } else if ((!memcmp(param.credentialType, CREDENTIAL_TYPE_PSKD, sizeof(CREDENTIAL_TYPE_PSKD)))) {
+        esp_openthread_lock_acquire(portMAX_DELAY);
+
         ERROR_EXIT(otIp6SetEnabled(ins, false), exit, API_TAG, "Failed to set ifconfig down");
         ERROR_EXIT(otIp6SetEnabled(ins, true), exit, API_TAG, "Failed to set ifconfig up");
 
@@ -673,26 +694,39 @@ otError handle_openthread_join_network_request(const cJSON *request, cJSON *log)
                                  NULL, &join_network_handler, NULL),
                    exit, API_TAG, "Failed to start joiner");
 
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        /* Release lock while waiting for joiner callback to avoid blocking other requests */
+        esp_openthread_lock_release();
+        if (xSemaphoreTake(s_join_done_semaphore, pdMS_TO_TICKS(10000)) != pdTRUE) {
+            ESP_LOGW(API_TAG, "Joiner timed out waiting for callback");
+            ret = OT_ERROR_RESPONSE_TIMEOUT;
+            goto exit_no_unlock;
+        }
+        esp_openthread_lock_acquire(portMAX_DELAY);
         ERROR_EXIT(s_join_state, exit, API_TAG, "Failed to join network");
     } else {
-        return OT_ERROR_PARSE;
+        ret = OT_ERROR_PARSE;
+        goto exit_no_unlock;
     }
     ERROR_EXIT(otThreadSetEnabled(ins, true), exit, API_TAG, "Failed to thread start");
 
-    memset(&config, 0x00, sizeof(otBorderRouterConfig));
-    config.mPreferred = true;
-    config.mSlaac = true;
-    config.mStable = true;
-    config.mOnMesh = true;
-    config.mDefaultRoute = (bool)param.defaultRoute;
-    ERROR_EXIT(parse_ipv6_prefix_from_string(param.prefix, &config.mPrefix), exit, API_TAG, "Failed to parse prefix");
-    ERROR_EXIT(network_prefix_add(&config), exit, API_TAG, "Failed to add thread prefix");
+    /* Only add on-mesh prefix if one was provided */
+    if (param.prefix[0] != '\0') {
+        memset(&config, 0x00, sizeof(otBorderRouterConfig));
+        config.mPreferred = true;
+        config.mSlaac = true;
+        config.mStable = true;
+        config.mOnMesh = true;
+        config.mDefaultRoute = (bool)param.defaultRoute;
+        ERROR_EXIT(parse_ipv6_prefix_from_string(param.prefix, &config.mPrefix), exit, API_TAG,
+                   "Failed to parse prefix");
+        ERROR_EXIT(network_prefix_add(&config), exit, API_TAG, "Failed to add thread prefix");
+    }
 
 exit:
     esp_openthread_lock_release();
+exit_no_unlock:
     if (ret == OT_ERROR_NONE)
-        cJSON_SetValuestring(log, "Submit successfully, joining...");
+        cJSON_SetValuestring(log, "Join request submitted, attaching...");
     else
         cJSON_SetValuestring(log, "Join Network: Failure");
     return ret;
@@ -713,8 +747,10 @@ otError handle_openthread_add_network_prefix_request(const cJSON *request)
     ESP_RETURN_ON_FALSE(str, OT_ERROR_INVALID_ARGS, API_TAG, "Failed to get prefix");
     memset(str_prefix, 0x00, OT_IP6_PREFIX_STRING_SIZE);
     memcpy(str_prefix, str, strlen(str) + 1);
-    default_route = (bool)cJSON_GetNumberValue(cJSON_GetObjectItem(request, "defaultRoute"));
-    ESP_RETURN_ON_FALSE(default_route, OT_ERROR_INVALID_ARGS, API_TAG, "Failed to get prefix or parameter from root");
+    cJSON *default_route_item = cJSON_GetObjectItem(request, "defaultRoute");
+    ESP_RETURN_ON_FALSE(default_route_item, OT_ERROR_INVALID_ARGS, API_TAG,
+                        "Failed to get prefix or parameter from root");
+    default_route = cJSON_IsTrue(default_route_item);
 
     memset(&config, 0x00, sizeof(otBorderRouterConfig));
     config.mPreferred = true;
@@ -727,7 +763,7 @@ otError handle_openthread_add_network_prefix_request(const cJSON *request)
     esp_openthread_lock_acquire(portMAX_DELAY);
     ERROR_EXIT(network_prefix_add(&config), exit, API_TAG, "Failed to add thread prefix");
 #if OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE
-    ERROR_EXIT(otBorderRouterRegister(ins), exit, API_TAG, "Failed to register in data net");
+    ERROR_EXIT(otBorderRouterRegister(esp_openthread_get_instance()), exit, API_TAG, "Failed to register in data net");
 #else
     ERROR_EXIT(otServerRegister(esp_openthread_get_instance()), exit, API_TAG, "Failed to register in data net");
 #endif
@@ -754,7 +790,7 @@ otError handle_openthread_delete_network_prefix_request(const cJSON *request)
     ERROR_EXIT(otBorderRouterRemoveOnMeshPrefix(esp_openthread_get_instance(), &ip6_prefix), exit, API_TAG,
                "Failed to remove thread prefix");
 #if OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE
-    ERROR_EXIT(otBorderRouterRegister(ins), ESP_FAIL, exit, API_TAG, "Failed to register in data net");
+    ERROR_EXIT(otBorderRouterRegister(esp_openthread_get_instance()), exit, API_TAG, "Failed to register in data net");
 #else
     ERROR_EXIT(otServerRegister(esp_openthread_get_instance()), exit, API_TAG, "Failed to register in data net");
 #endif
@@ -838,10 +874,19 @@ exit:
                        thread network Topology
 ----------------------------------------------------------------------*/
 static thread_diagnosticTlv_set_t *s_diagnosticTlv_set = NULL;
-static SemaphoreHandle_t s_diagnostic_semaphore = NULL;
-static const uint8_t kAllTlvTypes[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 14, 15, 16, 17, 19};
+/* s_diagnostic_semaphore is initialized in esp_br_web_api_init() */
+/* Only request TLV types the topology page actually uses:
+ *   0=ExtAddress, 1=Address16, 2=Mode, 5=Route, 6=LeaderData,
+ *   8=IPv6AddressList, 16=ChildTable */
+static const uint8_t kAllTlvTypes[] = {0, 1, 2, 5, 6, 8, 16};
 static const char *kMulticastAddrAllRouters = "ff03::2";
-#define DIAGNOSTICS_UPDATE_TIMEINTERVAL 2000 /* ms */
+static volatile bool s_diag_collecting = false;           /* true while actively collecting responses */
+static volatile int s_diag_response_count = 0;            /* number of responses received this collection */
+static volatile TickType_t s_diag_last_response_tick = 0; /* tick of most recent response */
+#define DIAG_QUIET_PERIOD_MS 3000                         /* stop after no new response for 3s */
+#define DIAG_MIN_WAIT_MS 2000                             /* always wait at least 2s */
+#define DIAG_MAX_TIMEOUT_MS 30000                         /* hard cap to avoid blocking forever */
+#define DIAG_POLL_INTERVAL_MS 500                         /* polling interval */
 
 /**
  * @brief Update the diagnostic Tlv set with @param key and @param diag_list
@@ -867,6 +912,10 @@ static void update_diagnosticTlv(char *key, thread_diagnosticTlv_list_t *diag_li
 static void get_diagnosticTlv_information(otError aError, const otMessage *aMessage, const otMessageInfo *aMessageInfo)
 {
     thread_diagnosticTlv_list_t *diag_list = (thread_diagnosticTlv_list_t *)malloc(sizeof(thread_diagnosticTlv_list_t));
+    if (diag_list == NULL) {
+        ESP_LOGW(API_TAG, "Diagnostic: out of memory, skipping node");
+        return;
+    }
     otNetworkDiagTlv diagTlv;
     otNetworkDiagIterator iterator = OT_NETWORK_DIAGNOSTIC_ITERATOR_INIT;
     otError error;
@@ -894,13 +943,42 @@ static void get_diagnosticTlv_information(otError aError, const otMessage *aMess
  * @param[in]  aContext      A pointer to application-specific context.
  *
  */
+#define DIAG_MIN_FREE_HEAP 20000 /* bytes – stop collecting before starving OpenThread */
+
 static void diagnosticTlv_result_handler(otError aError, otMessage *aMessage, const otMessageInfo *aMessageInfo,
                                          void *aContext)
 {
-    if (aError == OT_ERROR_NONE && s_diagnostic_semaphore) {
-        xSemaphoreTake(s_diagnostic_semaphore, portMAX_DELAY);
-        get_diagnosticTlv_information(aError, aMessage, aMessageInfo);
-        xSemaphoreGive(s_diagnostic_semaphore);
+    if (aError == OT_ERROR_NONE) {
+        /* Skip child nodes — the topology only needs router data.
+           Children are already represented in their parent router's ChildTable TLV.
+           Diagnostic responses are sent from RLOC addresses where the
+           lower 10 bits encode the child ID (0 for routers).
+
+           Note: the RLOC16 filtering and heap check below happen outside the
+           s_diagnostic_semaphore, creating a small TOCTOU window with
+           s_diag_collecting. This is acceptable on ESP32 where the OT task
+           is pinned to a single core and callback ordering is deterministic. */
+        const uint8_t *src = aMessageInfo->mPeerAddr.mFields.m8;
+        uint16_t rloc16 = ((uint16_t)src[14] << 8) | src[15];
+        if ((rloc16 & 0x03FF) != 0) {
+            return;
+        }
+
+        if (esp_get_free_heap_size() < DIAG_MIN_FREE_HEAP) {
+            ESP_LOGW(API_TAG, "Diagnostic callback: low heap (%lu), dropping result",
+                     (unsigned long)esp_get_free_heap_size());
+            return;
+        }
+        if (xSemaphoreTake(s_diagnostic_semaphore, pdMS_TO_TICKS(1000)) == pdTRUE) {
+            if (s_diag_collecting) {
+                get_diagnosticTlv_information(aError, aMessage, aMessageInfo);
+                s_diag_response_count++;
+                s_diag_last_response_tick = xTaskGetTickCount();
+            }
+            xSemaphoreGive(s_diagnostic_semaphore);
+        } else {
+            ESP_LOGW(API_TAG, "Diagnostic callback: failed to acquire semaphore, dropping result");
+        }
     }
 }
 
@@ -928,9 +1006,9 @@ exit:
     return ret;
 }
 
-static thread_node_informaiton_t get_openthread_node_information(otInstance *ins)
+static thread_node_information_t get_openthread_node_information(otInstance *ins)
 {
-    thread_node_informaiton_t node;
+    thread_node_information_t node;
     thread_node_information_reset(&node);
     if (otThreadGetLeaderData(ins, &node.leader_data))
         ESP_LOGW(API_TAG, "Fail to get node's leader data.");
@@ -956,7 +1034,7 @@ static thread_node_informaiton_t get_openthread_node_information(otInstance *ins
 cJSON *handle_ot_resource_node_information_request()
 {
     esp_openthread_lock_acquire(portMAX_DELAY);
-    thread_node_informaiton_t node = get_openthread_node_information(esp_openthread_get_instance());
+    thread_node_information_t node = get_openthread_node_information(esp_openthread_get_instance());
     esp_openthread_lock_release();
     return thread_node_struct_convert2_json(&node);
 }
@@ -976,23 +1054,77 @@ exit:
 
 cJSON *handle_ot_resource_network_diagnostics_request()
 {
+    /* Stop accepting any late callbacks from a previous collection */
+    xSemaphoreTake(s_diagnostic_semaphore, portMAX_DELAY);
+    s_diag_collecting = false;
+
     destroy_thread_diagnosticTlv_set(s_diagnosticTlv_set);
-    s_diagnosticTlv_set = NULL; // s_diagnosticTlv_set MUST be NULL, when call destroy_thread_diagnosticTlv_set()
+    s_diagnosticTlv_set = NULL;
     s_diagnosticTlv_set = (thread_diagnosticTlv_set_t *)malloc(sizeof(thread_diagnosticTlv_set_t));
     initialize_thread_diagnosticTlv_set(s_diagnosticTlv_set, OPENTHREAD_INVALID_RLOC16);
 
-    if (s_diagnostic_semaphore == NULL)
-        s_diagnostic_semaphore = xSemaphoreCreateMutex();
+    s_diag_response_count = 0;
+    s_diag_last_response_tick = xTaskGetTickCount();
+    s_diag_collecting = true;
+    xSemaphoreGive(s_diagnostic_semaphore);
+
     build_thread_network_topology();
 
-    // wait the thread diagnostic to collect Thread topology message.
-    vTaskDelay(pdMS_TO_TICKS(DIAGNOSTICS_UPDATE_TIMEINTERVAL));
+    /* Get the expected router count as a minimum threshold */
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    otInstance *ins = esp_openthread_get_instance();
+    uint8_t maxRouterId = otThreadGetMaxRouterId(ins);
+    otRouterInfo routerInfo;
+    int expected_routers = 0;
+    for (uint8_t i = 0; i <= maxRouterId; i++) {
+        if (otThreadGetRouterInfo(ins, i, &routerInfo) == OT_ERROR_NONE)
+            expected_routers++;
+    }
+    esp_openthread_lock_release();
 
-    vSemaphoreDelete(s_diagnostic_semaphore);
-    s_diagnostic_semaphore = NULL;
+    /* Wait for responses:
+     * - At least expected_routers responses received
+     * - AND no new response for DIAG_QUIET_PERIOD_MS (responses done)
+     * - OR hard timeout reached
+     *
+     * Compare in ticks (not ms) to avoid overflow when multiplying
+     * TickType_t by portTICK_PERIOD_MS on systems with large tick counts. */
+    const TickType_t max_timeout_ticks = pdMS_TO_TICKS(DIAG_MAX_TIMEOUT_MS);
+    const TickType_t min_wait_ticks = pdMS_TO_TICKS(DIAG_MIN_WAIT_MS);
+    const TickType_t quiet_ticks = pdMS_TO_TICKS(DIAG_QUIET_PERIOD_MS);
+    const TickType_t poll_ticks = pdMS_TO_TICKS(DIAG_POLL_INTERVAL_MS);
+    TickType_t start = xTaskGetTickCount();
+    while (1) {
+        vTaskDelay(poll_ticks);
+        TickType_t now = xTaskGetTickCount();
+        TickType_t elapsed = now - start;
+        TickType_t quiet = now - s_diag_last_response_tick;
 
-    return dailnosticTlv_set_convert2_json(s_diagnosticTlv_set);
-    ;
+        if (elapsed >= max_timeout_ticks) {
+            ESP_LOGW(API_TAG, "Diagnostic collection: max timeout reached (%d responses)", s_diag_response_count);
+            break;
+        }
+        if (elapsed < min_wait_ticks) {
+            continue;
+        }
+        if (s_diag_response_count >= expected_routers && quiet >= quiet_ticks) {
+            ESP_LOGI(API_TAG, "Diagnostic collection complete: %d responses from %d routers", s_diag_response_count,
+                     expected_routers);
+            break;
+        }
+    }
+
+    /* Stop accepting new responses and serialize the result.
+       Free the diagnostic set immediately after conversion so the
+       JSON string serialization in the HTTP handler has more heap. */
+    xSemaphoreTake(s_diagnostic_semaphore, portMAX_DELAY);
+    s_diag_collecting = false;
+    cJSON *result = diagnosticTlv_set_convert2_json(s_diagnosticTlv_set);
+    destroy_thread_diagnosticTlv_set(s_diagnosticTlv_set);
+    s_diagnosticTlv_set = NULL;
+    xSemaphoreGive(s_diagnostic_semaphore);
+
+    return result;
 }
 
 /*----------------------------------------------------------------------
@@ -1001,4 +1133,282 @@ cJSON *handle_ot_resource_network_diagnostics_request()
 otError handle_openthread_set_dataset_request(const cJSON *request)
 {
     return OT_ERROR_NONE;
+}
+
+/*----------------------------------------------------------------------
+                        Ping Sender
+-----------------------------------------------------------------------*/
+#define PING_MAX_COUNT 10
+#define PING_DEFAULT_COUNT 4
+#define PING_DEFAULT_SIZE 32
+#define PING_TIMEOUT_MS 8000
+
+typedef struct {
+    char sender[OT_IP6_ADDRESS_STRING_SIZE];
+    uint16_t rtt;
+    uint16_t size;
+    uint16_t seq;
+    uint8_t hop_limit;
+} ping_reply_entry_t;
+
+static ping_reply_entry_t s_ping_replies[PING_MAX_COUNT];
+static uint16_t s_ping_reply_count = 0;
+static otPingSenderStatistics s_ping_statistics;
+/* s_ping_done_semaphore is initialized in esp_br_web_api_init() */
+
+static void ping_reply_callback(const otPingSenderReply *aReply, void *aContext)
+{
+    if (s_ping_reply_count < PING_MAX_COUNT) {
+        ping_reply_entry_t *entry = &s_ping_replies[s_ping_reply_count];
+        otIp6AddressToString(&aReply->mSenderAddress, entry->sender, sizeof(entry->sender));
+        entry->rtt = aReply->mRoundTripTime;
+        entry->size = aReply->mSize;
+        entry->seq = aReply->mSequenceNumber;
+        entry->hop_limit = aReply->mHopLimit;
+        s_ping_reply_count++;
+    }
+}
+
+static void ping_statistics_callback(const otPingSenderStatistics *aStatistics, void *aContext)
+{
+    memcpy(&s_ping_statistics, aStatistics, sizeof(otPingSenderStatistics));
+    if (s_ping_done_semaphore) {
+        xSemaphoreGive(s_ping_done_semaphore);
+    }
+}
+
+cJSON *handle_openthread_ping_request(const cJSON *request)
+{
+    ESP_RETURN_ON_FALSE(request, NULL, API_TAG, "Invalid ping request");
+
+    /* Only one ping at a time — return busy if another is in progress */
+    if (xSemaphoreTake(s_ping_mutex, 0) != pdTRUE) {
+        ESP_LOGW(API_TAG, "Ping already in progress");
+        return NULL;
+    }
+
+    cJSON *root = NULL;
+    cJSON *addr_item = cJSON_GetObjectItemCaseSensitive(request, "address");
+    if (!cJSON_IsString(addr_item) || !addr_item->valuestring) {
+        ESP_LOGE(API_TAG, "Missing or invalid 'address' field");
+        goto ping_exit;
+    }
+
+    cJSON *count_item = cJSON_GetObjectItemCaseSensitive(request, "count");
+    uint16_t count = (cJSON_IsNumber(count_item) && count_item->valuedouble > 0) ? (uint16_t)count_item->valuedouble
+                                                                                 : PING_DEFAULT_COUNT;
+    if (count > PING_MAX_COUNT) {
+        count = PING_MAX_COUNT;
+    }
+
+    cJSON *size_item = cJSON_GetObjectItemCaseSensitive(request, "size");
+    uint16_t size = (cJSON_IsNumber(size_item) && size_item->valuedouble > 0) ? (uint16_t)size_item->valuedouble
+                                                                              : PING_DEFAULT_SIZE;
+
+    /* Reset state */
+    s_ping_reply_count = 0;
+    memset(s_ping_replies, 0, sizeof(s_ping_replies));
+    memset(&s_ping_statistics, 0, sizeof(s_ping_statistics));
+
+    /* Configure and start ping */
+    otPingSenderConfig config;
+    memset(&config, 0, sizeof(config));
+
+    otError err = otIp6AddressFromString(addr_item->valuestring, &config.mDestination);
+    if (err != OT_ERROR_NONE) {
+        ESP_LOGE(API_TAG, "Failed to parse IPv6 address: %s", addr_item->valuestring);
+        goto ping_exit;
+    }
+
+    config.mReplyCallback = ping_reply_callback;
+    config.mStatisticsCallback = ping_statistics_callback;
+    config.mCallbackContext = NULL;
+    config.mSize = size;
+    config.mCount = count;
+    config.mInterval = 1000; /* 1 second between pings */
+    config.mTimeout = 3000;  /* 3 second timeout for final reply */
+    config.mHopLimit = 0;    /* default */
+    config.mAllowZeroHopLimit = false;
+    config.mMulticastLoop = false;
+
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    err = otPingSenderPing(esp_openthread_get_instance(), &config);
+    esp_openthread_lock_release();
+
+    if (err != OT_ERROR_NONE) {
+        ESP_LOGE(API_TAG, "Failed to start ping: %d", err);
+        goto ping_exit;
+    }
+
+    /* Wait for ping to complete. Timeout: count * interval + extra timeout + margin */
+    TickType_t wait_ticks = pdMS_TO_TICKS((count * config.mInterval) + config.mTimeout + 1000);
+    if (xSemaphoreTake(s_ping_done_semaphore, wait_ticks) != pdTRUE) {
+        ESP_LOGW(API_TAG, "Ping timed out waiting for statistics callback");
+        /* Stop any in-progress ping */
+        esp_openthread_lock_acquire(portMAX_DELAY);
+        otPingSenderStop(esp_openthread_get_instance());
+        esp_openthread_lock_release();
+    }
+
+    /* Build JSON response */
+    root = cJSON_CreateObject();
+
+    /* Replies array */
+    cJSON *replies = cJSON_CreateArray();
+    for (uint16_t i = 0; i < s_ping_reply_count; i++) {
+        cJSON *reply = cJSON_CreateObject();
+        cJSON_AddStringToObject(reply, "from", s_ping_replies[i].sender);
+        cJSON_AddNumberToObject(reply, "seq", s_ping_replies[i].seq);
+        cJSON_AddNumberToObject(reply, "size", s_ping_replies[i].size);
+        cJSON_AddNumberToObject(reply, "rtt", s_ping_replies[i].rtt);
+        cJSON_AddNumberToObject(reply, "hlim", s_ping_replies[i].hop_limit);
+        cJSON_AddItemToArray(replies, reply);
+    }
+    cJSON_AddItemToObject(root, "replies", replies);
+
+    /* Statistics */
+    cJSON *stats = cJSON_CreateObject();
+    cJSON_AddNumberToObject(stats, "sent", s_ping_statistics.mSentCount);
+    cJSON_AddNumberToObject(stats, "received", s_ping_statistics.mReceivedCount);
+    uint16_t lost = s_ping_statistics.mSentCount > s_ping_statistics.mReceivedCount
+        ? s_ping_statistics.mSentCount - s_ping_statistics.mReceivedCount
+        : 0;
+    double loss_pct = s_ping_statistics.mSentCount > 0 ? (double)lost / s_ping_statistics.mSentCount * 100.0 : 0.0;
+    cJSON_AddNumberToObject(stats, "loss_percent", loss_pct);
+    if (s_ping_statistics.mReceivedCount > 0) {
+        uint32_t avg_rtt = s_ping_statistics.mTotalRoundTripTime / s_ping_statistics.mReceivedCount;
+        cJSON_AddNumberToObject(stats, "rtt_min", s_ping_statistics.mMinRoundTripTime);
+        cJSON_AddNumberToObject(stats, "rtt_avg", avg_rtt);
+        cJSON_AddNumberToObject(stats, "rtt_max", s_ping_statistics.mMaxRoundTripTime);
+    }
+    cJSON_AddItemToObject(root, "statistics", stats);
+
+ping_exit:
+    xSemaphoreGive(s_ping_mutex);
+    return root;
+}
+
+/*----------------------------------------------------------------------
+                       IPv6 Address Management
+-----------------------------------------------------------------------*/
+cJSON *handle_openthread_ipaddr_list_request(void)
+{
+    cJSON *arr = cJSON_CreateArray();
+    char addr_str[OT_IP6_ADDRESS_STRING_SIZE];
+
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    const otNetifAddress *addr = otIp6GetUnicastAddresses(esp_openthread_get_instance());
+    while (addr) {
+        cJSON *entry = cJSON_CreateObject();
+        otIp6AddressToString(&addr->mAddress, addr_str, sizeof(addr_str));
+        cJSON_AddStringToObject(entry, "address", addr_str);
+        cJSON_AddNumberToObject(entry, "prefixLength", addr->mPrefixLength);
+        const char *origin;
+        switch (addr->mAddressOrigin) {
+        case OT_ADDRESS_ORIGIN_THREAD:
+            origin = "thread";
+            break;
+        case OT_ADDRESS_ORIGIN_SLAAC:
+            origin = "slaac";
+            break;
+        case OT_ADDRESS_ORIGIN_DHCPV6:
+            origin = "dhcpv6";
+            break;
+        case OT_ADDRESS_ORIGIN_MANUAL:
+            origin = "manual";
+            break;
+        default:
+            origin = "unknown";
+            break;
+        }
+        cJSON_AddStringToObject(entry, "origin", origin);
+        cJSON_AddBoolToObject(entry, "preferred", addr->mPreferred);
+        cJSON_AddBoolToObject(entry, "meshLocal", addr->mMeshLocal);
+        cJSON_AddBoolToObject(entry, "rloc", addr->mRloc);
+        cJSON_AddItemToArray(arr, entry);
+        addr = addr->mNext;
+    }
+    esp_openthread_lock_release();
+    return arr;
+}
+
+cJSON *handle_openthread_add_ipaddr_request(const cJSON *request)
+{
+    cJSON *result = cJSON_CreateObject();
+    if (!request) {
+        ESP_LOGE(API_TAG, "Invalid ipaddr add request");
+        cJSON_AddStringToObject(result, "status", "error");
+        cJSON_AddStringToObject(result, "message", "Invalid request");
+        return result;
+    }
+
+    const cJSON *addr_json = cJSON_GetObjectItem(request, "address");
+    if (!addr_json || !addr_json->valuestring) {
+        ESP_LOGE(API_TAG, "Missing address field");
+        cJSON_AddStringToObject(result, "status", "error");
+        cJSON_AddStringToObject(result, "message", "Missing address field");
+        return result;
+    }
+
+    otNetifAddress netif_addr;
+    memset(&netif_addr, 0, sizeof(netif_addr));
+
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    otError err = otIp6AddressFromString(addr_json->valuestring, &netif_addr.mAddress);
+    if (err == OT_ERROR_NONE) {
+        netif_addr.mPrefixLength = 64;
+        netif_addr.mPreferred = true;
+        netif_addr.mValid = true;
+        netif_addr.mAddressOrigin = OT_ADDRESS_ORIGIN_MANUAL;
+        err = otIp6AddUnicastAddress(esp_openthread_get_instance(), &netif_addr);
+    }
+    esp_openthread_lock_release();
+
+    if (err == OT_ERROR_NONE) {
+        cJSON_AddStringToObject(result, "status", "ok");
+        ESP_LOGI(API_TAG, "Added IPv6 address: %s", addr_json->valuestring);
+    } else {
+        cJSON_AddStringToObject(result, "status", "error");
+        cJSON_AddStringToObject(result, "message", otThreadErrorToString(err));
+        ESP_LOGE(API_TAG, "Failed to add IPv6 address: %s (err=%d)", addr_json->valuestring, err);
+    }
+    return result;
+}
+
+cJSON *handle_openthread_delete_ipaddr_request(const cJSON *request)
+{
+    cJSON *result = cJSON_CreateObject();
+    if (!request) {
+        ESP_LOGE(API_TAG, "Invalid ipaddr delete request");
+        cJSON_AddStringToObject(result, "status", "error");
+        cJSON_AddStringToObject(result, "message", "Invalid request");
+        return result;
+    }
+
+    const cJSON *addr_json = cJSON_GetObjectItem(request, "address");
+    if (!addr_json || !addr_json->valuestring) {
+        ESP_LOGE(API_TAG, "Missing address field");
+        cJSON_AddStringToObject(result, "status", "error");
+        cJSON_AddStringToObject(result, "message", "Missing address field");
+        return result;
+    }
+
+    otIp6Address addr;
+
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    otError err = otIp6AddressFromString(addr_json->valuestring, &addr);
+    if (err == OT_ERROR_NONE) {
+        err = otIp6RemoveUnicastAddress(esp_openthread_get_instance(), &addr);
+    }
+    esp_openthread_lock_release();
+
+    if (err == OT_ERROR_NONE) {
+        cJSON_AddStringToObject(result, "status", "ok");
+        ESP_LOGI(API_TAG, "Removed IPv6 address: %s", addr_json->valuestring);
+    } else {
+        cJSON_AddStringToObject(result, "status", "error");
+        cJSON_AddStringToObject(result, "message", otThreadErrorToString(err));
+        ESP_LOGE(API_TAG, "Failed to remove IPv6 address: %s (err=%d)", addr_json->valuestring, err);
+    }
+    return result;
 }

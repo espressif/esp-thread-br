@@ -1,0 +1,216 @@
+<!--
+  SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+  SPDX-License-Identifier: Apache-2.0
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Thread Border Router - Addresses</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+<nav class="nav" id="nav"></nav>
+<div class="container">
+    <div class="flex-between mb-16">
+        <div>
+            <h1 class="page-title">Addresses</h1>
+            <p class="page-desc" style="margin-bottom:0">Manage IPv6 addresses and on-mesh prefixes</p>
+        </div>
+        <button class="btn btn-primary btn-sm" id="refreshBtn" onclick="loadAddresses()">Refresh</button>
+    </div>
+
+    <!-- Current IPv6 Addresses -->
+    <div class="card section">
+        <div class="card-header">IPv6 Unicast Addresses</div>
+        <div id="addrList"><p class="text-muted" style="font-size:13px">Loading...</p></div>
+    </div>
+
+    <!-- Add IPv6 Address -->
+    <div class="card section">
+        <div class="card-header">Add IPv6 Address</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Add a manually-assigned unicast IPv6 address to the Thread interface.</p>
+        <form id="ipaddrForm" onsubmit="return false">
+            <div class="form-group">
+                <label class="form-label">IPv6 Address</label>
+                <input class="form-input" name="address" type="text" placeholder="e.g. 2001::dead:beef:cafe">
+            </div>
+            <div style="display:flex;align-items:center;gap:12px">
+                <button type="button" class="btn btn-primary" onclick="addIpAddr()">Add Address</button>
+                <span id="ipaddrStatus" style="font-size:13px"></span>
+            </div>
+        </form>
+    </div>
+
+    <!-- On-Mesh Prefix -->
+    <div class="card section">
+        <div class="card-header">On-Mesh Prefix</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Add or remove on-mesh prefixes from the Thread network.</p>
+        <form id="prefixForm" onsubmit="return false">
+            <div class="form-group">
+                <label class="form-label">Prefix</label>
+                <input class="form-input" name="prefix" type="text" value="fd11:22::" placeholder="e.g. fd11:22::">
+                <div class="form-hint">IPv6 prefix for on-mesh routing</div>
+            </div>
+            <div class="form-check" style="margin-bottom:16px">
+                <input type="checkbox" name="defaultRoute" id="prefDefRoute" checked>
+                <label for="prefDefRoute">Default Route</label>
+            </div>
+            <div class="flex-between">
+                <div style="display:flex;gap:8px">
+                    <button type="button" class="btn btn-primary" onclick="addPrefix()">Add Prefix</button>
+                    <button type="button" class="btn btn-danger" onclick="deletePrefix()">Delete Prefix</button>
+                </div>
+                <span id="prefStatus" style="font-size:13px"></span>
+            </div>
+        </form>
+    </div>
+
+</div>
+<div class="footer">Copyright &copy; 2026 Espressif Systems. All rights reserved.</div>
+<script src="/static/api.js"></script>
+<script>
+/* Disable page if Thread network is not connected */
+checkThreadState(function(role, connected) {
+    if (!connected) disableManagementPage();
+});
+
+/* ──── IPv6 Address List ──── */
+function renderAddrTable(data) {
+    var list = (data && data.result) ? data.result : [];
+    var el = document.getElementById('addrList');
+    if (!list.length) {
+        el.innerHTML = '<p class="text-muted" style="font-size:13px">No addresses</p>';
+        return;
+    }
+    var html = '<table><thead><tr><th>Address</th><th>Origin</th><th>Status</th><th style="width:70px"></th></tr></thead><tbody>';
+    for (var i = 0; i < list.length; i++) {
+        var a = list[i];
+        var badge = 'badge-info';
+        if (a.origin === 'manual') badge = 'badge-success';
+        else if (a.origin === 'thread') badge = 'badge-warning';
+        var statusBadge = a.preferred ? '<span class="badge badge-success">preferred</span>'
+                                      : '<span class="badge badge-danger">deprecated</span>';
+        var rmBtn = '';
+        if (a.origin === 'manual') {
+            rmBtn = '<button class="btn btn-danger btn-sm" onclick="removeIpAddr(\'' + escapeHtml(a.address) + '\')">Remove</button>';
+        }
+        html += '<tr><td style="font-family:\'Courier New\',Consolas,monospace;font-size:12px">' + escapeHtml(a.address) + '/' + escapeHtml(a.prefixLength) +
+                '</td><td><span class="badge ' + badge + '">' + escapeHtml(a.origin) + '</span></td><td>' + statusBadge + '</td><td>' + rmBtn + '</td></tr>';
+    }
+    html += '</tbody></table>';
+    el.innerHTML = html;
+}
+
+function loadAddresses() {
+    var btn = document.getElementById('refreshBtn');
+    btn.disabled = true; btn.textContent = 'Loading...';
+    apiGet('/ipaddr').then(function(data) {
+        btn.disabled = false; btn.textContent = 'Refresh';
+        renderAddrTable(data);
+    }).catch(function() {
+        btn.disabled = false; btn.textContent = 'Refresh';
+        showToast('Failed to load addresses', 'error');
+    });
+}
+
+/* ──── Add IPv6 Address ──── */
+function addIpAddr() {
+    var form = document.getElementById('ipaddrForm');
+    var addr = form.address.value.trim();
+    if (!addr) { showToast('Please enter an IPv6 address', 'error'); return; }
+    var status = document.getElementById('ipaddrStatus');
+    status.textContent = 'Adding...'; status.style.color = 'var(--primary)';
+
+    apiPost('/add_ipaddr', { address: addr }).then(function(res) {
+        if (res.error) {
+            status.textContent = res.message || 'Add failed';
+            status.style.color = 'var(--danger)';
+            showToast('Failed to add address', 'error');
+        } else {
+            status.textContent = 'Address added';
+            status.style.color = 'var(--success)';
+            showToast('Address added', 'success');
+            form.address.value = '';
+            loadAddresses();
+        }
+    }).catch(function() {
+        status.textContent = 'Connection error'; status.style.color = 'var(--danger)';
+    });
+}
+
+/* ──── Remove IPv6 Address ──── */
+function removeIpAddr(addr) {
+    apiPost('/delete_ipaddr', { address: addr }).then(function(res) {
+        if (res.error) {
+            showToast('Failed to remove address', 'error');
+        } else {
+            showToast('Address removed', 'success');
+            loadAddresses();
+        }
+    }).catch(function() {
+        showToast('Connection error', 'error');
+    });
+}
+
+/* ──── On-Mesh Prefix ──── */
+function getPrefixData() {
+    var form = document.getElementById('prefixForm');
+    return {
+        prefix: form.prefix.value,
+        defaultRoute: form.defaultRoute.checked ? 1 : 0
+    };
+}
+
+function addPrefix() {
+    var status = document.getElementById('prefStatus');
+    status.textContent = 'Adding prefix...'; status.style.color = 'var(--primary)';
+    showLoading(true);
+
+    apiPost('/add_prefix', getPrefixData()).then(function(res) {
+        showLoading(false);
+        if (res.error) {
+            status.textContent = res.message || 'Add failed';
+            status.style.color = 'var(--danger)';
+            showToast('Add prefix failed', 'error');
+        } else {
+            status.textContent = 'Prefix added successfully';
+            status.style.color = 'var(--success)';
+            showToast('Prefix added', 'success');
+        }
+    }).catch(function() {
+        showLoading(false);
+        status.textContent = 'Connection error'; status.style.color = 'var(--danger)';
+    });
+}
+
+function deletePrefix() {
+    var status = document.getElementById('prefStatus');
+    status.textContent = 'Deleting prefix...'; status.style.color = 'var(--primary)';
+    showLoading(true);
+
+    apiPost('/delete_prefix', getPrefixData()).then(function(res) {
+        showLoading(false);
+        if (res.error) {
+            status.textContent = res.message || 'Delete failed';
+            status.style.color = 'var(--danger)';
+            showToast('Delete prefix failed', 'error');
+        } else {
+            status.textContent = 'Prefix deleted successfully';
+            status.style.color = 'var(--success)';
+            showToast('Prefix deleted', 'success');
+        }
+    }).catch(function() {
+        showLoading(false);
+        status.textContent = 'Connection error'; status.style.color = 'var(--danger)';
+    });
+}
+
+/* Render from cache, then fetch live */
+renderAddrTable(getCached('/ipaddr'));
+loadAddresses();
+</script>
+</body>
+</html>
