@@ -9,7 +9,6 @@
 #include "esp_br_web_base.h"
 #include "esp_check.h"
 #include "esp_err.h"
-#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_netif_ip_addr.h"
