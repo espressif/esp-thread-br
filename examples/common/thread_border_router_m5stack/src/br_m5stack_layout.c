@@ -112,8 +112,8 @@ void br_m5stack_create_ui(void)
             br_m5stack_hidden_page(s_main_page);
         }
     } else {
-        // Normal mode, update main page with webgui
-        br_m5stack_update_main_page_webgui();
+        // Normal mode: show main page
+        br_m5stack_show_main_page();
     }
 #endif
 
@@ -311,10 +311,7 @@ static void br_m5stack_display_wifi_config_info(const char *ssid, const char *ip
             br_m5stack_hidden_page(s_wifi_config_page);
         }
         // Show main page and update webgui
-        if (s_main_page) {
-            br_m5stack_update_main_page_webgui();
-            br_m5stack_display_page(s_main_page);
-        }
+        br_m5stack_show_main_page();
         bsp_display_unlock();
         return;
     }
