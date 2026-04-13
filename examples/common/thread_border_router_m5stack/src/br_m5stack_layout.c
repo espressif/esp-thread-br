@@ -173,8 +173,8 @@ static void br_m5stack_wifi_event_handler(void *arg, esp_event_base_t event_base
         wifi_event_sta_disconnected_t *disc = (wifi_event_sta_disconnected_t *)event_data;
         uint8_t reason = disc ? disc->reason : WIFI_REASON_UNSPECIFIED;
 
-        bool on_connecting_page = s_wifi_connecting_page &&
-                                  !lv_obj_has_flag(s_wifi_connecting_page, LV_OBJ_FLAG_HIDDEN);
+        bool on_connecting_page =
+            s_wifi_connecting_page && !lv_obj_has_flag(s_wifi_connecting_page, LV_OBJ_FLAG_HIDDEN);
         if (!on_connecting_page) {
             // Wi-Fi dropped while on the main page — show connection page and spin
             // while the stack automatically retries; the next disconnect event will
@@ -247,9 +247,8 @@ static void br_m5stack_display_wifi_connecting(void)
         ESP_GOTO_ON_FALSE(s_wifi_connecting_page, ESP_FAIL, exit, BR_M5STACK_TAG,
                           "Failed to create Wi-Fi connecting page");
 
-        title_label = br_m5stack_create_label(s_wifi_connecting_page, "Wi-Fi Connection",
-                                              &lv_font_montserrat_20, lv_color_make(255, 140, 0),
-                                              LV_ALIGN_TOP_MID, 0, 40);
+        title_label = br_m5stack_create_label(s_wifi_connecting_page, "Wi-Fi Connection", &lv_font_montserrat_20,
+                                              lv_color_make(255, 140, 0), LV_ALIGN_TOP_MID, 0, 40);
         ESP_GOTO_ON_FALSE(title_label, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create title label");
 
         spinner = lv_spinner_create(s_wifi_connecting_page, 1000, 60);
@@ -260,14 +259,12 @@ static void br_m5stack_display_wifi_connecting(void)
         lv_obj_set_style_arc_width(spinner, 6, LV_PART_INDICATOR);
         lv_obj_set_style_arc_width(spinner, 6, LV_PART_MAIN);
 
-        s_wifi_status_label = br_m5stack_create_label(s_wifi_connecting_page, "Connecting...",
-                                                       &lv_font_montserrat_16, lv_color_make(80, 80, 80),
-                                                       LV_ALIGN_CENTER, 0, 35);
+        s_wifi_status_label = br_m5stack_create_label(s_wifi_connecting_page, "Connecting...", &lv_font_montserrat_16,
+                                                      lv_color_make(80, 80, 80), LV_ALIGN_CENTER, 0, 35);
         ESP_GOTO_ON_FALSE(s_wifi_status_label, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create status label");
 
         factoryreset_btn = br_m5stack_create_factoryreset_button(s_wifi_connecting_page);
-        ESP_GOTO_ON_FALSE(factoryreset_btn, ESP_FAIL, exit, BR_M5STACK_TAG,
-                          "Failed to create factory reset button");
+        ESP_GOTO_ON_FALSE(factoryreset_btn, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create factory reset button");
         br_m5stack_add_btn_to_page(s_wifi_connecting_page, factoryreset_btn, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
     }
 

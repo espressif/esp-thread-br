@@ -16,15 +16,15 @@
 #include "bsp/esp-bsp.h"
 #include "core/lv_obj_tree.h"
 
-#define FULL_BRIGHTNESS      100
-#define DIMMED_BRIGHTNESS    30
-#define DIM_TIMEOUT_S  10    /* seconds of inactivity before dimming */
-#define OFF_TIMEOUT_S  300   /* seconds of inactivity before backlight off */
+#define FULL_BRIGHTNESS 100
+#define DIMMED_BRIGHTNESS 30
+#define DIM_TIMEOUT_S 10  /* seconds of inactivity before dimming */
+#define OFF_TIMEOUT_S 300 /* seconds of inactivity before backlight off */
 
 static esp_timer_handle_t s_inactivity_timer = NULL;
 static lv_obj_t *s_main_page = NULL;
 static atomic_bool s_screen_dimmed = ATOMIC_VAR_INIT(false);
-static atomic_bool s_screen_off    = ATOMIC_VAR_INIT(false);
+static atomic_bool s_screen_off = ATOMIC_VAR_INIT(false);
 static atomic_bool s_dimming_enabled = ATOMIC_VAR_INIT(false);
 
 static void reset_s_inactivity_timer(void)
