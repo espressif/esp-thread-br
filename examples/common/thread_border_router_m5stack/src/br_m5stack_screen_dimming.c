@@ -18,28 +18,40 @@
 
 #define FULL_BRIGHTNESS 100
 #define DIMMED_BRIGHTNESS 30
-#define INACTIVE_SCREEN_TIMEOUT 10
+#define DIM_TIMEOUT_S 10  /* seconds of inactivity before dimming */
+#define OFF_TIMEOUT_S 300 /* seconds of inactivity before backlight off */
 
 static esp_timer_handle_t s_inactivity_timer = NULL;
 static lv_obj_t *s_main_page = NULL;
 static atomic_bool s_screen_dimmed = ATOMIC_VAR_INIT(false);
+static atomic_bool s_screen_off = ATOMIC_VAR_INIT(false);
 static atomic_bool s_dimming_enabled = ATOMIC_VAR_INIT(false);
 
 static void reset_s_inactivity_timer(void)
 {
     if (s_inactivity_timer) {
         esp_timer_stop(s_inactivity_timer);
-        esp_timer_start_once(s_inactivity_timer, INACTIVE_SCREEN_TIMEOUT * 1000000);
+        esp_timer_start_once(s_inactivity_timer, DIM_TIMEOUT_S * 1000000ULL);
     }
 }
 
 static void s_inactivity_timer_callback(void *arg)
 {
-    // Only dim if dimming is enabled (main page is visible)
-    if (atomic_load(&s_dimming_enabled) && !atomic_load(&s_screen_dimmed)) {
-        ESP_LOGI(BR_M5STACK_TAG, "No touch detected for %d seconds. Dimming screen.", INACTIVE_SCREEN_TIMEOUT);
+    if (!atomic_load(&s_dimming_enabled)) {
+        return;
+    }
+
+    if (!atomic_load(&s_screen_dimmed)) {
+        // Stage 1: dim the screen, then schedule the off stage
+        ESP_LOGI(BR_M5STACK_TAG, "No touch for %ds, dimming screen.", DIM_TIMEOUT_S);
         bsp_display_brightness_set(DIMMED_BRIGHTNESS);
         atomic_store(&s_screen_dimmed, true);
+        esp_timer_start_once(s_inactivity_timer, (OFF_TIMEOUT_S - DIM_TIMEOUT_S) * 1000000ULL);
+    } else if (!atomic_load(&s_screen_off)) {
+        // Stage 2: turn off the backlight entirely
+        ESP_LOGI(BR_M5STACK_TAG, "No touch for %ds, turning off display.", OFF_TIMEOUT_S);
+        bsp_display_backlight_off();
+        atomic_store(&s_screen_off, true);
     }
 }
 
@@ -75,7 +87,13 @@ static void touch_event_handler(lv_event_t *e)
             return;
         }
 
-        if (atomic_load(&s_screen_dimmed)) {
+        if (atomic_load(&s_screen_off)) {
+            ESP_LOGI(BR_M5STACK_TAG, "Touch detected. Turning display back on.");
+            bsp_display_backlight_on();
+            bsp_display_brightness_set(FULL_BRIGHTNESS);
+            atomic_store(&s_screen_off, false);
+            atomic_store(&s_screen_dimmed, false);
+        } else if (atomic_load(&s_screen_dimmed)) {
             ESP_LOGI(BR_M5STACK_TAG, "Touch detected. Restoring full brightness.");
             bsp_display_brightness_set(FULL_BRIGHTNESS);
             atomic_store(&s_screen_dimmed, false);
@@ -90,7 +108,7 @@ void setup_inactivity_monitor(void)
     create_s_inactivity_timer();
 
     if (s_inactivity_timer) {
-        esp_timer_start_once(s_inactivity_timer, INACTIVE_SCREEN_TIMEOUT * 1000000);
+        esp_timer_start_once(s_inactivity_timer, DIM_TIMEOUT_S * 1000000ULL);
     }
 }
 
@@ -113,8 +131,13 @@ void disable_screen_dimming(void)
     if (s_inactivity_timer) {
         esp_timer_stop(s_inactivity_timer);
     }
-    // Restore full brightness when disabling dimming
-    if (atomic_load(&s_screen_dimmed)) {
+    // Restore display when disabling dimming
+    if (atomic_load(&s_screen_off)) {
+        bsp_display_backlight_on();
+        bsp_display_brightness_set(FULL_BRIGHTNESS);
+        atomic_store(&s_screen_off, false);
+        atomic_store(&s_screen_dimmed, false);
+    } else if (atomic_load(&s_screen_dimmed)) {
         bsp_display_brightness_set(FULL_BRIGHTNESS);
         atomic_store(&s_screen_dimmed, false);
     }
