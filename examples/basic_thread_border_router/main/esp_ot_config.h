@@ -38,6 +38,11 @@
             .tx_pin = CONFIG_PIN_TO_RCP_RX,                \
         },                                                 \
     }
+#elif CONFIG_OPENTHREAD_RADIO_NATIVE
+#define ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG()              \
+    {                                                      \
+        .radio_mode = RADIO_MODE_NATIVE,                   \
+    }
 #else
 #define ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG()              \
     {                                                      \
@@ -65,7 +70,7 @@
             .intr_pin = CONFIG_PIN_TO_RCP_BOOT,            \
         },                                                 \
     }
-#endif // CONFIG_OPENTHREAD_RADIO_SPINEL_UART OR  CONFIG_OPENTHREAD_RADIO_SPINEL_SPI
+#endif // CONFIG_OPENTHREAD_RADIO_SPINEL_UART OR CONFIG_OPENTHREAD_RADIO_NATIVE OR CONFIG_OPENTHREAD_RADIO_SPINEL_SPI
 
 #if CONFIG_AUTO_UPDATE_RCP
 
