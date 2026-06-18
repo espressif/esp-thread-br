@@ -234,6 +234,10 @@ cJSON *handle_ot_resource_node_get_dataset_request(const cJSON *request, cJSON *
     const char *dataset_type =
         cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(request, ESP_OT_REST_DATASET_TYPE));
 
+    if (!accept_format || !dataset_type) {
+        cJSON_SetValuestring(log, "Error: Missing dataset type or accept format");
+        return NULL;
+    }
     esp_openthread_lock_acquire(portMAX_DELAY);
     otInstance *ins = esp_openthread_get_instance();
     if (strcmp(accept_format, ESP_OT_REST_CONTENT_TYPE_PLAIN) == 0) {
@@ -282,6 +286,8 @@ void handle_ot_resource_node_set_dataset_request(const cJSON *request, cJSON *lo
     const char *dataset_type =
         cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(request, ESP_OT_REST_DATASET_TYPE));
 
+    ESP_RETURN_VOID_ON_FALSE(dataset_type, API_TAG, "Invalid dataset type");
+    ESP_RETURN_VOID_ON_FALSE(content_format, API_TAG, "Invalid content format");
     esp_openthread_lock_acquire(portMAX_DELAY);
     otInstance *ins = esp_openthread_get_instance();
 
@@ -526,6 +532,7 @@ cJSON *handle_openthread_available_network_request(void)
     destroy_available_thread_networks_list(s_networkList);
 
     s_networkList = (thread_network_list_t *)malloc(sizeof(thread_network_list_t));
+    ESP_GOTO_ON_FALSE(s_networkList, OT_ERROR_NO_BUFS, exit, API_TAG, "Failed to alloc network list");
     s_networkList_count = 0;
 
     initialize_available_thread_networks_list(s_networkList);
@@ -545,7 +552,10 @@ cJSON *handle_openthread_available_network_request(void)
     }
 
 exit:
-    ESP_RETURN_ON_FALSE(!ret, NULL, API_TAG, "Failed to handle available network request");
+    if (ret) {
+        cJSON_Delete(networks);
+        return NULL;
+    }
     return networks;
 }
 
@@ -745,6 +755,7 @@ otError handle_openthread_add_network_prefix_request(const cJSON *request)
     ESP_RETURN_ON_FALSE(request, OT_ERROR_INVALID_ARGS, API_TAG, "Failed to parse the json type of prefix");
     char *str = cJSON_GetStringValue(cJSON_GetObjectItem(request, "prefix"));
     ESP_RETURN_ON_FALSE(str, OT_ERROR_INVALID_ARGS, API_TAG, "Failed to get prefix");
+    ESP_RETURN_ON_FALSE(strlen(str) + 1 < OT_IP6_PREFIX_STRING_SIZE, OT_ERROR_INVALID_ARGS, API_TAG, "Prefix too long");
     memset(str_prefix, 0x00, OT_IP6_PREFIX_STRING_SIZE);
     memcpy(str_prefix, str, strlen(str) + 1);
     cJSON *default_route_item = cJSON_GetObjectItem(request, "defaultRoute");
@@ -781,6 +792,7 @@ otError handle_openthread_delete_network_prefix_request(const cJSON *request)
     ESP_RETURN_ON_FALSE(request, OT_ERROR_INVALID_ARGS, API_TAG, "Failed to parse the json type of prefix");
     char *str = cJSON_GetStringValue(cJSON_GetObjectItem(request, "prefix"));
     ESP_RETURN_ON_FALSE(str, OT_ERROR_INVALID_ARGS, API_TAG, "Failed to get prefix");
+    ESP_RETURN_ON_FALSE(strlen(str) + 1 < OT_IP6_PREFIX_STRING_SIZE, OT_ERROR_INVALID_ARGS, API_TAG, "Prefix too long");
     memset(str_prefix, 0x00, OT_IP6_PREFIX_STRING_SIZE);
     memcpy(str_prefix, str, strlen(str) + 1);
     ESP_RETURN_ON_FALSE(!parse_ipv6_prefix_from_string(str_prefix, &ip6_prefix), OT_ERROR_FAILED, API_TAG,

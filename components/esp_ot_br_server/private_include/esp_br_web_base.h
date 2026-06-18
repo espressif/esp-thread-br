@@ -186,7 +186,6 @@ esp_err_t string_to_hex(char str[], uint8_t hex[], size_t size);
 void otbr_properties_reset(openthread_properties_t *properties);
 cJSON *otbr_properties_struct_convert2_json(openthread_properties_t *properties);
 
-void available_network_reset(thread_network_information_t *network);
 cJSON *available_network_struct_convert2_json(thread_network_information_t *network);
 
 esp_err_t initialize_available_thread_networks_list(thread_network_list_t *list);
