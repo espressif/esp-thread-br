@@ -21,7 +21,6 @@
 #include "esp_netif_ip_addr.h"
 #include "esp_netif_net_stack.h"
 #include "esp_netif_types.h"
-#include "esp_openthread_border_router.h"
 #include "esp_openthread_lock.h"
 #include "esp_ot_cli_extension.h"
 #include "esp_wifi.h"
@@ -33,6 +32,9 @@
 #include "freertos/portmacro.h"
 #include "freertos/task.h"
 #include "openthread/cli.h"
+#if CONFIG_OPENTHREAD_BORDER_ROUTER
+#include "esp_openthread_border_router.h"
+#endif
 
 #ifndef EXAMPLE_WIFI_SCAN_METHOD
 #if CONFIG_EXAMPLE_WIFI_SCAN_METHOD_FAST
@@ -74,7 +76,9 @@
 
 static bool s_wifi_initialized = false;
 static esp_ot_wifi_state_t s_wifi_state = OT_WIFI_DISCONNECTED;
+#if CONFIG_OPENTHREAD_BORDER_ROUTER
 static bool s_border_router_initialized = false;
+#endif
 static bool s_wifi_handler_registered = false;
 static uint16_t wifi_conn_retry_nums = 0;
 const char wifi_state_string[3][20] = {"disconnected", "connected", "reconnecting"};
@@ -172,10 +176,12 @@ static esp_err_t wifi_config_print(void)
     return ESP_OK;
 }
 
+#if CONFIG_OPENTHREAD_BORDER_ROUTER
 void esp_ot_wifi_border_router_init_flag_set(bool initialized)
 {
     s_border_router_initialized = initialized;
 }
+#endif
 
 esp_err_t esp_ot_wifi_connect(const char *ssid, const char *password)
 {
@@ -299,6 +305,7 @@ otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs
         esp_err_t error = esp_ot_wifi_connect(ssid, psk);
         esp_openthread_task_switching_lock_acquire(portMAX_DELAY);
         if (error == ESP_OK) {
+#if CONFIG_OPENTHREAD_BORDER_ROUTER
             if (!s_border_router_initialized) {
                 esp_openthread_set_backbone_netif(get_example_netif());
                 if (esp_openthread_border_router_init() != ESP_OK) {
@@ -306,6 +313,7 @@ otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs
                 }
                 s_border_router_initialized = true;
             }
+#endif
             otCliOutputFormat("wifi sta is connected successfully\n");
         } else {
             ESP_LOGW(OT_EXT_CLI_TAG, "Connection time out, please check your ssid & password, then retry");
