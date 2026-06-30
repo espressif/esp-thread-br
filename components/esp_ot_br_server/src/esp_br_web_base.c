@@ -175,11 +175,6 @@ cJSON *otbr_properties_struct_convert2_json(openthread_properties_t *properties)
 /*----------------------------------------------------------------------
                        Scan Thread netWork
 -----------------------------------------------------------------------*/
-void available_network_reset(thread_network_information_t *network)
-{
-    memset(network, 0x00, sizeof(thread_network_information_t));
-}
-
 cJSON *available_network_struct_convert2_json(thread_network_information_t *network)
 {
     cJSON *root = cJSON_CreateObject();
@@ -231,6 +226,7 @@ esp_err_t append_available_thread_networks_list(thread_network_list_t *list, thr
             memcpy(node->network, &network, sizeof(network)); /* need to free */
         else {
             ESP_LOGW(BASE_TAG, "Failed to create network node");
+            free(node);
             return ESP_FAIL;
         }
         head->next = node;
@@ -275,7 +271,7 @@ esp_err_t network_formation_param_json_convert2_struct(const cJSON *root, cJSON 
     }
 
     cJSON *temp = cJSON_GetObjectItem(root, "networkName");
-    if (!(temp) || strlen(temp->valuestring) > sizeof(otNetworkName)) {
+    if (!cJSON_IsString(temp) || strlen(temp->valuestring) > sizeof(otNetworkName)) {
         ESP_LOGW(BASE_TAG, "Error: Invalid Network Name");
         cJSON_SetValuestring(log, "Error: Invalid Network Name");
         return ESP_ERR_INVALID_ARG;
@@ -297,7 +293,8 @@ esp_err_t network_formation_param_json_convert2_struct(const cJSON *root, cJSON 
         return ESP_ERR_INVALID_ARG;
     }
 
-    if (!(temp = cJSON_GetObjectItem(root, "panId")) || sscanf(temp->valuestring, "0x%hx", &param->panid) != 1) {
+    if (!cJSON_IsString(temp = cJSON_GetObjectItem(root, "panId")) ||
+        sscanf(temp->valuestring, "0x%hx", &param->panid) != 1) {
         ESP_LOGW(BASE_TAG, "Error: PanId requires \"0x\"");
         cJSON_SetValuestring(log, "Error: PanId requires  \"0x\"");
         return ESP_ERR_INVALID_ARG;
@@ -436,6 +433,7 @@ esp_err_t append_thread_diagnosticTlv_list(thread_diagnosticTlv_list_t *list, ot
             memcpy(node->diagTlv, &diagTlv, sizeof(otNetworkDiagTlv)); /* need to free */
         else {
             ESP_LOGW(BASE_TAG, "Fail to create diagnostic node!");
+            free(node);
             return ESP_FAIL;
         }
         head->next = node;
@@ -473,26 +471,6 @@ esp_err_t initialize_thread_diagnosticTlv_set(thread_diagnosticTlv_set_t *set, c
     return ESP_OK;
 }
 
-void keep_diagnosticTlv_node_live(thread_diagnosticTlv_set_t *set)
-{
-    ESP_RETURN_ON_FALSE(set, , BASE_TAG, "Invalid diagnosticTlv set");
-    thread_diagnosticTlv_set_t *head = set;
-    thread_diagnosticTlv_set_t *next = head->next;
-    time_t current_time;
-    time(&current_time);
-    while (next) {
-        if ((int)difftime(current_time, next->timeout) >= DIAGSET_NODE_MAX_TIMEOUT_SECOND &&
-            next->diagTlv_next != NULL) {
-            ESP_LOGW(BASE_TAG, "Node:%s is timeout.\r\n", next->rloc16);
-            destroy_thread_diagnosticTlv_list(next->diagTlv_next);
-            next->diagTlv_next = NULL;
-            head->next = next->next;
-        }
-        head = head->next;
-        next = head->next;
-    }
-}
-
 esp_err_t update_thread_diagnosticTlv_set(thread_diagnosticTlv_set_t *set, char *rloc16,
                                           thread_diagnosticTlv_list_t *list)
 {
@@ -508,13 +486,15 @@ esp_err_t update_thread_diagnosticTlv_set(thread_diagnosticTlv_set_t *set, char 
     if (!head) /* name is mismatch, add new list */
     {
         thread_diagnosticTlv_set_t *node = (thread_diagnosticTlv_set_t *)malloc(sizeof(thread_diagnosticTlv_set_t));
-        if (node) {
-            initialize_thread_diagnosticTlv_set(node, rloc16);
-            node->diagTlv_next = list;
-            time(&node->timeout);
-            node->next = NULL;
-        } else
+        if (!node) {
             ESP_LOGW(BASE_TAG, "Fail to malloc dignosticTlv set.");
+            destroy_thread_diagnosticTlv_list(list);
+            return ESP_ERR_NO_MEM;
+        }
+        initialize_thread_diagnosticTlv_set(node, rloc16);
+        node->diagTlv_next = list;
+        time(&node->timeout);
+        node->next = NULL;
         head = set;
         while (head->next) head = head->next;
         head->next = node;
@@ -699,8 +679,11 @@ cJSON *diagnosticTlv_set_convert2_json(const thread_diagnosticTlv_set_t *set)
                 break;
             case OT_NETWORK_DIAGNOSTIC_TLV_IP6_ADDR_LIST: {
                 addr_list = cJSON_CreateArray();
-                if (list->diagTlv->mData.mIp6AddrList.mCount <= 0 || list->diagTlv->mData.mIp6AddrList.mCount >= 15)
+                if (list->diagTlv->mData.mIp6AddrList.mCount <= 0 || list->diagTlv->mData.mIp6AddrList.mCount >= 15) {
+                    cJSON_Delete(addr_list);
+                    addr_list = NULL;
                     break;
+                }
                 for (uint16_t i = 0; i < list->diagTlv->mData.mIp6AddrList.mCount; ++i) {
                     cJSON_AddItemToArray(addr_list, IpAddr2Json((list->diagTlv->mData.mIp6AddrList.mList[i])));
                 }

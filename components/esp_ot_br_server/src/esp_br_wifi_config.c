@@ -249,7 +249,6 @@ static esp_err_t wifi_config_start_softap(void)
     ret = esp_wifi_init(&cfg);
     ESP_RETURN_ON_FALSE(ret == ESP_OK || ret == ESP_ERR_INVALID_STATE, ret, WIFI_CONFIG_TAG,
                         "Failed to initialize WiFi: %s", esp_err_to_name(ret));
-
     // Register event handlers
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_config_wifi_event_handler,
                                                         NULL, &s_wifi_event_handler_instance));
@@ -277,7 +276,12 @@ static void wifi_config_stop_softap(void)
     }
 
     esp_wifi_stop();
-    esp_wifi_deinit();
+
+    /* Always restore STA mode rather than calling esp_wifi_deinit(). If we deinit here, the
+     * managed component's s_wifi_initialized flag remains true, causing the next
+     * esp_ot_wifi_connect() to skip example_wifi_start() and fail with ESP_ERR_WIFI_NOT_INIT. */
+    esp_wifi_set_mode(WIFI_MODE_STA);
+    esp_wifi_start();
 
     if (s_ap_netif) {
         esp_netif_destroy(s_ap_netif);

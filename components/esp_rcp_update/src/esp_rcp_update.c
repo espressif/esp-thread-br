@@ -100,7 +100,12 @@ esp_err_t esp_rcp_load_version_in_storage(char *version_str, size_t size)
         return ESP_ERR_NOT_FOUND;
     }
     esp_rcp_subfile_info_t version_info;
-    ESP_RETURN_ON_ERROR(seek_to_subfile(fp, FILETAG_RCP_VERSION, &version_info), TAG, "Failed to find version subfile");
+    esp_err_t err = seek_to_subfile(fp, FILETAG_RCP_VERSION, &version_info);
+    if (err != ESP_OK) {
+        fclose(fp);
+        ESP_LOGE(TAG, "Failed to find version subfile");
+        return err;
+    }
     memset(version_str, 0, size);
     int read_size = size < version_info.size ? size : version_info.size;
     fread(version_str, 1, read_size, fp);
@@ -246,7 +251,11 @@ esp_err_t esp_rcp_update(void)
     FILE *fp = fopen(fullpath, "r");
     ESP_RETURN_ON_FALSE(fp != NULL, ESP_ERR_NOT_FOUND, TAG, "Cannot find rcp image");
     esp_rcp_subfile_info_t subfile;
-    seek_to_subfile(fp, FILETAG_RCP_FLASH_ARGS, &subfile);
+    if (seek_to_subfile(fp, FILETAG_RCP_FLASH_ARGS, &subfile) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to find flash args subfile");
+        fclose(fp);
+        return ESP_FAIL;
+    }
     int num_flash_binaries = subfile.size / sizeof(rcp_flash_arg_t);
 
     for (int i = 0; i < num_flash_binaries; i++) {
