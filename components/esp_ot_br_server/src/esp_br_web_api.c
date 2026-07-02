@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "esp_br_web_api.h"
+#include "sdkconfig.h"
+
 #include "cJSON.h"
+#include "esp_br_web_api.h"
 #include "esp_br_web_base.h"
 #include "esp_check.h"
 #include "esp_err.h"
@@ -16,7 +18,6 @@
 #include "esp_openthread.h"
 #include "esp_openthread_lock.h"
 #include "malloc.h"
-#include "sdkconfig.h"
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
@@ -37,6 +38,27 @@
 #include "openthread/ping_sender.h"
 #include "openthread/server.h"
 #include "openthread/thread_ftd.h"
+
+/* TODO(IDF-5.2-compat): Remove this fallback once IDF release/v5.2 is no longer maintained. */
+#ifndef ESP_RETURN_VOID_ON_FALSE
+#if defined(CONFIG_COMPILER_OPTIMIZATION_CHECKS_SILENT)
+#define ESP_RETURN_VOID_ON_FALSE(a, log_tag, format, ...) \
+    do {                                                  \
+        (void)log_tag;                                    \
+        if (unlikely(!(a))) {                             \
+            return;                                       \
+        }                                                 \
+    } while (0)
+#else
+#define ESP_RETURN_VOID_ON_FALSE(a, log_tag, format, ...)                                \
+    do {                                                                                 \
+        if (unlikely(!(a))) {                                                            \
+            ESP_LOGE(log_tag, "%s(%d): " format, __FUNCTION__, __LINE__, ##__VA_ARGS__); \
+            return;                                                                      \
+        }                                                                                \
+    } while (0)
+#endif
+#endif
 
 #define API_TAG "web_api"
 
