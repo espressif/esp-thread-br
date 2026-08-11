@@ -339,7 +339,8 @@ void esp_rcp_reset(void)
     io_conf.intr_type = GPIO_INTR_DISABLE;
     gpio_config(&io_conf);
     gpio_set_level(reset_pin, 0);
-    vTaskDelay(pdMS_TO_TICKS(150));
+    vTaskDelay(pdMS_TO_TICKS(10));
     gpio_set_level(reset_pin, 1);
-    vTaskDelay(pdMS_TO_TICKS(850));
+    vTaskDelay(pdMS_TO_TICKS(30));
+    gpio_reset_pin(reset_pin);
 }
