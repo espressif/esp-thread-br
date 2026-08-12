@@ -29,6 +29,7 @@
 #include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_wifi.h"
+#include "esp_wifi_default.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "lwip/ip_addr.h"
@@ -284,7 +285,7 @@ static void wifi_config_stop_softap(void)
     esp_wifi_start();
 
     if (s_ap_netif) {
-        esp_netif_destroy(s_ap_netif);
+        esp_netif_destroy_default_wifi(s_ap_netif);
         s_ap_netif = NULL;
     }
 
