@@ -291,6 +291,102 @@ paths:
           description: Successfully created the pending operational dataset.
         "400":
           description: Invalid request body.
+  /node/ba-epskc/state:
+    get:
+      tags:
+        - node
+      summary: Get whether the Border Agent ephemeral key (ePSKc) feature is enabled.
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: string
+                description: Whether the ephemeral key feature is enabled.
+                enum: ["enabled", "disabled"]
+                example: "enabled"
+    put:
+      tags:
+        - node
+      summary: Enable or disable the Border Agent ephemeral key (ePSKc) feature.
+      description: |-
+        The feature must be enabled before an ephemeral key can be activated
+        with a POST request to `/node/ba-epskc/key`.
+      responses:
+        "200":
+          description: Successful operation.
+        "400":
+          description: Invalid request body.
+      requestBody:
+        description: New ephemeral key feature state.
+        content:
+          application/json:
+            schema:
+              type: string
+              description: Can be "enable" or "disable".
+              example: "enable"
+  /node/ba-epskc/key:
+    get:
+      tags:
+        - node
+      summary: Get the status of the Border Agent ephemeral key (ePSKc) session.
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EpskcStatus"
+    post:
+      tags:
+        - node
+      summary: Generate and activate an ephemeral key (ePSKc).
+      description: |-
+        Generates a new 9-digit Thread Administration Passcode (TAP) and
+        starts listening for an external commissioner candidate to connect
+        using it. The ephemeral key feature must first be enabled with a PUT
+        request to `/node/ba-epskc/state`.
+      requestBody:
+        description: Optional activation parameters. An empty body uses the device defaults.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lifetime:
+                  type: integer
+                  description: |-
+                    The key lifetime in milliseconds. Defaults to 2 minutes
+                    when omitted or zero. Capped at 10 minutes.
+                  example: 120000
+                port:
+                  type: integer
+                  description: The UDP port to use. Defaults to an ephemeral port when omitted.
+                  example: 49152
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EpskcActivateResult"
+        "400":
+          description: Invalid request body.
+        "409":
+          description: Ephemeral key feature disabled, or a key is already active.
+        "500":
+          description: Failed to start the ephemeral key session.
+    delete:
+      tags:
+        - node
+      summary: Deactivate the currently active ephemeral key (ePSKc), if any.
+      description: |-
+        Stops the ephemeral key use and disconnects any commissioner session
+        using it. Has no effect if there is no ephemeral key in use.
+      responses:
+        "200":
+          description: Successful operation.
 components:
   schemas:
     LeaderData:
@@ -462,3 +558,26 @@ components:
       type: string
       description: Operational dataset as hex-encoded TLVs.
       example: 0E080000000000010000000300000F35060004001FFFE0020811111111222222220708FDAD70BFE5AA15DD051000112233445566778899AABBCCDDEEFF030E4F70656E54687265616444656D6F010212340410445F2B5CA6F2A93A55CE570A70EFEECB0C0402A0F7F8
+    EpskcStatus:
+      type: object
+      properties:
+        state:
+          type: string
+          description: The Border Agent ephemeral key session state.
+          enum: ["disabled", "stopped", "started", "connected", "accepted"]
+          example: "started"
+        port:
+          type: integer
+          description: The UDP port used by the ephemeral key session, if active.
+          example: 49152
+    EpskcActivateResult:
+      type: object
+      properties:
+        tap:
+          type: string
+          description: The generated 9-digit Thread Administration Passcode (TAP).
+          example: "123456789"
+        port:
+          type: integer
+          description: The UDP port the border agent is listening on for the ePSKc session.
+          example: 49152
