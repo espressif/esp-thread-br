@@ -4,9 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <inttypes.h>
 #include <limits.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "sdkconfig.h"
@@ -101,6 +104,11 @@ static esp_err_t esp_otbr_network_node_baid_get_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_dataset_active_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_dataset_pending_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_dataset_handler(httpd_req_t *req, const char *dataset_type);
+static esp_err_t esp_otbr_network_node_epskc_state_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_epskc_state_put_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_epskc_key_get_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_epskc_key_post_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_network_node_epskc_key_delete_handler(httpd_req_t *req);
 
 static httpd_uri_t s_resource_handlers[] = {
     {
@@ -204,6 +212,36 @@ static httpd_uri_t s_resource_handlers[] = {
         .method = HTTP_PUT,
         .handler = esp_otbr_network_node_dataset_pending_handler,
         .user_ctx = &s_server.data,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_EPSKC_STATE_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_network_node_epskc_state_get_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_EPSKC_STATE_PATH,
+        .method = HTTP_PUT,
+        .handler = esp_otbr_network_node_epskc_state_put_handler,
+        .user_ctx = &s_server.data,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_EPSKC_KEY_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_network_node_epskc_key_get_handler,
+        .user_ctx = NULL,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_EPSKC_KEY_PATH,
+        .method = HTTP_POST,
+        .handler = esp_otbr_network_node_epskc_key_post_handler,
+        .user_ctx = &s_server.data,
+    },
+    {
+        .uri = ESP_OT_REST_API_NODE_EPSKC_KEY_PATH,
+        .method = HTTP_DELETE,
+        .handler = esp_otbr_network_node_epskc_key_delete_handler,
+        .user_ctx = NULL,
     },
 };
 
@@ -685,6 +723,97 @@ exit:
     cJSON_Delete(request);
     cJSON_Delete(response);
     cJSON_Delete(log);
+    return ret;
+}
+
+static esp_err_t esp_otbr_network_node_epskc_state_get_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *response = handle_ot_resource_node_epskc_state_request();
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
+    cJSON_Delete(response);
+    return ret;
+}
+
+static esp_err_t esp_otbr_network_node_epskc_state_put_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    otError err = OT_ERROR_NONE;
+    cJSON *state = httpd_request_convert2_json(req, cJSON_Object);
+    if (cJSON_IsString(state)) {
+        err = handle_ot_resource_node_epskc_state_put_request(state);
+    } else {
+        ESP_LOGE(WEB_TAG, "Invalid args");
+        err = OT_ERROR_INVALID_ARGS;
+    }
+
+    char http_return_status[64];
+    if (convert_ot_err_to_response_code(err, http_return_status) != ESP_OK) {
+        strcpy(http_return_status, HTTPD_500);
+    }
+    httpd_resp_set_status(req, http_return_status);
+    ESP_GOTO_ON_ERROR(httpd_resp_send(req, NULL, 0), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
+    cJSON_Delete(state);
+    return ret;
+}
+
+static esp_err_t esp_otbr_network_node_epskc_key_get_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *response = handle_ot_resource_node_epskc_key_get_request();
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
+    cJSON_Delete(response);
+    return ret;
+}
+
+static esp_err_t esp_otbr_network_node_epskc_key_post_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *request = NULL;
+    cJSON *response = NULL;
+    cJSON *log = cJSON_CreateObject();
+    uint16_t errcode = 0;
+
+    if (req->content_len > 0) {
+        request = httpd_request_convert2_json(req, cJSON_Object);
+        if (!cJSON_IsObject(request)) {
+            errcode = 400;
+        }
+    }
+
+    if (errcode == 0) {
+        response = handle_ot_resource_node_epskc_key_post_request(request, log);
+        cJSON *value = cJSON_GetObjectItemCaseSensitive(log, "ErrorCode");
+        if (cJSON_IsNumber(value)) {
+            errcode = (uint16_t)cJSON_GetNumberValue(value);
+        }
+    }
+
+    char http_return_status[64];
+    ot_br_web_response_code_get(errcode, http_return_status);
+    httpd_resp_set_status(req, http_return_status);
+    if (response) {
+        ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+    } else {
+        ESP_GOTO_ON_ERROR(httpd_resp_send(req, NULL, 0), exit, WEB_TAG, "Failed to response %s", req->uri);
+    }
+exit:
+    cJSON_Delete(request);
+    cJSON_Delete(response);
+    cJSON_Delete(log);
+    return ret;
+}
+
+static esp_err_t esp_otbr_network_node_epskc_key_delete_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    handle_ot_resource_node_epskc_key_delete_request();
+    httpd_resp_set_status(req, HTTPD_200);
+    ESP_GOTO_ON_ERROR(httpd_resp_send(req, NULL, 0), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
     return ret;
 }
 
@@ -1406,4 +1535,32 @@ void esp_br_web_start(char *base_path)
 {
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &handler_got_ip_event, base_path));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &handler_got_ip_event, base_path));
+}
+
+/* 9-digit TAPs only span [0, 999999999], so this is safe to use as an invalid/sentinel value. */
+#define EPSKC_TAP_INVALID 1000000000
+
+static _Atomic uint32_t s_active_epskc_tap = EPSKC_TAP_INVALID;
+
+void esp_br_web_epskc_set_active_tap(const char *tap)
+{
+    uint32_t value = EPSKC_TAP_INVALID;
+
+    if (tap != NULL && strlen(tap) == 9) {
+        value = (uint32_t)strtoul(tap, NULL, 10);
+    }
+
+    atomic_store(&s_active_epskc_tap, value);
+}
+
+bool esp_br_web_epskc_get_active_tap(char *tap_out, size_t tap_out_len)
+{
+    uint32_t value = atomic_load(&s_active_epskc_tap);
+
+    if (value == EPSKC_TAP_INVALID || tap_out == NULL || tap_out_len < 10) {
+        return false;
+    }
+
+    snprintf(tap_out, tap_out_len, "%09" PRIu32, value);
+    return true;
 }
