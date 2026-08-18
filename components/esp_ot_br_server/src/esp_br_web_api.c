@@ -7,6 +7,7 @@
 #include "sdkconfig.h"
 
 #include "cJSON.h"
+#include "esp_br_web.h"
 #include "esp_br_web_api.h"
 #include "esp_br_web_base.h"
 #include "esp_check.h"
@@ -27,6 +28,7 @@
 #include "freertos/portmacro.h"
 #include "freertos/semphr.h"
 #include "openthread/border_agent.h"
+#include "openthread/border_agent_ephemeral_key.h"
 #include "openthread/border_router.h"
 #include "openthread/commissioner.h"
 #include "openthread/dataset.h"
@@ -1445,4 +1447,171 @@ cJSON *handle_openthread_delete_ipaddr_request(const cJSON *request)
         ESP_LOGE(API_TAG, "Failed to remove IPv6 address: %s (err=%d)", addr_json->valuestring, err);
     }
     return result;
+}
+
+/*----------------------------------------------------------------------
+            Border Agent ephemeral key (ePSKc)
+----------------------------------------------------------------------*/
+#define EPSKC_TAP_STRING_SIZE (OT_BORDER_AGENT_EPHEMERAL_KEY_TAP_STRING_LENGTH + 1) /* 9 TAP chars + '\0' */
+
+static const char *epskc_state_to_string(otBorderAgentEphemeralKeyState state)
+{
+    switch (state) {
+    case OT_BORDER_AGENT_STATE_DISABLED:
+        return "disabled";
+    case OT_BORDER_AGENT_STATE_STOPPED:
+        return "stopped";
+    case OT_BORDER_AGENT_STATE_STARTED:
+        return "started";
+    case OT_BORDER_AGENT_STATE_CONNECTED:
+        return "connected";
+    case OT_BORDER_AGENT_STATE_ACCEPTED:
+        return "accepted";
+    default:
+        return "unknown";
+    }
+}
+
+/**
+ * @brief Generate a random 9-digit Thread Administration Passcode (TAP) via OpenThread's
+ *        own Verhoeff-checksummed TAP generator.
+ */
+static bool generate_epskc_tap(char *tap_buf)
+{
+    otBorderAgentEphemeralKeyTap tap;
+
+    if (otBorderAgentEphemeralKeyGenerateTap(&tap) != OT_ERROR_NONE) {
+        return false;
+    }
+    memcpy(tap_buf, tap.mTap, sizeof(tap.mTap));
+
+    return true;
+}
+
+cJSON *handle_ot_resource_node_epskc_state_request(void)
+{
+    otBorderAgentEphemeralKeyState state;
+
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    state = otBorderAgentEphemeralKeyGetState(esp_openthread_get_instance());
+    esp_openthread_lock_release();
+
+    return cJSON_CreateString(state == OT_BORDER_AGENT_STATE_DISABLED ? "disabled" : "enabled");
+}
+
+otError handle_ot_resource_node_epskc_state_put_request(const cJSON *request)
+{
+    const char *state = cJSON_IsString(request) ? cJSON_GetStringValue(request) : NULL;
+
+    ESP_RETURN_ON_FALSE(state, OT_ERROR_INVALID_ARGS, API_TAG, "Invalid ePSKc state");
+    ESP_RETURN_ON_FALSE(strcmp(state, "enable") == 0 || strcmp(state, "disable") == 0, OT_ERROR_INVALID_ARGS, API_TAG,
+                        "Invalid ePSKc state[%s]", state);
+
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    otBorderAgentEphemeralKeySetEnabled(esp_openthread_get_instance(), strcmp(state, "enable") == 0);
+    esp_openthread_lock_release();
+
+    return OT_ERROR_NONE;
+}
+
+cJSON *handle_ot_resource_node_epskc_key_get_request(void)
+{
+    cJSON *root = cJSON_CreateObject();
+    otInstance *ins;
+    otBorderAgentEphemeralKeyState state;
+    uint16_t port;
+
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    ins = esp_openthread_get_instance();
+    state = otBorderAgentEphemeralKeyGetState(ins);
+    port = otBorderAgentEphemeralKeyGetUdpPort(ins);
+    esp_openthread_lock_release();
+
+    cJSON_AddStringToObject(root, "state", epskc_state_to_string(state));
+    cJSON_AddNumberToObject(root, "port", port);
+    return root;
+}
+
+cJSON *handle_ot_resource_node_epskc_key_post_request(const cJSON *request, cJSON *log)
+{
+    cJSON *response = NULL;
+    uint16_t errcode = 200;
+    otError err = OT_ERROR_NONE;
+    uint32_t lifetime = 0;
+    uint16_t port = 0;
+    char tap[EPSKC_TAP_STRING_SIZE] = "";
+    otInstance *ins;
+
+    if (request) {
+        cJSON *value = cJSON_GetObjectItemCaseSensitive(request, "lifetime");
+        if (value) {
+            if (!cJSON_IsNumber(value) || value->valuedouble < 0.0 || value->valuedouble > UINT32_MAX) {
+                errcode = 400;
+                goto exit;
+            }
+            lifetime = (uint32_t)value->valuedouble;
+        }
+
+        value = cJSON_GetObjectItemCaseSensitive(request, "port");
+        if (value) {
+            if (!cJSON_IsNumber(value) || value->valuedouble < 0.0 || value->valuedouble > UINT16_MAX) {
+                errcode = 400;
+                goto exit;
+            }
+            port = (uint16_t)value->valuedouble;
+        }
+    }
+
+    if (lifetime > OT_BORDER_AGENT_MAX_EPHEMERAL_KEY_TIMEOUT) {
+        errcode = 400;
+        goto exit;
+    }
+
+    if (!generate_epskc_tap(tap)) {
+        ESP_LOGE(API_TAG, "Failed to generate ePSKc TAP");
+        errcode = 500;
+        goto exit;
+    }
+
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    ins = esp_openthread_get_instance();
+    err = otBorderAgentEphemeralKeyStart(ins, tap, lifetime, port);
+    if (err == OT_ERROR_NONE) {
+        port = otBorderAgentEphemeralKeyGetUdpPort(ins);
+        esp_br_web_epskc_set_active_tap(tap);
+    }
+    esp_openthread_lock_release();
+
+    switch (err) {
+    case OT_ERROR_NONE:
+        errcode = 200;
+        break;
+    case OT_ERROR_INVALID_STATE:
+        errcode = 409;
+        break;
+    case OT_ERROR_INVALID_ARGS:
+        errcode = 400;
+        break;
+    default:
+        errcode = 500;
+        break;
+    }
+
+    if (err == OT_ERROR_NONE) {
+        response = cJSON_CreateObject();
+        cJSON_AddStringToObject(response, "tap", tap);
+        cJSON_AddNumberToObject(response, "port", port);
+    }
+
+exit:
+    cJSON_AddItemToObject(log, "ErrorCode", cJSON_CreateNumber(errcode));
+    return response;
+}
+
+void handle_ot_resource_node_epskc_key_delete_request(void)
+{
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    otBorderAgentEphemeralKeyStop(esp_openthread_get_instance());
+    esp_br_web_epskc_set_active_tap(NULL);
+    esp_openthread_lock_release();
 }

@@ -8,6 +8,7 @@
 #include "br_m5stack_epskc_page.h"
 #include "br_m5stack_common.h"
 #include "br_m5stack_layout.h"
+#include "esp_br_web.h"
 
 #include <stdatomic.h>
 #include <string.h>
@@ -49,6 +50,12 @@ static void delete_epskc_display_page(void *user_data)
 static void br_m5stack_meshcop_e_remove_handler(void *args, esp_event_base_t base, int32_t event_id, void *data)
 {
     lv_obj_t *page = NULL;
+
+    // The ePSKc session has ended, regardless of who stopped it (this screen's
+    // exit button, the REST API, or a natural timeout) - forget the TAP so it's
+    // no longer offered up as "currently active" to any UI.
+    esp_br_web_epskc_set_active_tap(NULL);
+
     page = atomic_exchange(&s_epskc_display_page, page);
     if (page) {
         lv_async_call(delete_epskc_display_page, (void *)page);
@@ -151,7 +158,9 @@ static lv_obj_t *create_qrcode_image(lv_obj_t *parent, const char *text, int sca
     return img;
 }
 
-static void create_ephemeral_key_page(char *key_txt)
+// Builds the QR code + key label + exit button page for an already-active TAP.
+// Does not itself start (or assume ownership of) the ephemeral key session.
+static void display_ephemeral_key_page(const char *key_txt)
 {
     esp_err_t ret = ESP_OK;
     br_m5stack_err_msg_t err_msg = "";
@@ -159,16 +168,8 @@ static void create_ephemeral_key_page(char *key_txt)
     lv_obj_t *label = NULL;
     lv_obj_t *qrcode_img = NULL;
     lv_obj_t *exit_btn = NULL;
-    otError err = OT_ERROR_NONE;
     char txt[13] = "";
 
-    esp_openthread_lock_acquire(portMAX_DELAY);
-    err = otBorderAgentEphemeralKeyStart(esp_openthread_get_instance(), key_txt,
-                                         CONFIG_OPENTHREAD_EPHEMERALKEY_LIFE_TIME * 1000,
-                                         CONFIG_OPENTHREAD_EPHEMERALKEY_PORT);
-    esp_openthread_lock_release();
-
-    BR_M5STACK_GOTO_ON_FALSE(err == OT_ERROR_NONE, exit, "Fail to apply ephemeral key");
     page = br_m5stack_create_blank_page(s_epskc_page);
     ESP_GOTO_ON_FALSE(page, ESP_FAIL, exit, BR_M5STACK_TAG, "Failed to create the page to display Ephemeral Key");
     atomic_store(&s_epskc_display_page, (lv_obj_t *)page);
@@ -193,6 +194,30 @@ exit:
     } else {
         BR_M5STACK_DELETE_OBJ_IF_EXIST(page);
     }
+}
+
+static void create_ephemeral_key_page(char *key_txt)
+{
+    br_m5stack_err_msg_t err_msg = "";
+    otError err = OT_ERROR_NONE;
+
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    err = otBorderAgentEphemeralKeyStart(esp_openthread_get_instance(), key_txt,
+                                         CONFIG_OPENTHREAD_EPHEMERALKEY_LIFE_TIME * 1000,
+                                         CONFIG_OPENTHREAD_EPHEMERALKEY_PORT);
+    if (err == OT_ERROR_NONE) {
+        // Record the TAP so the REST API (or a later screen visit) can report
+        // the same key this screen just activated.
+        esp_br_web_epskc_set_active_tap(key_txt);
+    }
+    esp_openthread_lock_release();
+
+    BR_M5STACK_GOTO_ON_FALSE(err == OT_ERROR_NONE, exit, "Fail to apply ephemeral key");
+    display_ephemeral_key_page(key_txt);
+    return;
+
+exit:
+    BR_M5STACK_CREATE_WARNING_IF_EXIST(1000);
 }
 
 static bool generate_ephemeral_key(char *key_buf, bool random)
@@ -226,7 +251,10 @@ static void br_m5stack_epskc_page_display(lv_event_t *e)
     esp_ot_wifi_state_t wifi_state = OT_WIFI_DISCONNECTED;
     otDeviceRole thread_role = OT_DEVICE_ROLE_DISABLED;
     otBorderRoutingState br_state = OT_BORDER_ROUTING_STATE_UNINITIALIZED;
+    otBorderAgentEphemeralKeyState epskc_state = OT_BORDER_AGENT_STATE_DISABLED;
+    bool already_active = false;
     char random_digits[10];
+    char active_tap[ESP_BR_EPSKC_TAP_LEN] = "";
 
     esp_openthread_lock_acquire(portMAX_DELAY);
     instance = esp_openthread_get_instance();
@@ -239,6 +267,16 @@ static void br_m5stack_epskc_page_display(lv_event_t *e)
                                  : "Thread is not connected\nPlease check the state");
     br_state = otBorderRoutingGetState(esp_openthread_get_instance());
     BR_M5STACK_GOTO_ON_FALSE(br_state == OT_BORDER_ROUTING_STATE_RUNNING, exit, "Border router is not running");
+
+    // An ephemeral key session may already be running - e.g. started through
+    // the REST API. Reuse (and display) it instead of trying to start a
+    // second, conflicting one.
+    epskc_state = otBorderAgentEphemeralKeyGetState(instance);
+    already_active = (epskc_state != OT_BORDER_AGENT_STATE_DISABLED && epskc_state != OT_BORDER_AGENT_STATE_STOPPED);
+    if (already_active) {
+        BR_M5STACK_GOTO_ON_FALSE(esp_br_web_epskc_get_active_tap(active_tap, sizeof(active_tap)), exit,
+                                 "A key is already active but was\nstarted elsewhere; stop it first");
+    }
     error = ESP_OK;
 
 exit:
@@ -246,6 +284,11 @@ exit:
     if (error == ESP_OK) {
         // Display the page first
         br_m5stack_display_page(s_epskc_page);
+        if (already_active) {
+            // Show the already-active key instead of starting a new one.
+            display_ephemeral_key_page(active_tap);
+            return;
+        }
         // Generate random key and display it on the page
         BR_M5STACK_GOTO_ON_FALSE(generate_ephemeral_key(random_digits, true), exit2,
                                  "Failed to generate ephemeral key");
