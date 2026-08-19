@@ -10,15 +10,33 @@ info:
   license:
     name: Apache
     url: https://github.com/espressif/esp-thread-br/blob/main/LICENSE
-  version: 1.0.0
+  version: 0.5.0
 servers:
   - url: http://localhost:80
 tags:
+  - name: discovery
+    description: REST API version and entry point discovery.
   - name: node
     description: Thread parameters of this node.
   - name: diagnostics
     description: Thread network diagnostic.
 paths:
+  /.well-known/thread/br-rest:
+    get:
+      tags:
+        - discovery
+      summary: Discover the REST API version and entry points
+      description: |-
+        RFC 8615 well-known URI, mirroring ot-br-posix's `GET /.well-known/thread/br-rest`.
+        Lets clients discover the running REST API version and its entry points at runtime,
+        instead of hardcoding or probing endpoint paths.
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WellKnownBrRest"
   /diagnostics:
     get:
       tags:
@@ -389,6 +407,37 @@ paths:
           description: Successful operation.
 components:
   schemas:
+    WellKnownBrRest:
+      type: object
+      properties:
+        api:
+          type: object
+          properties:
+            version:
+              type: string
+              description: The running REST API's semantic version.
+              example: "0.5.0"
+            base:
+              type: string
+              description: The base path entry points are relative to.
+              example: "/"
+        links:
+          type: array
+          description: RFC 8288 web links to REST API entry points.
+          items:
+            type: object
+            properties:
+              href:
+                type: string
+                example: "/node"
+              rel:
+                type: string
+                example: "node"
+              type:
+                type: array
+                items:
+                  type: string
+                example: ["application/json"]
     LeaderData:
       type: object
       properties:

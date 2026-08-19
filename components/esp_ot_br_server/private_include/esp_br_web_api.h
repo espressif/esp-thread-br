@@ -24,6 +24,7 @@ void esp_br_web_api_init(void);
             ESP Thread Border Router Wer Server REST API
 ----------------------------------------------------------------------*/
 /* HTTP GET */
+#define ESP_OT_REST_API_WELL_KNOWN_BR_REST_PATH "/.well-known/thread/br-rest"
 #define ESP_OT_REST_API_DIAGNOSTICS_PATH "/diagnostics"
 #define ESP_OT_REST_API_NODE_PATH "/node"
 #define ESP_OT_REST_API_NODE_RLOC_PATH "/node/rloc"

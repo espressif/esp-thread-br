@@ -18,6 +18,7 @@
 #include "esp_br_web.h"
 #include "esp_br_web_api.h"
 #include "esp_br_web_base.h"
+#include "esp_br_web_version.h"
 #if CONFIG_OPENTHREAD_BR_SOFTAP_SETUP
 #include "esp_br_wifi_config.h"
 #endif
@@ -109,8 +110,15 @@ static esp_err_t esp_otbr_network_node_epskc_state_put_handler(httpd_req_t *req)
 static esp_err_t esp_otbr_network_node_epskc_key_get_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_epskc_key_post_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_network_node_epskc_key_delete_handler(httpd_req_t *req);
+static esp_err_t esp_otbr_well_known_br_rest_get_handler(httpd_req_t *req);
 
 static httpd_uri_t s_resource_handlers[] = {
+    {
+        .uri = ESP_OT_REST_API_WELL_KNOWN_BR_REST_PATH,
+        .method = HTTP_GET,
+        .handler = esp_otbr_well_known_br_rest_get_handler,
+        .user_ctx = NULL,
+    },
     {
         .uri = ESP_OT_REST_API_DIAGNOSTICS_PATH,
         .method = HTTP_GET,
@@ -814,6 +822,52 @@ static esp_err_t esp_otbr_network_node_epskc_key_delete_handler(httpd_req_t *req
     httpd_resp_set_status(req, HTTPD_200);
     ESP_GOTO_ON_ERROR(httpd_resp_send(req, NULL, 0), exit, WEB_TAG, "Failed to response %s", req->uri);
 exit:
+    return ret;
+}
+
+/**
+ * @brief REST API discovery endpoint (RFC 8615 well-known URI), mirroring ot-br-posix's
+ *        `GET /.well-known/thread/br-rest` (see https://github.com/openthread/ot-br-posix/pull/3330).
+ *        Lets clients discover the REST API version and its entry points at runtime instead of
+ *        hardcoding or probing endpoint paths.
+ *
+ * @param[in] req The request from http client.
+ * @return
+ *      -   ESP_OK   : On success
+ *      -   ESP_FAIL : Failed to handle @param req
+ */
+static esp_err_t esp_otbr_well_known_br_rest_get_handler(httpd_req_t *req)
+{
+    esp_err_t ret = ESP_OK;
+    cJSON *response = cJSON_CreateObject();
+    ESP_RETURN_ON_FALSE(response, ESP_FAIL, WEB_TAG, "Failed to allocate well-known response");
+
+    cJSON *api = cJSON_CreateObject();
+    cJSON_AddStringToObject(api, "version", ESP_OT_REST_API_VERSION);
+    cJSON_AddStringToObject(api, "base", "/");
+    cJSON_AddItemToObject(response, "api", api);
+
+    cJSON *links = cJSON_AddArrayToObject(response, "links");
+    static const struct {
+        const char *href;
+        const char *rel;
+    } entry_points[] = {
+        {ESP_OT_REST_API_WELL_KNOWN_BR_REST_PATH, "self"},
+        {ESP_OT_REST_API_NODE_PATH, "node"},
+        {ESP_OT_REST_API_DIAGNOSTICS_PATH, "diagnostic"},
+    };
+    for (size_t i = 0; i < sizeof(entry_points) / sizeof(entry_points[0]); i++) {
+        cJSON *link = cJSON_CreateObject();
+        cJSON_AddStringToObject(link, "href", entry_points[i].href);
+        cJSON_AddStringToObject(link, "rel", entry_points[i].rel);
+        cJSON *type = cJSON_AddArrayToObject(link, "type");
+        cJSON_AddItemToArray(type, cJSON_CreateString(ESP_OT_REST_CONTENT_TYPE_JSON));
+        cJSON_AddItemToArray(links, link);
+    }
+
+    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
+exit:
+    cJSON_Delete(response);
     return ret;
 }
 
