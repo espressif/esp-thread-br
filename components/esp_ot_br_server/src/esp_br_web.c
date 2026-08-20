@@ -18,7 +18,6 @@
 #include "esp_br_web.h"
 #include "esp_br_web_api.h"
 #include "esp_br_web_base.h"
-#include "esp_br_web_version.h"
 #if CONFIG_OPENTHREAD_BR_SOFTAP_SETUP
 #include "esp_br_wifi_config.h"
 #endif
@@ -114,7 +113,7 @@ static esp_err_t esp_otbr_well_known_br_rest_get_handler(httpd_req_t *req);
 
 static httpd_uri_t s_resource_handlers[] = {
     {
-        .uri = ESP_OT_REST_API_WELL_KNOWN_BR_REST_PATH,
+        .uri = ESP_OT_REST_API_WELL_KNOWN_ESP_BR_REST_PATH,
         .method = HTTP_GET,
         .handler = esp_otbr_well_known_br_rest_get_handler,
         .user_ctx = NULL,
@@ -826,10 +825,13 @@ exit:
 }
 
 /**
- * @brief REST API discovery endpoint (RFC 8615 well-known URI), mirroring ot-br-posix's
- *        `GET /.well-known/thread/br-rest` (see https://github.com/openthread/ot-br-posix/pull/3330).
- *        Lets clients discover the REST API version and its entry points at runtime instead of
- *        hardcoding or probing endpoint paths.
+ * @brief REST API discovery endpoint (RFC 8615 well-known URI), inspired by ot-br-posix's
+ *        `GET /.well-known/thread/br-rest` (see https://github.com/openthread/ot-br-posix/pull/3330)
+ *        but served on its own esp-thread-br-specific path, since the two implementations do not
+ *        expose the same REST API contract (see
+ *        https://github.com/espressif/esp-thread-br/pull/216#issuecomment-5357228430). Lets clients
+ *        discover the REST API version and its entry points at runtime instead of hardcoding or
+ *        probing endpoint paths.
  *
  * @param[in] req The request from http client.
  * @return
@@ -843,6 +845,7 @@ static esp_err_t esp_otbr_well_known_br_rest_get_handler(httpd_req_t *req)
     ESP_RETURN_ON_FALSE(response, ESP_FAIL, WEB_TAG, "Failed to allocate well-known response");
 
     cJSON *api = cJSON_CreateObject();
+    ESP_GOTO_ON_FALSE(api, ESP_FAIL, exit, WEB_TAG, "Failed to allocate well-known api object");
     cJSON_AddStringToObject(api, "version", ESP_OT_REST_API_VERSION);
     cJSON_AddStringToObject(api, "base", "/");
     cJSON_AddItemToObject(response, "api", api);
@@ -852,7 +855,7 @@ static esp_err_t esp_otbr_well_known_br_rest_get_handler(httpd_req_t *req)
         const char *href;
         const char *rel;
     } entry_points[] = {
-        {ESP_OT_REST_API_WELL_KNOWN_BR_REST_PATH, "self"},
+        {ESP_OT_REST_API_WELL_KNOWN_ESP_BR_REST_PATH, "self"},
         {ESP_OT_REST_API_NODE_PATH, "node"},
         {ESP_OT_REST_API_DIAGNOSTICS_PATH, "diagnostic"},
     };
