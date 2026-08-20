@@ -23,19 +23,23 @@ void esp_br_web_api_init(void);
 /**
  * @brief REST API semantic version, the single source of truth for this component's REST API version.
  *
- * This mirrors ot-br-posix's `OTBR_REST_API_VERSION` (src/rest/version.hpp): both implementations expose
- * the same REST resources, so they are kept at the same version whenever their API surface is at parity.
+ * esp-thread-br maintains its own independent REST API version rather than mirroring ot-br-posix's
+ * `OTBR_REST_API_VERSION` (src/rest/version.hpp): the two implementations do not currently expose the
+ * same REST API contract (e.g. ot-br-posix serves under an `/api/` base path and also exposes actions,
+ * devices, JSON:API diagnostics, commissioner, and coprocessor-version endpoints that esp-thread-br does
+ * not implement), so their version histories are tracked separately from this point on
+ * (see https://github.com/espressif/esp-thread-br/pull/216#discussion_r3819911931).
+ *
  * Bump this value, and openapi.yaml's `info.version`, together whenever a REST endpoint is added, removed,
- * or changed, following the same semver rules ot-br-posix documents for its REST API:
+ * or changed, following semver:
  *   - MAJOR: an incompatible API change.
- *   - MINOR: backward-compatible functionality added (or a breaking change while the major version is 0).
+ *   - MINOR: backward-compatible functionality added.
  *   - PATCH: a backward-compatible bug fix.
  *
- * Current value matches ot-br-posix's ePSKc endpoints
- * (https://github.com/openthread/ot-br-posix/pull/3480, version bump proposed in
- * https://github.com/openthread/ot-br-posix/pull/3534), which this component also implements.
+ * `tools/ci/check_rest_api_version_sync.py` enforces that this value and openapi.yaml's `info.version`
+ * stay in sync.
  */
-#define ESP_OT_REST_API_VERSION "0.5.0"
+#define ESP_OT_REST_API_VERSION "1.0.0"
 
 /*---------------------------------------------------------------------
             ESP Thread Border Router Wer Server REST API
