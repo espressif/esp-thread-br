@@ -39,7 +39,7 @@ void esp_br_web_api_init(void);
  * `tools/ci/check_rest_api_version_sync.py` enforces that this value and openapi.yaml's `info.version`
  * stay in sync.
  */
-#define ESP_OT_REST_API_VERSION "1.0.0"
+#define ESP_OT_REST_API_VERSION "1.1.0"
 
 /*---------------------------------------------------------------------
             ESP Thread Border Router Wer Server REST API

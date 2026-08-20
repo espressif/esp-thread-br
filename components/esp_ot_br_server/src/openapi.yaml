@@ -10,7 +10,7 @@ info:
   license:
     name: Apache
     url: https://github.com/espressif/esp-thread-br/blob/main/LICENSE
-  version: 1.0.0
+  version: 1.1.0
 servers:
   - url: http://localhost:80
 tags:
@@ -419,7 +419,7 @@ components:
             version:
               type: string
               description: The running REST API's semantic version.
-              example: "1.0.0"
+              example: "1.1.0"
             base:
               type: string
               description: The base path entry points are relative to.
