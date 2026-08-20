@@ -48,8 +48,7 @@ void esp_br_web_api_init(void);
 /* HTTP GET */
 /* Uses an esp-thread-br-specific path (rather than ot-br-posix's "/.well-known/thread/br-rest") since the
  * two implementations do not expose the same REST API contract; a distinct path lets clients that support
- * both discover and disambiguate them without extra logic
- * (https://github.com/espressif/esp-thread-br/pull/216#issuecomment-5357228430). */
+ * both discover and disambiguate them without extra logic. */
 #define ESP_OT_REST_API_WELL_KNOWN_ESP_BR_REST_PATH "/.well-known/thread/esp-br-rest"
 #define ESP_OT_REST_API_DIAGNOSTICS_PATH "/diagnostics"
 #define ESP_OT_REST_API_NODE_PATH "/node"

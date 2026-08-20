@@ -828,10 +828,8 @@ exit:
  * @brief REST API discovery endpoint (RFC 8615 well-known URI), inspired by ot-br-posix's
  *        `GET /.well-known/thread/br-rest` (see https://github.com/openthread/ot-br-posix/pull/3330)
  *        but served on its own esp-thread-br-specific path, since the two implementations do not
- *        expose the same REST API contract (see
- *        https://github.com/espressif/esp-thread-br/pull/216#issuecomment-5357228430). Lets clients
- *        discover the REST API version and its entry points at runtime instead of hardcoding or
- *        probing endpoint paths.
+ *        expose the same REST API contract. Lets clients discover the REST API version and its
+ *        entry points at runtime instead of hardcoding or probing endpoint paths.
  *
  * @param[in] req The request from http client.
  * @return
