@@ -325,7 +325,7 @@ esp_err_t network_formation_param_json_convert2_struct(const cJSON *root, cJSON 
 
     temp = cJSON_GetObjectItem(root, "defaultRoute");
     if (temp && temp->type != cJSON_NULL)
-        param->default_route = temp->valueint;
+        param->default_route = (bool)cJSON_GetNumberValue(temp);
     else
         param->default_route = false;
 
@@ -883,7 +883,7 @@ esp_err_t Json2Timestamp(const cJSON *jsonTimestamp, otTimestamp *aTimestamp)
 
     value = cJSON_GetObjectItemCaseSensitive(jsonTimestamp, "Authoritative");
     if (cJSON_IsBool(value)) {
-        aTimestamp->mAuthoritative = value->valueint;
+        aTimestamp->mAuthoritative = cJSON_IsTrue(value);
     }
 
     return ESP_OK;
@@ -900,47 +900,47 @@ esp_err_t Json2SecurityPolicy(const cJSON *jsonSecurityPolicy, otSecurityPolicy 
 
     value = cJSON_GetObjectItemCaseSensitive(jsonSecurityPolicy, "ObtainNetworkKey");
     if (cJSON_IsBool(value)) {
-        aSecurityPolicy->mObtainNetworkKeyEnabled = value->valueint;
+        aSecurityPolicy->mObtainNetworkKeyEnabled = cJSON_IsTrue(value);
     }
 
     value = cJSON_GetObjectItemCaseSensitive(jsonSecurityPolicy, "NativeCommissioning");
     if (cJSON_IsBool(value)) {
-        aSecurityPolicy->mNativeCommissioningEnabled = value->valueint;
+        aSecurityPolicy->mNativeCommissioningEnabled = cJSON_IsTrue(value);
     }
 
     value = cJSON_GetObjectItemCaseSensitive(jsonSecurityPolicy, "Routers");
     if (cJSON_IsBool(value)) {
-        aSecurityPolicy->mRoutersEnabled = value->valueint;
+        aSecurityPolicy->mRoutersEnabled = cJSON_IsTrue(value);
     }
 
     value = cJSON_GetObjectItemCaseSensitive(jsonSecurityPolicy, "ExternalCommissioning");
     if (cJSON_IsBool(value)) {
-        aSecurityPolicy->mExternalCommissioningEnabled = value->valueint;
+        aSecurityPolicy->mExternalCommissioningEnabled = cJSON_IsTrue(value);
     }
 
     value = cJSON_GetObjectItemCaseSensitive(jsonSecurityPolicy, "CommercialCommissioning");
     if (cJSON_IsBool(value)) {
-        aSecurityPolicy->mCommercialCommissioningEnabled = value->valueint;
+        aSecurityPolicy->mCommercialCommissioningEnabled = cJSON_IsTrue(value);
     }
 
     value = cJSON_GetObjectItemCaseSensitive(jsonSecurityPolicy, "AutonomousEnrollment");
     if (cJSON_IsBool(value)) {
-        aSecurityPolicy->mAutonomousEnrollmentEnabled = value->valueint;
+        aSecurityPolicy->mAutonomousEnrollmentEnabled = cJSON_IsTrue(value);
     }
 
     value = cJSON_GetObjectItemCaseSensitive(jsonSecurityPolicy, "NetworkKeyProvisioning");
     if (cJSON_IsBool(value)) {
-        aSecurityPolicy->mNetworkKeyProvisioningEnabled = value->valueint;
+        aSecurityPolicy->mNetworkKeyProvisioningEnabled = cJSON_IsTrue(value);
     }
 
     value = cJSON_GetObjectItemCaseSensitive(jsonSecurityPolicy, "TobleLink");
     if (cJSON_IsBool(value)) {
-        aSecurityPolicy->mTobleLinkEnabled = value->valueint;
+        aSecurityPolicy->mTobleLinkEnabled = cJSON_IsTrue(value);
     }
 
     value = cJSON_GetObjectItemCaseSensitive(jsonSecurityPolicy, "NonCcmRouters");
     if (cJSON_IsBool(value)) {
-        aSecurityPolicy->mNonCcmRoutersEnabled = value->valueint;
+        aSecurityPolicy->mNonCcmRoutersEnabled = cJSON_IsTrue(value);
     }
 
     return ESP_OK;
