@@ -35,6 +35,7 @@ void esp_br_web_api_init(void);
  *   - MAJOR: an incompatible API change.
  *   - MINOR: backward-compatible functionality added.
  *   - PATCH: a backward-compatible bug fix.
+ * Record the change in ../CHANGELOG.md.
  *
  * `tools/ci/check_rest_api_version_sync.py` enforces that this value and openapi.yaml's `info.version`
  * stay in sync.
