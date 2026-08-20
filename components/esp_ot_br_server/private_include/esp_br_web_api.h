@@ -20,10 +20,36 @@ extern "C" {
  */
 void esp_br_web_api_init(void);
 
+/**
+ * @brief REST API semantic version, the single source of truth for this component's REST API version.
+ *
+ * esp-thread-br maintains its own independent REST API version rather than mirroring ot-br-posix's
+ * `OTBR_REST_API_VERSION` (src/rest/version.hpp): the two implementations do not currently expose the
+ * same REST API contract (e.g. ot-br-posix serves under an `/api/` base path and also exposes actions,
+ * devices, JSON:API diagnostics, commissioner, and coprocessor-version endpoints that esp-thread-br does
+ * not implement), so their version histories are tracked separately from this point on
+ * (see https://github.com/espressif/esp-thread-br/pull/216#discussion_r3819911931).
+ *
+ * Bump this value, and openapi.yaml's `info.version`, together whenever a REST endpoint is added, removed,
+ * or changed, following semver:
+ *   - MAJOR: an incompatible API change.
+ *   - MINOR: backward-compatible functionality added.
+ *   - PATCH: a backward-compatible bug fix.
+ * Record the change in ../CHANGELOG.md.
+ *
+ * `tools/ci/check_rest_api_version_sync.py` enforces that this value and openapi.yaml's `info.version`
+ * stay in sync.
+ */
+#define ESP_OT_REST_API_VERSION "1.1.0"
+
 /*---------------------------------------------------------------------
             ESP Thread Border Router Wer Server REST API
 ----------------------------------------------------------------------*/
 /* HTTP GET */
+/* Uses an esp-thread-br-specific path (rather than ot-br-posix's "/.well-known/thread/br-rest") since the
+ * two implementations do not expose the same REST API contract; a distinct path lets clients that support
+ * both discover and disambiguate them without extra logic. */
+#define ESP_OT_REST_API_WELL_KNOWN_ESP_BR_REST_PATH "/.well-known/thread/esp-br-rest"
 #define ESP_OT_REST_API_DIAGNOSTICS_PATH "/diagnostics"
 #define ESP_OT_REST_API_NODE_PATH "/node"
 #define ESP_OT_REST_API_NODE_RLOC_PATH "/node/rloc"

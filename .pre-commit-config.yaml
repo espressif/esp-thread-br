@@ -18,6 +18,16 @@ repos:
 
   - repo: local
     hooks:
+      - id: check-rest-api-version-sync
+        name: Check REST API version is in sync between esp_br_web_api.h and openapi.yaml
+        entry: python3 tools/ci/check_rest_api_version_sync.py
+        language: python
+        additional_dependencies: [pyyaml]
+        pass_filenames: false
+        files: '^components/esp_ot_br_server/(private_include/esp_br_web_api\.h|src/openapi\.yaml)$'
+
+  - repo: local
+    hooks:
       - id: codespell
         name: Check typos with codespell
         entry: bash tools/check_typos.sh
