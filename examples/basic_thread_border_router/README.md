@@ -33,7 +33,7 @@ idf.py set-target <target>
 |  v5.3.0                                  |            8              |
 |  v5.1.5, v5.2.3, v5.3.1, v5.4 and later  |            12             |
 
-The host could be pre-configured with `OPENTHREAD_RADIO_SPINEL_UART` or `OPENTHREAD_RADIO_SPINEL_SPI` to select UART or SPI to access the Radio Co-Processor.
+The host accesses the Radio Co-Processor over UART (`OPENTHREAD_RADIO_SPINEL_UART`).
 
 If the `OPENTHREAD_BR_AUTO_START` option is enabled, the device will connect to the configured Wi-Fi and form Thread network automatically then act as the border router:
 - The Wi-Fi network's ssid and psk needs to be pre-configured with `EXAMPLE_WIFI_SSID` and `EXAMPLE_WIFI_PASSWORD`. In this mode, the device will first attempt to use the Wi-Fi SSID and password stored in NVS. If no Wi-Fi information is stored, it will then use the pre-configured ssid and psk.

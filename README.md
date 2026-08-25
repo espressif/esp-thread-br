@@ -22,9 +22,9 @@ The [ESP Thread Border Router](https://docs.espressif.com/projects/esp-thread-br
 ![br_dev_kit](docs/images/esp-thread-border-router-board.png)
 
 The two SoCs are connected with following interfaces:
-* UART and SPI for serial communication
+* UART for serial communication
 * RESET and BOOT pins for RCP Update
-* 3-Wires PTA for RF coexistence
+* PTA wires for RF coexistence
 
 This board is used as the default configuration for the [Basic Thread Border Router example](examples/basic_thread_border_router).
 
@@ -43,7 +43,7 @@ This board is used as the default configuration for the [M5Stack Thread Border R
 
 ### Standalone Modules
 
-The SDK also supports manually connecting an IEEE802.15.4-capable DevKit (e.g. ESP32-H2) RCP to an ESP32 series DevKit. Communication between RCP and SoC can be achieved using either one out of two supported serial communication protocols: UART or SPI. Please refer to the [Standalone RCP Guide](examples/basic_thread_border_router/README_standalone_RCP.md) for detailed wiring instructions. Specific instructions for the ESP32-P4 can be found [here](examples/basic_thread_border_router/README_esp32p4.md).
+The SDK also supports manually connecting an IEEE802.15.4-capable DevKit (e.g. ESP32-H2) RCP to an ESP32 series DevKit. Communication between RCP and SoC is over UART. Please refer to the [Standalone RCP Guide](examples/basic_thread_border_router/README_standalone_RCP.md) for detailed wiring instructions. Specific instructions for the ESP32-P4 can be found [here](examples/basic_thread_border_router/README_esp32p4.md).
 
 Recommended main processor and RCP combinations:
 

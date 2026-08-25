@@ -22,7 +22,7 @@ CONFIG_ESP_BR_C6_TARGET=y (if you are using an ESP32-C6 as RCP)
 
 You can use either the ESP32-H2 (default) or ESP32-C6 as an Radio Co-Processor (RCP).
 
-#### Connect the main processor to an RCP using UART (recommended):
+#### Connect the main processor to an RCP using UART:
 Main Processor pin  | RCP (H2 or C6) pin
 --------------------|-------------------
   GND               |     G
@@ -31,17 +31,6 @@ Main Processor pin  | RCP (H2 or C6) pin
   GPIO5  (UART TX)  |     RX
   GPIO7             |     RST
   GPIO8             |     GPIO9 (BOOT)
-
-#### Connect the main processor to an RCP using SPI:
-Main Processor pin  | RCP (H2 or C6) pin
---------------------|-------------------
-  GND               |     G
-  GPIO7             |     RST
-  GPIO8  (SPI INTR) |     GPIO9 (BOOT)
-  GPIO20 (SPI CS)   |     GPIO2
-  GPIO21 (SPI MOSI) |     GPIO3
-  GPIO22 (SPI CLK)  |     GPIO0
-  GPIO23 (SPI MISO) |     GPIO1
 
 ### Notes
 
