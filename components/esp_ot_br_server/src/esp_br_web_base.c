@@ -636,19 +636,17 @@ static cJSON *ChildTableEntry2Json(const otNetworkDiagChildEntry aChildEntry)
     return childEntry;
 }
 
-cJSON *diagnosticTlv_set_convert2_json(const thread_diagnosticTlv_set_t *set)
+cJSON *diagnosticTlv_node_convert2_json(const thread_diagnosticTlv_set_t *head)
 {
-    ESP_RETURN_ON_FALSE(set, NULL, BASE_TAG, "Invalid Diagnostic Set");
-    cJSON *root = cJSON_CreateArray();
-    cJSON *child = NULL;
+    if (!head || !head->diagTlv_next) {
+        return NULL;
+    }
+    cJSON *child = cJSON_CreateObject();
     cJSON *addr_list = NULL;
     cJSON *table_list = NULL;
     char output[512];
-    thread_diagnosticTlv_list_t *list = NULL;
-    thread_diagnosticTlv_set_t *head = set->next; /* Skip the invalid header node */
-    while (head) {
-        child = cJSON_CreateObject();
-        list = head->diagTlv_next;
+    thread_diagnosticTlv_list_t *list = head->diagTlv_next;
+    {
         while (list && list->diagTlv) {
             switch (list->diagTlv->mType) {
             case OT_NETWORK_DIAGNOSTIC_TLV_EXT_ADDRESS:
@@ -721,11 +719,19 @@ cJSON *diagnosticTlv_set_convert2_json(const thread_diagnosticTlv_set_t *set)
             }
             list = list->next;
         }
-        // avoid to add empty child.
-        if (head->diagTlv_next && child) {
+    }
+    return child;
+}
+
+cJSON *diagnosticTlv_set_convert2_json(const thread_diagnosticTlv_set_t *set)
+{
+    ESP_RETURN_ON_FALSE(set, NULL, BASE_TAG, "Invalid Diagnostic Set");
+    cJSON *root = cJSON_CreateArray();
+    for (const thread_diagnosticTlv_set_t *head = set->next; head; head = head->next) {
+        cJSON *child = diagnosticTlv_node_convert2_json(head);
+        if (child) { /* a node without TLVs yields nothing, and nothing to free */
             cJSON_AddItemToArray(root, child);
         }
-        head = head->next;
     }
     return root;
 }
