@@ -189,14 +189,7 @@ The configuration result would look like this.
 
 The Thread network parameters could be pre-configured with ``OPENTHREAD_NETWORK_xx`` options.
 
-2.1.3.4. Communication Interface
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The default communication interface between host SoC and RCP is UART.
-
-In order to use the SPI interface instead, the ``OPENTHREAD_RCP_SPI`` and ``OPENTHREAD_RADIO_SPINEL_SPI`` options should be enabled in ``ot_rcp`` and ``basic_thread_border_router`` example configurations, respectively. And set corresponding GPIO numbers in `esp_ot_config.h`.
-
-2.1.3.5. RF External Coexistence
+2.1.3.4. RF External Coexistence
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The SDK incorporates an external coexistence feature that improves transmission performance when there is RF signal interference between Wi-Fi (ESP32-S3) and 802.15.4 (ESP32-H2).
