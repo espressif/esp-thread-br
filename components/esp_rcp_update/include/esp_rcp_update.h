@@ -28,18 +28,18 @@ typedef enum {
  *
  * @note By default, H2 is used as the RCP chip. To use a different chip, modify the value of .target_chip.
  */
-#define ESP_RCP_UPDATE_DEFAULT_CONFIG()                                                                      \
-    {                                                                                                        \
-        .rcp_type = RCP_TYPE_UART,                        /* Type of RCP connection: UART */                 \
-            .uart_rx_pin = CONFIG_DEFAULT_PIN_TO_RCP_TX,  /* UART RX pin connected to RCP TX */              \
-            .uart_tx_pin = CONFIG_DEFAULT_PIN_TO_RCP_RX,  /* UART TX pin connected to RCP RX */              \
-            .uart_port = 1,                               /* UART port number used for RCP communication */  \
-            .uart_baudrate = 115200,                      /* Initial baud rate */                            \
-            .reset_pin = CONFIG_DEFAULT_PIN_TO_RCP_RESET, /* GPIO pin used to reset the RCP */               \
-            .boot_pin = CONFIG_DEFAULT_PIN_TO_RCP_BOOT,   /* GPIO pin used to put RCP into boot mode */      \
-            .update_baudrate = 460800,                    /* Baud rate used during firmware update */        \
-            .firmware_dir = "/" CONFIG_RCP_PARTITION_NAME "/" CONFIG_RCP_PATH_NAME, /* Firmware file path */ \
-            .target_chip = ESP32H2_CHIP /* Default target chip for update */                                 \
+#define ESP_RCP_UPDATE_DEFAULT_CONFIG()                                                                                \
+    {                                                                                                                  \
+        .rcp_type = RCP_TYPE_UART,                                   /* Type of RCP connection: UART */                \
+            .uart_rx_pin = CONFIG_DEFAULT_PIN_TO_RCP_TX,             /* UART RX pin connected to RCP TX */             \
+            .uart_tx_pin = CONFIG_DEFAULT_PIN_TO_RCP_RX,             /* UART TX pin connected to RCP RX */             \
+            .uart_port = 1,                                          /* UART port number used for RCP communication */ \
+            .uart_baudrate = 115200,                                 /* Initial baud rate */                           \
+            .reset_pin = CONFIG_DEFAULT_PIN_TO_RCP_RESET,            /* GPIO pin used to reset the RCP */              \
+            .boot_pin = CONFIG_DEFAULT_PIN_TO_RCP_BOOT,              /* GPIO pin used to put RCP into boot mode */     \
+            .update_baudrate = 460800,                               /* Baud rate used during firmware update */       \
+            .firmware_dir = "/" CONFIG_RCP_PARTITION_NAME "/ot_rcp", /* Firmware file path */                          \
+            .target_chip = ESP32H2_CHIP                              /* Default target chip for update */              \
     }
 
 /* For compatibility, will be removed in the next major update. */

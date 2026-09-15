@@ -16,8 +16,6 @@
 
 #include "esp_openthread_types.h"
 
-#define RCP_FIRMWARE_DIR "/spiffs/ot_rcp"
-
 #if CONFIG_OPENTHREAD_RADIO_SPINEL_UART
 #define ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG()              \
     {                                                      \
@@ -62,7 +60,7 @@
                     .spics_io_num = CONFIG_PIN_TO_RCP_CS,  \
                     .queue_size = 5,                       \
                 },                                         \
-            .intr_pin = CONFIG_PIN_TO_RCP_BOOT,            \
+            .intr_pin = CONFIG_DEFAULT_PIN_TO_RCP_BOOT,    \
         },                                                 \
     }
 #endif // CONFIG_OPENTHREAD_RADIO_SPINEL_UART OR  CONFIG_OPENTHREAD_RADIO_SPINEL_SPI
@@ -80,8 +78,8 @@
 #define ESP_OPENTHREAD_RCP_UPDATE_CONFIG()                                                                   \
     {                                                                                                        \
         .rcp_type = RCP_TYPE_UART, .uart_rx_pin = CONFIG_PIN_TO_RCP_TX, .uart_tx_pin = CONFIG_PIN_TO_RCP_RX, \
-        .uart_port = 1, .uart_baudrate = 115200, .reset_pin = CONFIG_PIN_TO_RCP_RESET,                       \
-        .boot_pin = CONFIG_PIN_TO_RCP_BOOT, .update_baudrate = 460800,                                       \
+        .uart_port = 1, .uart_baudrate = 115200, .reset_pin = CONFIG_DEFAULT_PIN_TO_RCP_RESET,               \
+        .boot_pin = CONFIG_DEFAULT_PIN_TO_RCP_BOOT, .update_baudrate = 460800,                               \
         .firmware_dir = "/" CONFIG_RCP_PARTITION_NAME "/ot_rcp", .target_chip = ESP_BR_RCP_TARGET_ID         \
     }
 #else
