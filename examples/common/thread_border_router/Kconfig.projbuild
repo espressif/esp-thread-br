@@ -24,18 +24,6 @@ menu "ESP Thread Border Router Example"
     endchoice
 
     menu "Board Configuration"
-        config PIN_TO_RCP_RESET
-            int "Pin to RCP reset"
-            default 7 if ESP_BR_BOARD_DEV_KIT
-            default 7 if ESP_BR_BOARD_STANDALONE
-            default 7 if ESP_BR_BOARD_M5STACK_CORES3
-
-        config PIN_TO_RCP_BOOT
-            int "Pin to RCP boot"
-            default 8 if ESP_BR_BOARD_DEV_KIT
-            default 8 if ESP_BR_BOARD_STANDALONE
-            default 18 if ESP_BR_BOARD_M5STACK_CORES3
-
         config PIN_TO_RCP_TX
             int "Pin to RCP TX"
             default 17 if ESP_BR_BOARD_DEV_KIT
