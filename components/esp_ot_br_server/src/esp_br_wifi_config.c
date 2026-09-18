@@ -213,6 +213,20 @@ static esp_err_t wifi_config_start_softap(void)
     esp_err_t ret = ESP_OK;
     uint8_t mac[6];
 
+    // Initialize WiFi if not already initialized
+    // Setup configurations before obtaining wifi mac
+    wifi_mode_t mode = WIFI_MODE_NULL;
+    ret = esp_wifi_get_mode(&mode);
+
+    if (ret == ESP_ERR_WIFI_NOT_INIT) {
+        wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+        ret = esp_wifi_init(&cfg);
+    }
+    ESP_RETURN_ON_ERROR(ret, WIFI_CONFIG_TAG, "Failed to initialize WiFi: %s", esp_err_to_name(ret));
+
+    // Get MAC address for SSID
+    ESP_ERROR_CHECK(esp_wifi_get_mac(WIFI_IF_AP, mac));
+
     // Create AP netif
     s_ap_netif = esp_netif_create_default_wifi_ap();
     ESP_RETURN_ON_FALSE(s_ap_netif != NULL, ESP_FAIL, WIFI_CONFIG_TAG, "Failed to create AP netif");
@@ -230,9 +244,6 @@ static esp_err_t wifi_config_start_softap(void)
     // Start DNS server
     wifi_config_dns_server_start();
 
-    // Get MAC address for SSID
-    ESP_ERROR_CHECK(esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP));
-
     // Generate SSID: ESP-ThreadBR-XXXX
     snprintf(s_softap_ssid, sizeof(s_softap_ssid), "ESP-ThreadBR-%02X%02X", mac[4], mac[5]);
 
@@ -245,11 +256,6 @@ static esp_err_t wifi_config_start_softap(void)
     wifi_config.ap.authmode = WIFI_AUTH_OPEN;
     wifi_config.ap.beacon_interval = 100; // Set beacon interval to 100ms for better discoverability
 
-    // Initialize WiFi if not already initialized
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ret = esp_wifi_init(&cfg);
-    ESP_RETURN_ON_FALSE(ret == ESP_OK || ret == ESP_ERR_INVALID_STATE, ret, WIFI_CONFIG_TAG,
-                        "Failed to initialize WiFi: %s", esp_err_to_name(ret));
     // Register event handlers
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_config_wifi_event_handler,
                                                         NULL, &s_wifi_event_handler_instance));

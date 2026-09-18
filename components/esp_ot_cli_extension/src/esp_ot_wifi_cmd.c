@@ -16,7 +16,6 @@
 #include "esp_coexist.h"
 #include "esp_err.h"
 #include "esp_event.h"
-#include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_netif_ip_addr.h"
 #include "esp_netif_net_stack.h"
@@ -340,14 +339,20 @@ otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs
             return OT_ERROR_INVALID_ARGS;
         }
         esp_err_t error = ESP_OK;
+        wifi_interface_t interface = WIFI_IF_NAN;
         if (strcmp(aArgs[1], "sta") == 0) {
-            error = esp_read_mac(mac, ESP_MAC_WIFI_STA);
+            interface = WIFI_IF_STA;
         } else if (strcmp(aArgs[1], "ap") == 0) {
-            error = esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP);
+            interface = WIFI_IF_AP;
         } else {
             otCliOutputFormat("invalid arguments: %s\n", aArgs[1]);
             return OT_ERROR_INVALID_ARGS;
         }
+        // Read the active Wi-Fi interface, including the remote radio on ESP32-P4.
+        // Remote Wi-Fi queries may block while waiting for an RPC response.
+        esp_openthread_task_switching_lock_release();
+        error = esp_wifi_get_mac(interface, mac);
+        esp_openthread_task_switching_lock_acquire(portMAX_DELAY);
         if (error == ESP_OK) {
             for (int i = 0; i < 5; i++) {
                 otCliOutputFormat("%02x:", mac[i]);
@@ -355,6 +360,9 @@ otError esp_ot_process_wifi_cmd(void *aContext, uint8_t aArgsLength, char *aArgs
             otCliOutputFormat("%02x\n", mac[5]);
         } else {
             otCliOutputFormat("Fail to get the mac address\n");
+            if (error == ESP_ERR_WIFI_NOT_INIT) {
+                otCliOutputFormat("Wi-Fi is not initialized; run wifi connect first\n");
+            }
         }
     } else if (strcmp(aArgs[0], "config") == 0) {
         if (aArgsLength == 1) {
