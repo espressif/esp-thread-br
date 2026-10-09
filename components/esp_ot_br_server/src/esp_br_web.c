@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "esp_system.h"
+#include <ctype.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <stdatomic.h>
@@ -11,6 +13,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #include "sdkconfig.h"
 
@@ -92,26 +96,6 @@ typedef struct request_url {
 Note: Http Server Thread REST API
 -----------------------------------------------------*/
 static esp_err_t esp_otbr_network_diagnostics_get_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_get_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_delete_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_rloc_get_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_rloc16_get_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_state_get_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_state_put_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_extaddress_get_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_network_name_get_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_leader_data_get_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_number_of_router_get_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_extpanid_get_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_baid_get_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_dataset_active_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_dataset_pending_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_dataset_handler(httpd_req_t *req, const char *dataset_type);
-static esp_err_t esp_otbr_network_node_epskc_state_get_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_epskc_state_put_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_epskc_key_get_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_epskc_key_post_handler(httpd_req_t *req);
-static esp_err_t esp_otbr_network_node_epskc_key_delete_handler(httpd_req_t *req);
 static esp_err_t esp_otbr_well_known_br_rest_get_handler(httpd_req_t *req);
 
 static httpd_uri_t s_resource_handlers[] = {
@@ -127,133 +111,344 @@ static httpd_uri_t s_resource_handlers[] = {
         .handler = esp_otbr_network_diagnostics_get_handler,
         .user_ctx = NULL,
     },
-    {
-        .uri = ESP_OT_REST_API_NODE_PATH,
-        .method = HTTP_GET,
-        .handler = esp_otbr_network_node_get_handler,
-        .user_ctx = NULL,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_PATH,
-        .method = HTTP_DELETE,
-        .handler = esp_otbr_network_node_delete_handler,
-        .user_ctx = NULL,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_RLOC_PATH,
-        .method = HTTP_GET,
-        .handler = esp_otbr_network_node_rloc_get_handler,
-        .user_ctx = NULL,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_RLOC16_PATH,
-        .method = HTTP_GET,
-        .handler = esp_otbr_network_node_rloc16_get_handler,
-        .user_ctx = NULL,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_STATE_PATH,
-        .method = HTTP_GET,
-        .handler = esp_otbr_network_node_state_get_handler,
-        .user_ctx = NULL,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_STATE_PATH,
-        .method = HTTP_PUT,
-        .handler = esp_otbr_network_node_state_put_handler,
-        .user_ctx = &s_server.data,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_EXTADDRESS_PATH,
-        .method = HTTP_GET,
-        .handler = esp_otbr_network_node_extaddress_get_handler,
-        .user_ctx = NULL,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_NETWORKNAME_PATH,
-        .method = HTTP_GET,
-        .handler = esp_otbr_network_node_network_name_get_handler,
-        .user_ctx = NULL,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_LEADERDATA_PATH,
-        .method = HTTP_GET,
-        .handler = esp_otbr_network_node_leader_data_get_handler,
-        .user_ctx = NULL,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_NUMBEROFROUTER_PATH,
-        .method = HTTP_GET,
-        .handler = esp_otbr_network_node_number_of_router_get_handler,
-        .user_ctx = NULL,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_EXTPANID_PATH,
-        .method = HTTP_GET,
-        .handler = esp_otbr_network_node_extpanid_get_handler,
-        .user_ctx = NULL,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_BORDERAGENTID_PATH,
-        .method = HTTP_GET,
-        .handler = esp_otbr_network_node_baid_get_handler,
-        .user_ctx = NULL,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_DATASET_ACTIVE_PATH,
-        .method = HTTP_GET,
-        .handler = esp_otbr_network_node_dataset_active_handler,
-        .user_ctx = NULL,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_DATASET_ACTIVE_PATH,
-        .method = HTTP_PUT,
-        .handler = esp_otbr_network_node_dataset_active_handler,
-        .user_ctx = &s_server.data,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_DATASET_PENDING_PATH,
-        .method = HTTP_GET,
-        .handler = esp_otbr_network_node_dataset_pending_handler,
-        .user_ctx = NULL,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_DATASET_PENDING_PATH,
-        .method = HTTP_PUT,
-        .handler = esp_otbr_network_node_dataset_pending_handler,
-        .user_ctx = &s_server.data,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_EPSKC_STATE_PATH,
-        .method = HTTP_GET,
-        .handler = esp_otbr_network_node_epskc_state_get_handler,
-        .user_ctx = NULL,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_EPSKC_STATE_PATH,
-        .method = HTTP_PUT,
-        .handler = esp_otbr_network_node_epskc_state_put_handler,
-        .user_ctx = &s_server.data,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_EPSKC_KEY_PATH,
-        .method = HTTP_GET,
-        .handler = esp_otbr_network_node_epskc_key_get_handler,
-        .user_ctx = NULL,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_EPSKC_KEY_PATH,
-        .method = HTTP_POST,
-        .handler = esp_otbr_network_node_epskc_key_post_handler,
-        .user_ctx = &s_server.data,
-    },
-    {
-        .uri = ESP_OT_REST_API_NODE_EPSKC_KEY_PATH,
-        .method = HTTP_DELETE,
-        .handler = esp_otbr_network_node_epskc_key_delete_handler,
-        .user_ctx = NULL,
-    },
 };
+
+/*----------------------------------------------------------------------
+                    Thread REST HTTP handlers
+----------------------------------------------------------------------*/
+#define THREAD_REST_MAX_BODY (16 * 1024)
+#define REST_METHOD(method) (UINT32_C(1) << (method))
+#define REST_GET REST_METHOD(HTTP_GET)
+#define REST_PUT REST_METHOD(HTTP_PUT)
+#define REST_POST REST_METHOD(HTTP_POST)
+#define REST_DELETE REST_METHOD(HTTP_DELETE)
+
+typedef struct {
+    const char *path;
+    uint32_t methods;
+    bool item;
+} thread_rest_route_t;
+
+static const thread_rest_route_t s_thread_rest_routes[] = {
+    {"/node", REST_GET | REST_DELETE, false},
+    {"/node/ba-id", REST_GET, false},
+    {"/node/rloc", REST_GET, false},
+    {"/node/rloc16", REST_GET, false},
+    {"/node/state", REST_GET | REST_PUT, false},
+    {"/node/ext-address", REST_GET, false},
+    {"/node/network-name", REST_GET, false},
+    {"/node/leader-data", REST_GET, false},
+    {"/node/num-of-router", REST_GET, false},
+    {"/node/ext-panid", REST_GET, false},
+    {"/node/dataset/active", REST_GET | REST_PUT, false},
+    {"/node/dataset/pending", REST_GET | REST_PUT, false},
+    {"/node/commissioner/state", REST_GET | REST_PUT, false},
+    {"/node/commissioner/joiner", REST_GET | REST_POST | REST_DELETE, false},
+    {"/node/coprocessor/version", REST_GET, false},
+    {"/node/ba-epskc/state", REST_GET | REST_PUT, false},
+    {"/node/ba-epskc/key", REST_GET | REST_POST | REST_DELETE, false},
+    {"/api/node", REST_GET, false},
+    {"/api/actions", REST_GET | REST_POST | REST_DELETE, false},
+    {"/api/actions/", REST_GET | REST_DELETE, true},
+    {"/api/devices", REST_GET | REST_DELETE, false},
+    {"/api/devices/", REST_GET | REST_DELETE, true},
+    {"/api/diagnostics", REST_GET | REST_DELETE, false},
+    {"/api/diagnostics/", REST_GET | REST_DELETE, true},
+    {"/.well-known/thread/br-rest", REST_GET, false},
+};
+
+static const char *thread_rest_status_title(int status)
+{
+    switch (status) {
+    case 200:
+        return "OK";
+    case 201:
+        return "Created";
+    case 204:
+        return "No Content";
+    case 400:
+        return "Bad Request";
+    case 404:
+        return "Not Found";
+    case 405:
+        return "Method Not Allowed";
+    case 406:
+        return "Not Acceptable";
+    case 409:
+        return "Conflict";
+    case 412:
+        return "Precondition Failed";
+    case 413:
+        return "Payload Too Large";
+    case 415:
+        return "Unsupported Media Type";
+    case 422:
+        return "Unprocessable Content";
+    case 503:
+        return "Service Unavailable";
+    case 504:
+        return "Gateway Timeout";
+    case 507:
+        return "Insufficient Storage";
+    default:
+        return "Internal Server Error";
+    }
+}
+
+static esp_err_t thread_rest_send(httpd_req_t *req, esp_br_thread_rest_response_t *response, bool close)
+{
+    const char *title = thread_rest_status_title(response->status);
+    char status[48];
+    snprintf(status, sizeof(status), "%d %s", response->status, title);
+    if (response->status >= 400) {
+        cJSON_Delete(response->json);
+        response->json = cJSON_CreateObject();
+        cJSON_AddNumberToObject(response->json, "status", response->status);
+        cJSON_AddStringToObject(response->json, "title", title);
+        if (response->detail) {
+            cJSON_AddStringToObject(response->json, "detail", response->detail);
+        }
+        response->content_type = "application/json";
+    }
+    char *json = response->json ? cJSON_PrintUnformatted(response->json) : NULL;
+    const char *body = json ? json : response->text;
+    if (response->json && !json) {
+        strcpy(status, "500 Internal Server Error");
+        body = "{\"status\":500,\"title\":\"Internal Server Error\"}";
+    }
+    httpd_resp_set_status(req, status);
+    httpd_resp_set_type(req, response->content_type ? response->content_type : "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers",
+                       "Origin, Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, "
+                       "Access-Control-Request-Headers, If-None-Match");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "DELETE, GET, OPTIONS, POST, PUT");
+    if (close) {
+        httpd_resp_set_hdr(req, "Connection", "close");
+    }
+    esp_err_t error = httpd_resp_send(req, req->method == HTTP_HEAD ? NULL : body,
+                                      req->method == HTTP_HEAD || !body ? 0 : strlen(body));
+    cJSON_free(json);
+    cJSON_Delete(response->json);
+    free(response->text);
+    return close && error == ESP_OK ? ESP_FAIL : error;
+}
+
+static bool thread_rest_decode(char *text, bool query)
+{
+    char *write = text;
+    for (char *read = text; *read; read++) {
+        unsigned char value = *read;
+        if (value == '%') {
+            if (!read[1] || !read[2] || !isxdigit((unsigned char)read[1]) || !isxdigit((unsigned char)read[2])) {
+                return false;
+            }
+            char pair[3] = {read[1], read[2], 0};
+            value = strtoul(pair, NULL, 16);
+            if (!value) {
+                return false;
+            }
+            read += 2;
+        } else if (query && value == '+') {
+            value = ' ';
+        }
+        *write++ = value;
+    }
+    *write = 0;
+    return true;
+}
+
+static char *thread_rest_header(httpd_req_t *req, const char *name)
+{
+    size_t length = httpd_req_get_hdr_value_len(req, name);
+    char *header = calloc(length + 1, 1);
+    if (header && length && httpd_req_get_hdr_value_str(req, name, header, length + 1) != ESP_OK) {
+        free(header);
+        header = NULL;
+    }
+    return header;
+}
+
+static cJSON *thread_rest_discovery(void)
+{
+    cJSON *json = cJSON_CreateObject();
+    cJSON *api = cJSON_AddObjectToObject(json, "api");
+    cJSON_AddStringToObject(api, "version", ESP_OT_REST_API_VERSION);
+    cJSON_AddStringToObject(api, "base", "/api/");
+    cJSON *links = cJSON_AddArrayToObject(json, "links");
+    static const char *const paths[] = {"/.well-known/thread/br-rest", "/api/node", "/api/actions", "/api/devices",
+                                        "/api/diagnostics"};
+    static const char *const relations[] = {"self", "node", "task", "device", "diagnostic"};
+    for (unsigned i = 0; i < 5; i++) {
+        cJSON *link = cJSON_CreateObject();
+        cJSON_AddStringToObject(link, "href", paths[i]);
+        cJSON_AddStringToObject(link, "rel", relations[i]);
+        cJSON *types = cJSON_AddArrayToObject(link, "type");
+        cJSON_AddItemToArray(types, cJSON_CreateString(i ? "application/vnd.api+json" : "application/json"));
+        cJSON_AddItemToArray(links, link);
+    }
+    return json;
+}
+
+static esp_err_t esp_otbr_thread_rest_handler(httpd_req_t *req)
+{
+    esp_br_thread_rest_response_t response = {.status = 200, .content_type = "application/json"};
+    esp_br_thread_rest_request_t request = {.method = req->method};
+    char *uri = strdup(req->uri), *body = NULL, *accept = NULL, *content_type = NULL, *condition = NULL;
+    cJSON *query = cJSON_CreateObject();
+    bool close = false;
+    if (!uri || !query) {
+        response.status = 500;
+        close = true;
+        goto exit;
+    }
+    char *parameters = strchr(uri, '?');
+    if (parameters) {
+        *parameters++ = 0;
+    }
+    if (!thread_rest_decode(uri, false)) {
+        response.status = 400;
+        close = true;
+        goto exit;
+    }
+    request.path = uri;
+    unsigned parameter_count = 0;
+    while (parameters && *parameters) {
+        char *end = strchr(parameters, '&');
+        if (end) {
+            *end++ = 0;
+        }
+        char *value = strchr(parameters, '=');
+        if (value) {
+            *value++ = 0;
+        } else {
+            value = parameters + strlen(parameters);
+        }
+        if (++parameter_count >= 16 || !thread_rest_decode(parameters, true) || !thread_rest_decode(value, true)) {
+            response.status = 400;
+            close = true;
+            goto exit;
+        }
+        cJSON_AddStringToObject(query, parameters, value);
+        parameters = end;
+    }
+    request.query = query;
+    const thread_rest_route_t *route = NULL;
+    for (unsigned i = 0; i < sizeof(s_thread_rest_routes) / sizeof(s_thread_rest_routes[0]); i++) {
+        const thread_rest_route_t *candidate = &s_thread_rest_routes[i];
+        size_t length = strlen(candidate->path);
+        if ((!candidate->item && !strcmp(uri, candidate->path)) ||
+            (candidate->item && !strncmp(uri, candidate->path, length) && uri[length] && !strchr(uri + length, '/'))) {
+            route = candidate;
+            break;
+        }
+    }
+    if (!route) {
+        response.status = 404;
+        goto exit;
+    }
+    char allow[48] = "";
+    const httpd_method_t methods[] = {HTTP_GET, HTTP_POST, HTTP_PUT, HTTP_DELETE, HTTP_OPTIONS};
+    const char *names[] = {"GET", "POST", "PUT", "DELETE", "OPTIONS"};
+    for (unsigned i = 0; i < 5; i++) {
+        if (methods[i] == HTTP_OPTIONS || (route->methods & REST_METHOD(methods[i]))) {
+            if (*allow) {
+                strcat(allow, ", ");
+            }
+            strcat(allow, names[i]);
+        }
+    }
+    if (req->method == HTTP_OPTIONS || !(route->methods & REST_METHOD(req->method))) {
+        response.status = req->method == HTTP_OPTIONS ? 200 : 405;
+        if (response.status == 405) {
+            response.detail = "method not supported";
+        }
+        httpd_resp_set_hdr(req, "Allow", allow);
+        /* Header values must remain live until httpd_resp_send(). */
+        if (req->content_len) {
+            close = true;
+        }
+        esp_err_t error = thread_rest_send(req, &response, close);
+        free(uri);
+        cJSON_Delete(query);
+        return error;
+    }
+    if (req->content_len > THREAD_REST_MAX_BODY) {
+        response.status = 413;
+        close = true;
+        goto exit;
+    }
+    body = calloc(req->content_len + 1, 1);
+    accept = thread_rest_header(req, "Accept");
+    content_type = thread_rest_header(req, "Content-Type");
+    condition = thread_rest_header(req, "If-None-Match");
+    if (!body || !accept || !content_type || !condition) {
+        response.status = 500;
+        close = true;
+        goto exit;
+    }
+    for (size_t received = 0; received < req->content_len;) {
+        int count = httpd_req_recv(req, body + received, req->content_len - received);
+        if (count <= 0) {
+            response.status = 400;
+            close = true;
+            goto exit;
+        }
+        received += count;
+    }
+    if (memchr(body, 0, req->content_len)) {
+        response.status = 400;
+        close = true;
+        goto exit;
+    }
+    request.body = body;
+    request.accept = accept;
+    request.content_type = content_type;
+    request.if_none_match = condition;
+    if (!strcmp(uri, "/.well-known/thread/br-rest")) {
+        response.json = thread_rest_discovery();
+    } else {
+        esp_br_thread_rest_request(&request, &response);
+    }
+exit:
+    if (response.status >= 400 && req->content_len && !body) {
+        close = true;
+    }
+    bool reset = response.reset;
+    esp_err_t error = thread_rest_send(req, &response, close);
+    free(uri);
+    free(body);
+    free(accept);
+    free(content_type);
+    free(condition);
+    cJSON_Delete(query);
+    if (reset) {
+        /* httpd_resp_send has submitted the response before rebooting. */
+        vTaskDelay(pdMS_TO_TICKS(200));
+        esp_restart();
+    }
+    return error;
+}
+
+static esp_err_t esp_otbr_thread_rest_register(httpd_handle_t server)
+{
+    esp_err_t error = esp_br_thread_rest_init();
+    if (error != ESP_OK) {
+        return error;
+    }
+    static const char *const paths[] = {"/node", "/node/*", "/api/*", "/.well-known/thread/br-rest"};
+    const httpd_method_t methods[] = {HTTP_GET, HTTP_POST, HTTP_PUT, HTTP_DELETE, HTTP_OPTIONS, HTTP_HEAD, HTTP_PATCH};
+    for (unsigned p = 0; p < 4; p++) {
+        for (unsigned m = 0; m < 7; m++) {
+            httpd_uri_t route = {.uri = paths[p], .method = methods[m], .handler = esp_otbr_thread_rest_handler};
+            error = httpd_register_uri_handler(server, &route);
+            if (error != ESP_OK) {
+                return error;
+            }
+        }
+    }
+    return ESP_OK;
+}
 
 /*-----------------------------------------------------
 Note: Http Server WEB-GUI API
@@ -446,18 +641,6 @@ exit:
     return ret;
 }
 
-static esp_err_t httpd_send_plain_text(httpd_req_t *req, char *str)
-{
-    esp_err_t ret = ESP_OK;
-    ESP_RETURN_ON_FALSE(str, ESP_FAIL, WEB_TAG, "Invalid plain text");
-    ESP_LOGD(WEB_TAG, "Properties: %s\r\n", str);
-    ESP_GOTO_ON_ERROR(httpd_resp_set_type(req, ESP_OT_REST_CONTENT_TYPE_PLAIN), exit, WEB_TAG,
-                      "Failed to set http type");
-    ESP_GOTO_ON_ERROR(httpd_resp_sendstr(req, str), exit, WEB_TAG, "Failed to send http respond");
-exit:
-    return ret;
-}
-
 /*-----------------------------------------------------
 Note: Openthread resource API implement
 -----------------------------------------------------*/
@@ -508,322 +691,6 @@ static esp_err_t esp_otbr_network_diagnostics_get_handler(httpd_req_t *req)
 
 exit:
     cJSON_Delete(response);
-    return ret;
-}
-
-static esp_err_t esp_otbr_network_node_get_handler(httpd_req_t *req)
-{
-    ESP_RETURN_ON_FALSE(req, ESP_FAIL, WEB_TAG, "Failed to parse the node information of http request");
-    esp_err_t ret = ESP_OK;
-    cJSON *response = handle_ot_resource_node_information_request();
-    ESP_RETURN_ON_FALSE(response, ESP_FAIL, WEB_TAG, "Failed to handle openthread diagnostics request");
-    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
-exit:
-    cJSON_Delete(response);
-    return ret;
-}
-
-static esp_err_t esp_otbr_network_node_delete_handler(httpd_req_t *req)
-{
-    ESP_RETURN_ON_FALSE(req, ESP_FAIL, WEB_TAG, "Failed to parse the node information of http request");
-    esp_err_t ret = ESP_OK;
-    otError error = handle_ot_resource_node_delete_information_request();
-    if (error == OT_ERROR_NONE) {
-        httpd_resp_set_status(req, HTTPD_200);
-    } else if (error == OT_ERROR_INVALID_STATE) {
-        httpd_resp_set_status(req, HTTPD_409);
-    } else {
-        httpd_resp_set_status(req, HTTPD_500);
-    }
-    ESP_GOTO_ON_ERROR(httpd_resp_send(req, NULL, 0), exit, WEB_TAG, "Failed to response %s", req->uri);
-exit:
-    return ret;
-}
-
-static esp_err_t esp_otbr_network_node_rloc_get_handler(httpd_req_t *req)
-{
-    esp_err_t ret = ESP_OK;
-    cJSON *response = handle_ot_resource_node_rloc_request();
-    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
-exit:
-    cJSON_Delete(response);
-    return ret;
-}
-
-static esp_err_t esp_otbr_network_node_rloc16_get_handler(httpd_req_t *req)
-{
-    esp_err_t ret = ESP_OK;
-    cJSON *response = handle_ot_resource_node_rloc16_request();
-    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
-exit:
-    cJSON_Delete(response);
-    return ret;
-}
-
-static esp_err_t esp_otbr_network_node_state_get_handler(httpd_req_t *req)
-{
-    esp_err_t ret = ESP_OK;
-    cJSON *response = handle_ot_resource_node_state_request();
-    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
-exit:
-    cJSON_Delete(response);
-    return ret;
-}
-
-static esp_err_t esp_otbr_network_node_state_put_handler(httpd_req_t *req)
-{
-    esp_err_t ret = ESP_OK;
-    otError err = OT_ERROR_NONE;
-    cJSON *state = httpd_request_convert2_json(req, cJSON_Object);
-    if (cJSON_IsString(state)) {
-        err = handle_ot_resource_node_state_put_request(state);
-    } else {
-        ESP_LOGE(WEB_TAG, "Invalid args");
-        err = OT_ERROR_INVALID_ARGS;
-    }
-
-    char http_return_status[64];
-    if (convert_ot_err_to_response_code(err, http_return_status) != ESP_OK) {
-        strcpy(http_return_status, HTTPD_500);
-    }
-    httpd_resp_set_status(req, http_return_status);
-    ESP_GOTO_ON_ERROR(httpd_resp_send(req, NULL, 0), exit, WEB_TAG, "Failed to response %s", req->uri);
-exit:
-    cJSON_Delete(state);
-    return ret;
-}
-
-static esp_err_t esp_otbr_network_node_extaddress_get_handler(httpd_req_t *req)
-{
-    esp_err_t ret = ESP_OK;
-    cJSON *response = handle_ot_resource_node_extaddress_request();
-    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
-exit:
-    cJSON_Delete(response);
-    return ret;
-}
-
-static esp_err_t esp_otbr_network_node_network_name_get_handler(httpd_req_t *req)
-{
-    esp_err_t ret = ESP_OK;
-    cJSON *response = handle_ot_resource_node_network_name_request();
-    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
-exit:
-    cJSON_Delete(response);
-    return ret;
-}
-
-static esp_err_t esp_otbr_network_node_leader_data_get_handler(httpd_req_t *req)
-{
-    esp_err_t ret = ESP_OK;
-    cJSON *response = handle_ot_resource_node_leader_data_request();
-    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
-exit:
-    cJSON_Delete(response);
-    return ret;
-}
-
-static esp_err_t esp_otbr_network_node_number_of_router_get_handler(httpd_req_t *req)
-{
-    esp_err_t ret = ESP_OK;
-    cJSON *response = handle_ot_resource_node_numofrouter_request();
-    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
-exit:
-    cJSON_Delete(response);
-    return ret;
-}
-
-static esp_err_t esp_otbr_network_node_extpanid_get_handler(httpd_req_t *req)
-{
-    esp_err_t ret = ESP_OK;
-    cJSON *response = handle_ot_resource_node_extpanid_request();
-    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
-exit:
-    cJSON_Delete(response);
-    return ret;
-}
-
-static esp_err_t esp_otbr_network_node_baid_get_handler(httpd_req_t *req)
-{
-    esp_err_t ret = ESP_OK;
-    cJSON *response = handle_ot_resource_node_baid_request();
-    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
-exit:
-    cJSON_Delete(response);
-    return ret;
-}
-
-static esp_err_t esp_otbr_network_node_dataset_active_handler(httpd_req_t *req)
-{
-    return esp_otbr_network_node_dataset_handler(req, ESP_OT_DATASET_TYPE_ACTIVE);
-}
-
-static esp_err_t esp_otbr_network_node_dataset_pending_handler(httpd_req_t *req)
-{
-    return esp_otbr_network_node_dataset_handler(req, ESP_OT_DATASET_TYPE_PENDING);
-}
-
-static esp_err_t esp_otbr_network_node_dataset_handler(httpd_req_t *req, const char *dataset_type)
-{
-    esp_err_t ret = ESP_OK;
-    cJSON *request = cJSON_CreateObject();
-    cJSON *response = NULL;
-    cJSON *log = cJSON_CreateObject();
-    cJSON_AddItemToObject(request, ESP_OT_REST_DATASET_TYPE, cJSON_CreateString(dataset_type));
-    char format[256];
-    uint16_t errcode = 0;
-
-    if (req->method == HTTP_GET) {
-        if (httpd_req_get_hdr_value_str(req, ESP_OT_REST_ACCEPT_HEADER, format, sizeof(format)) == ESP_OK &&
-            strcmp(format, ESP_OT_REST_CONTENT_TYPE_PLAIN) == 0) {
-            cJSON_AddItemToObject(request, ESP_OT_REST_ACCEPT_HEADER,
-                                  cJSON_CreateString(ESP_OT_REST_CONTENT_TYPE_PLAIN));
-        } else {
-            cJSON_AddItemToObject(request, ESP_OT_REST_ACCEPT_HEADER,
-                                  cJSON_CreateString(ESP_OT_REST_CONTENT_TYPE_JSON));
-        }
-        response = handle_ot_resource_node_get_dataset_request(request, log);
-    } else if (req->method == HTTP_PUT) {
-        cJSON *value = NULL;
-        if (httpd_req_get_hdr_value_str(req, ESP_OT_REST_CONTENT_TYPE_HEADER, format, sizeof(format)) == ESP_OK &&
-            strcmp(format, ESP_OT_REST_CONTENT_TYPE_PLAIN) == 0) {
-            cJSON_AddItemToObject(request, ESP_OT_REST_CONTENT_TYPE_HEADER,
-                                  cJSON_CreateString(ESP_OT_REST_CONTENT_TYPE_PLAIN));
-            value = httpd_request_convert2_json(req, cJSON_String);
-            if (!cJSON_IsString(value)) {
-                errcode = 400;
-            }
-        } else {
-            cJSON_AddItemToObject(request, ESP_OT_REST_CONTENT_TYPE_HEADER,
-                                  cJSON_CreateString(ESP_OT_REST_CONTENT_TYPE_JSON));
-            value = httpd_request_convert2_json(req, cJSON_Object);
-            if (!cJSON_IsObject(value)) {
-                errcode = 400;
-            }
-        }
-
-        if (errcode == 0) {
-            cJSON_AddItemToObject(request, "DatasetData", value);
-            handle_ot_resource_node_set_dataset_request(request, log);
-        } else if (errcode == 400) {
-            ESP_LOGE(WEB_TAG, "Invalid args");
-        }
-    }
-
-    cJSON *value = cJSON_GetObjectItemCaseSensitive(log, "ErrorCode");
-    if (cJSON_IsNumber(value)) {
-        errcode = (uint16_t)cJSON_GetNumberValue(value);
-    }
-
-    char http_return_status[64];
-    ot_br_web_response_code_get(errcode, http_return_status);
-    httpd_resp_set_status(req, http_return_status);
-    if (response) {
-        if (cJSON_IsString(response)) {
-            ESP_GOTO_ON_ERROR(httpd_send_plain_text(req, cJSON_GetStringValue(response)), exit, WEB_TAG,
-                              "Failed to response %s", req->uri);
-        } else {
-            ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
-        }
-    } else {
-        ESP_GOTO_ON_ERROR(httpd_resp_send(req, NULL, 0), exit, WEB_TAG, "Failed to response %s", req->uri);
-    }
-
-exit:
-    cJSON_Delete(request);
-    cJSON_Delete(response);
-    cJSON_Delete(log);
-    return ret;
-}
-
-static esp_err_t esp_otbr_network_node_epskc_state_get_handler(httpd_req_t *req)
-{
-    esp_err_t ret = ESP_OK;
-    cJSON *response = handle_ot_resource_node_epskc_state_request();
-    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
-exit:
-    cJSON_Delete(response);
-    return ret;
-}
-
-static esp_err_t esp_otbr_network_node_epskc_state_put_handler(httpd_req_t *req)
-{
-    esp_err_t ret = ESP_OK;
-    otError err = OT_ERROR_NONE;
-    cJSON *state = httpd_request_convert2_json(req, cJSON_Object);
-    if (cJSON_IsString(state)) {
-        err = handle_ot_resource_node_epskc_state_put_request(state);
-    } else {
-        ESP_LOGE(WEB_TAG, "Invalid args");
-        err = OT_ERROR_INVALID_ARGS;
-    }
-
-    char http_return_status[64];
-    if (convert_ot_err_to_response_code(err, http_return_status) != ESP_OK) {
-        strcpy(http_return_status, HTTPD_500);
-    }
-    httpd_resp_set_status(req, http_return_status);
-    ESP_GOTO_ON_ERROR(httpd_resp_send(req, NULL, 0), exit, WEB_TAG, "Failed to response %s", req->uri);
-exit:
-    cJSON_Delete(state);
-    return ret;
-}
-
-static esp_err_t esp_otbr_network_node_epskc_key_get_handler(httpd_req_t *req)
-{
-    esp_err_t ret = ESP_OK;
-    cJSON *response = handle_ot_resource_node_epskc_key_get_request();
-    ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
-exit:
-    cJSON_Delete(response);
-    return ret;
-}
-
-static esp_err_t esp_otbr_network_node_epskc_key_post_handler(httpd_req_t *req)
-{
-    esp_err_t ret = ESP_OK;
-    cJSON *request = NULL;
-    cJSON *response = NULL;
-    cJSON *log = cJSON_CreateObject();
-    uint16_t errcode = 0;
-
-    if (req->content_len > 0) {
-        request = httpd_request_convert2_json(req, cJSON_Object);
-        if (!cJSON_IsObject(request)) {
-            errcode = 400;
-        }
-    }
-
-    if (errcode == 0) {
-        response = handle_ot_resource_node_epskc_key_post_request(request, log);
-        cJSON *value = cJSON_GetObjectItemCaseSensitive(log, "ErrorCode");
-        if (cJSON_IsNumber(value)) {
-            errcode = (uint16_t)cJSON_GetNumberValue(value);
-        }
-    }
-
-    char http_return_status[64];
-    ot_br_web_response_code_get(errcode, http_return_status);
-    httpd_resp_set_status(req, http_return_status);
-    if (response) {
-        ESP_GOTO_ON_ERROR(httpd_send_packet(req, response), exit, WEB_TAG, "Failed to response %s", req->uri);
-    } else {
-        ESP_GOTO_ON_ERROR(httpd_resp_send(req, NULL, 0), exit, WEB_TAG, "Failed to response %s", req->uri);
-    }
-exit:
-    cJSON_Delete(request);
-    cJSON_Delete(response);
-    cJSON_Delete(log);
-    return ret;
-}
-
-static esp_err_t esp_otbr_network_node_epskc_key_delete_handler(httpd_req_t *req)
-{
-    esp_err_t ret = ESP_OK;
-    handle_ot_resource_node_epskc_key_delete_request();
-    httpd_resp_set_status(req, HTTPD_200);
-    ESP_GOTO_ON_ERROR(httpd_resp_send(req, NULL, 0), exit, WEB_TAG, "Failed to response %s", req->uri);
-exit:
     return ret;
 }
 
@@ -1500,8 +1367,8 @@ static httpd_handle_t *start_esp_br_http_server(const char *base_path)
     strlcpy(s_server.data.base_path, base_path, ESP_VFS_PATH_MAX + 1);
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = (sizeof(s_resource_handlers) + sizeof(s_web_gui_handlers)) / sizeof(httpd_uri_t) + 2;
-    config.max_resp_headers = (sizeof(s_resource_handlers) + sizeof(s_web_gui_handlers)) / sizeof(httpd_uri_t) + 2;
+    config.max_uri_handlers = (sizeof(s_resource_handlers) + sizeof(s_web_gui_handlers)) / sizeof(httpd_uri_t) + 30;
+    config.max_resp_headers = (sizeof(s_resource_handlers) + sizeof(s_web_gui_handlers)) / sizeof(httpd_uri_t) + 30;
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8 * 1024;
     config.max_open_sockets = 7;
@@ -1518,6 +1385,12 @@ static httpd_handle_t *start_esp_br_http_server(const char *base_path)
                                     .handler = default_urls_get_handler,
                                     .user_ctx = &s_server.data};
 
+    if (esp_otbr_thread_rest_register(s_server.handle) != ESP_OK) {
+        ESP_LOGE(WEB_TAG, "Failed to register Thread REST API");
+        httpd_stop(s_server.handle);
+        s_server.handle = NULL;
+        return NULL;
+    }
     httpd_server_register_http_uri(&s_server, s_resource_handlers, sizeof(s_resource_handlers) / sizeof(httpd_uri_t));
     httpd_server_register_http_uri(&s_server, s_web_gui_handlers, sizeof(s_web_gui_handlers) / sizeof(httpd_uri_t));
     httpd_register_uri_handler(s_server.handle, &default_uris_get);
