@@ -395,7 +395,10 @@ static esp_err_t get_openthread_ipv6_properties(otInstance *ins, thread_ipv6_sta
            sizeof(otIp6Address));                                                           /* 1. linkLocalAddress */
     memcpy(&ipv6->routing_local_address, otThreadGetRloc(ins), sizeof(otIp6Address));       /* 2. routingLocalAddress */
     memcpy(&ipv6->mesh_local_address, otThreadGetMeshLocalEid(ins), sizeof(otIp6Address));  /* 3. meshLocalAddress */
-    memcpy(&ipv6->mesh_local_prefix, otThreadGetMeshLocalPrefix(ins), sizeof(otIp6Prefix)); /* 4. meshLocalPrefix */
+    /* The Mesh Local Prefix contains only the most significant 64 bits. */
+    memset(&ipv6->mesh_local_prefix, 0, sizeof(ipv6->mesh_local_prefix));
+    memcpy(ipv6->mesh_local_prefix.mPrefix.mFields.m8, otThreadGetMeshLocalPrefix(ins), sizeof(otMeshLocalPrefix));
+    ipv6->mesh_local_prefix.mLength = OT_IP6_PREFIX_SIZE * 8; /* 4. meshLocalPrefix */
 
     return ESP_OK;
 }
