@@ -100,6 +100,10 @@ otError handle_ot_resource_node_delete_information_request(void);
  * @return The cJSON object of diagnostics
  */
 cJSON *handle_ot_resource_network_diagnostics_request(void);
+/* Collect the mesh diagnostics and return the raw set; the caller owns it and
+   frees it with destroy_thread_diagnosticTlv_set().  Lets a handler serialise
+   one router at a time instead of holding the whole JSON tree. */
+thread_diagnosticTlv_set_t *handle_ot_resource_network_diagnostics_collect(void);
 
 /**
  * @brief Provide an entry to get current Thread node rloc

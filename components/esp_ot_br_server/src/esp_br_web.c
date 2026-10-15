@@ -474,40 +474,60 @@ Note: Openthread resource API implement
  *      -   ESP_ERR_HTTPD_INVALID_REQ   : Invalid request
  */
 
+/* Send the collected diagnostics one router at a time: convert a node to
+   JSON, free that node's TLVs, print, send, free the string, next.  The heap
+   holds the collected TLVs plus ONE router's JSON at any moment -- a few KB
+   per router, where converting the whole set first cost the entire mesh:
+   roughly 90 KB on top of ~40 KB of TLVs on a 16-router mesh.
+
+   The separator goes out BEFORE the chunk it precedes, so a send failure
+   there must release the chunk that is already printed.  Otherwise a reader
+   that gives up part way through the response leaks one router's JSON per
+   failed send. */
+static esp_err_t stream_diagnostic_set(httpd_req_t *req, thread_diagnosticTlv_set_t *set)
+{
+    int sent = 0;
+    for (thread_diagnosticTlv_set_t *node = set->next; node; node = node->next) {
+        cJSON *obj = diagnosticTlv_node_convert2_json(node);
+        destroy_thread_diagnosticTlv_list(node->diagTlv_next); /* JSON has it now */
+        node->diagTlv_next = NULL;
+        if (!obj) {
+            continue; /* a response without TLVs: nothing to say about it */
+        }
+        char *chunk = cJSON_PrintUnformatted(obj);
+        cJSON_Delete(obj);
+        if (!chunk) {
+            return ESP_ERR_NO_MEM;
+        }
+        esp_err_t send_err = sent ? httpd_resp_sendstr_chunk(req, ",") : ESP_OK;
+        if (send_err == ESP_OK) {
+            send_err = httpd_resp_sendstr_chunk(req, chunk);
+        }
+        cJSON_free(chunk);
+        if (send_err != ESP_OK) {
+            return send_err;
+        }
+        sent++;
+    }
+    return ESP_OK;
+}
+
 static esp_err_t esp_otbr_network_diagnostics_get_handler(httpd_req_t *req)
 {
     ESP_RETURN_ON_FALSE(req, ESP_FAIL, WEB_TAG, "Failed to parse the diagnostics of http request");
     esp_err_t ret = ESP_OK;
-    cJSON *response = handle_ot_resource_network_diagnostics_request();
-    ESP_RETURN_ON_FALSE(response, ESP_FAIL, WEB_TAG, "Failed to handle openthread diagnostics request");
+    thread_diagnosticTlv_set_t *set = handle_ot_resource_network_diagnostics_collect();
+    ESP_RETURN_ON_FALSE(set, ESP_FAIL, WEB_TAG, "Failed to handle openthread diagnostics request");
 
-    /* Stream the JSON array in chunks to avoid allocating the entire
-       serialized string in RAM at once (can be 30-50KB for large networks). */
     ESP_GOTO_ON_ERROR(httpd_resp_set_type(req, "application/json"), exit, WEB_TAG, "Failed to set content type");
-
-    int array_size = cJSON_GetArraySize(response);
     ESP_GOTO_ON_ERROR(httpd_resp_sendstr_chunk(req, "["), exit, WEB_TAG, "Failed to send chunk");
-
-    for (int i = 0; i < array_size; i++) {
-        cJSON *detached = cJSON_DetachItemFromArray(response, 0);
-        char *chunk = cJSON_PrintUnformatted(detached);
-        cJSON_Delete(detached);
-        if (chunk) {
-            if (i > 0) {
-                ESP_GOTO_ON_ERROR(httpd_resp_sendstr_chunk(req, ","), exit, WEB_TAG, "Failed to send chunk");
-            }
-            esp_err_t send_err = httpd_resp_sendstr_chunk(req, chunk);
-            cJSON_free(chunk);
-            ESP_GOTO_ON_ERROR(send_err, exit, WEB_TAG, "Failed to send chunk");
-        }
-    }
-
+    ESP_GOTO_ON_ERROR(stream_diagnostic_set(req, set), exit, WEB_TAG, "Failed to send chunk");
     ESP_GOTO_ON_ERROR(httpd_resp_sendstr_chunk(req, "]"), exit, WEB_TAG, "Failed to send chunk");
     /* Signal end of chunked response */
     httpd_resp_sendstr_chunk(req, NULL);
 
 exit:
-    cJSON_Delete(response);
+    destroy_thread_diagnosticTlv_set(set);
     return ret;
 }
 
@@ -1185,31 +1205,14 @@ static esp_err_t esp_otbr_network_topology_get_handler(httpd_req_t *req)
 {
     ESP_RETURN_ON_FALSE(req, ESP_FAIL, WEB_TAG, "Failed to parse the diagnostics of http request");
     esp_err_t ret = ESP_OK;
-    cJSON *result = handle_ot_resource_network_diagnostics_request();
-    ESP_RETURN_ON_FALSE(result, ESP_FAIL, WEB_TAG, "Failed to get Thread Network Topology");
+    thread_diagnosticTlv_set_t *set = handle_ot_resource_network_diagnostics_collect();
+    ESP_RETURN_ON_FALSE(set, ESP_FAIL, WEB_TAG, "Failed to get Thread Network Topology");
 
-    /* Stream the wrapped JSON response in chunks to avoid allocating the
-       entire serialized string in RAM at once (can be 30-50 KB for large networks).
-       Format: {"error":0,"result":[<item>,<item>,...],"message":"Topology: Success"} */
+    /* Format: {"error":0,"result":[<item>,<item>,...],"message":"Topology: Success"} */
     ESP_GOTO_ON_ERROR(httpd_resp_set_type(req, "application/json"), exit, WEB_TAG, "Failed to set content type");
     ESP_GOTO_ON_ERROR(httpd_resp_sendstr_chunk(req, "{\"error\":0,\"result\":["), exit, WEB_TAG,
                       "Failed to send chunk");
-
-    int array_size = cJSON_GetArraySize(result);
-    for (int i = 0; i < array_size; i++) {
-        cJSON *detached = cJSON_DetachItemFromArray(result, 0);
-        char *chunk = cJSON_PrintUnformatted(detached);
-        cJSON_Delete(detached);
-        if (chunk) {
-            if (i > 0) {
-                ESP_GOTO_ON_ERROR(httpd_resp_sendstr_chunk(req, ","), exit, WEB_TAG, "Failed to send chunk");
-            }
-            esp_err_t send_err = httpd_resp_sendstr_chunk(req, chunk);
-            cJSON_free(chunk);
-            ESP_GOTO_ON_ERROR(send_err, exit, WEB_TAG, "Failed to send chunk");
-        }
-    }
-
+    ESP_GOTO_ON_ERROR(stream_diagnostic_set(req, set), exit, WEB_TAG, "Failed to send chunk");
     ESP_GOTO_ON_ERROR(httpd_resp_sendstr_chunk(req, "],\"message\":\"Topology: Success\"}"), exit, WEB_TAG,
                       "Failed to send chunk");
     httpd_resp_sendstr_chunk(req, NULL); /* end chunked response */
@@ -1218,7 +1221,7 @@ static esp_err_t esp_otbr_network_topology_get_handler(httpd_req_t *req)
     ESP_LOGI(WEB_TAG, "Thread diagnostic Tlv Complete.");
     ESP_LOGI(WEB_TAG, "<==========================================================>");
 exit:
-    cJSON_Delete(result);
+    destroy_thread_diagnosticTlv_set(set);
     return ret;
 }
 
