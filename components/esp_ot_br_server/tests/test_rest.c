@@ -5,6 +5,25 @@
 #include "rest_api.inc"
 #include "rest_web.inc"
 
+#undef assert
+#define assert(expression)                                               \
+    do {                                                                 \
+        if (!(expression)) {                                             \
+            printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #expression); \
+            fflush(stdout);                                              \
+            exit(1);                                                     \
+        }                                                                \
+    } while (0)
+
+static void run_case(const char *name, void (*test)(void))
+{
+    printf("RUN  %s\n", name);
+    fflush(stdout);
+    test();
+    printf("PASS %s\n", name);
+    fflush(stdout);
+}
+
 static httpd_req_t request(httpd_method_t method, const char *uri, const char *body, const char *accept,
                            const char *type)
 {
@@ -269,12 +288,12 @@ int main(void)
 {
     mock_reset();
     assert(esp_otbr_thread_rest_register(NULL) == ESP_OK && mock_registered == 28);
-    test_node();
-    test_route_matrix();
-    test_routing();
-    test_dataset();
-    test_actions();
-    test_commissioner_and_energy();
+    run_case("node", test_node);
+    run_case("route_matrix", test_route_matrix);
+    run_case("routing", test_routing);
+    run_case("dataset", test_dataset);
+    run_case("actions", test_actions);
+    run_case("commissioner_and_energy", test_commissioner_and_energy);
     rest_collection_delete(&s_rest_actions, NULL, esp_openthread_get_instance());
     rest_collection_delete(&s_rest_devices, NULL, esp_openthread_get_instance());
     rest_collection_delete(&s_rest_diagnostics, NULL, esp_openthread_get_instance());

@@ -2,16 +2,28 @@
 # SPDX-FileCopyrightText: 2026 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
 """Exercise the ESP-native C REST sections with deterministic SDK stubs."""
+import hashlib
 import json
 import os
 from pathlib import Path
 import re
 import subprocess
 import tempfile
+import urllib.error
+import urllib.request
+import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 IDF = Path(os.environ['IDF_PATH'])
 OT = IDF / 'components/openthread/openthread/include'
+# Same component idf_component.yml selects for IDF >= 6. The registry version
+# 1.7.19~2 is the latest release matching "^1.7.19".
+CJSON_URL = (
+    'https://components-file.espressif.com/components/espressif/cjson/'
+    '1.7.19~2/espressif__cjson-v1.7.19_2.zip'
+)
+CJSON_SHA256 = '2e13f18fa612d85eeec4001dee87b246beac64cf019bc28d4c4e2e1910adc7f1'
+CJSON_DOWNLOAD_TIMEOUT = 180
 
 
 def run(args, **kwargs):
@@ -23,6 +35,36 @@ def functions(node, result):
         result[node['name']] = node
     for child in node.get('inner', []):
         functions(child, result)
+
+
+def use_cjson(path):
+    print(f'Using cJSON sources: {path}', flush=True)
+    return path
+
+
+def cjson_dir(destination):
+    bundled = IDF / 'components/json/cJSON'
+    if (bundled / 'cJSON.c').is_file():
+        return use_cjson(bundled)
+    managed = ROOT.parents[1] / 'examples/basic_thread_border_router/managed_components'
+    for path in sorted(managed.glob('*cjson/cJSON')):
+        if (path / 'cJSON.c').is_file():
+            return use_cjson(path)
+    archive = destination / 'cjson.zip'
+    try:
+        with urllib.request.urlopen(CJSON_URL, timeout=CJSON_DOWNLOAD_TIMEOUT) as response:
+            archive.write_bytes(response.read())
+    except (TimeoutError, urllib.error.URLError) as error:
+        raise SystemExit(f'cJSON download failed after {CJSON_DOWNLOAD_TIMEOUT}s: {error}') from error
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    if digest != CJSON_SHA256:
+        raise SystemExit(f'cJSON zip sha256 mismatch: {digest}')
+    with zipfile.ZipFile(archive) as package:
+        package.extractall(destination)
+    extracted = destination / 'cJSON'
+    if not (extracted / 'cJSON.c').is_file():
+        raise SystemExit(f'cJSON sources missing after download from {CJSON_URL}')
+    return use_cjson(extracted)
 
 
 def main():
@@ -38,9 +80,6 @@ def main():
     base = base[:base.rfind('/*------')]
     header = header[header.index('/** Internal Thread REST contract'):header.index('/*---------------------------------------------------------------------\n            ESP Thread Border Router Wer Server REST API')]
     headers = set(re.findall(r'#include [<"](openthread/[^">]+)[">]', (ROOT / 'tests/host_platform.h').read_text()))
-    cjson = IDF / 'components/json/cJSON'
-    if not cjson.exists():
-        cjson = next((ROOT.parents[1] / 'examples/basic_thread_border_router/managed_components').glob('*cjson/cJSON'))
     with tempfile.TemporaryDirectory(prefix='esp-native-rest-tests-') as directory:
         directory = Path(directory)
         declarations = directory / 'declarations.cpp'
@@ -74,6 +113,7 @@ def main():
         (directory / 'openthread_mock.c').write_text(mocks)
         (directory / 'rest_api.inc').write_text(header + '\n' + base + '\n' + api)
         (directory / 'rest_web.inc').write_text(web)
+        cjson = cjson_dir(directory)
         flags = ['-std=gnu11', '-O1', '-g', '-fsanitize=address,undefined', '-fno-omit-frame-pointer',
                  '-I', ROOT / 'tests', '-I', directory, '-I', OT, '-I', cjson]
         binary = directory / 'test_rest'

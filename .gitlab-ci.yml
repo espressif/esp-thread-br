@@ -1,6 +1,7 @@
 stages:
   - pre_check
   - build
+  - test
   - docs
 
 workflow:
@@ -194,6 +195,22 @@ build_docs:
         - build-docs -l en
     tags:
         - build_docs
+
+host_rest_tests:
+    stage: test
+    image:
+        name: espressif/idf:latest
+        entrypoint: [""]
+    tags:
+        - build
+    # Host tests do not use firmware artifacts, so do not wait for the build stage.
+    needs: []
+    before_script:
+        - apt-get update
+        - DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends clang
+    script:
+        - . /opt/esp/idf/export.sh
+        - python3 components/esp_ot_br_server/tests/run_host_tests.py
 
 .deploy_docs_template:
     stage: docs
