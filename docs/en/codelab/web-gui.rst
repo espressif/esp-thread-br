@@ -2,32 +2,23 @@
 3.5. WEB GUI
 ************
 
-The ESP Thread Border Router is equipped with a user-friendly graphical user interface (GUI) that enables users to easily discover, configure, and monitor Thread networks through the web server.
+The ESP Thread Border Router provides a Web GUI to discover, configure, and monitor Thread networks.
 
 To access the Web GUI, enter ``http://esp-ot-br.local`` in your browser window.
-
-.. figure:: ../../images/thread-border-router-main-gui.png
-   :align: center
-   :alt: ESP-Thread-Border-Router GUI
-   :figclass: align-center
-
-   ESP-Thread-Border-Router GUI
 
 Prerequisites
 -------------
 
-To perform web gui, the follow device are required:
+To use the Web GUI, you need:
 
 - An ESP Thread Border Router
-- A Linux host machine with browser
+- A computer or mobile device with a web browser
 
 Enable the ``CONFIG_OPENTHREAD_BR_START_WEB`` option to enable the Web Server feature.
 
-The Thread Border Router and the Linux Host machine shall be connected to the same Wi-Fi network that has access to the Internet.
+Connect the browser device to the same local network as the Thread Border Router.
 
-When the ESP Thread Border Router starts up, it will print the website's access address to terminal of the Linux host.
-
-such as:
+When the ESP Thread Border Router starts up, it prints the Web GUI address to the serial console. For example:
 
 .. code-block::
 
@@ -43,48 +34,181 @@ All REST APIs can be accessed by visiting ``http://esp-ot-br.local`` with the AP
 Thread REST APIs
 ----------------
 
-The ESP Thread Border Router server provides the REST APIs that are compatible with `ot-br-posix <https://github.com/openthread/ot-br-posix>`_
+REST API version 2.0.0 follows the methods, JSON schemas, and action model of
+``ot-br-posix`` REST API 0.6.0. All endpoints below use the ESP
+HTTP server on port 80; no separate server on port 8081 is needed.
 
-The Thread REST APIs field include ``/diagnostics``, ``/node``, ``/node/rloc``, ``/node/rloc16``, ``/node/ext-address``, ``/node/state``, ``/node/network-name``, ``/node/leader-data``, ``/node/num-of-router``, ``/node/ext-panid``, ``/node/ba-id``, ``/node/dataset/active`` and ``/node/dataset/pending``.
+.. list-table:: Supported Thread REST endpoints
+   :header-rows: 1
+   :widths: 65 35
 
-Visit `openapi.yaml <https://github.com/espressif/esp-thread-br/blob/main/components/esp_ot_br_server/src/openapi.yaml>`_ for more information about the ESP Thread REST APIs.
+   * - Path
+     - Methods
+   * - ``/.well-known/thread/br-rest``
+     - GET, OPTIONS
+   * - ``/node``
+     - GET, DELETE, OPTIONS
+   * - ``/node/ba-id``, ``/node/rloc``, ``/node/rloc16``, ``/node/ext-address``
+     - GET, OPTIONS
+   * - ``/node/network-name``, ``/node/leader-data``, ``/node/num-of-router``, ``/node/ext-panid``
+     - GET, OPTIONS
+   * - ``/node/state``
+     - GET, PUT, OPTIONS
+   * - ``/node/dataset/active``, ``/node/dataset/pending``
+     - GET, PUT, OPTIONS
+   * - ``/node/commissioner/state``
+     - GET, PUT, OPTIONS
+   * - ``/node/commissioner/joiner``
+     - GET, POST, DELETE, OPTIONS
+   * - ``/node/coprocessor/version``
+     - GET, OPTIONS
+   * - ``/node/ba-epskc/state``
+     - GET, PUT, OPTIONS
+   * - ``/node/ba-epskc/key``
+     - GET, POST, DELETE, OPTIONS
+   * - ``/api/node``
+     - GET, OPTIONS
+   * - ``/api/actions``
+     - GET, POST, DELETE, OPTIONS
+   * - ``/api/actions/{id}``
+     - GET, DELETE, OPTIONS
+   * - ``/api/devices``, ``/api/devices/{id}``
+     - GET, DELETE, OPTIONS
+   * - ``/api/diagnostics``, ``/api/diagnostics/{id}``
+     - GET, DELETE, OPTIONS
 
-Entering this link to the browser of Linux machine:
+Visit `openapi.yaml <https://github.com/espressif/esp-thread-br/blob/main/components/esp_ot_br_server/src/openapi.yaml>`_
+for request bodies, response schemas, media types, and error codes.
+Commissioner support (``CONFIG_OPENTHREAD_COMMISSIONER``) is required for
+commissioning and energy scans. The firmware must include OpenThread mesh
+diagnostics and Border Agent ephemeral key support.
 
-.. code-block::
+For example, ``GET http://esp-ot-br.local/node`` returns:
 
-    http://esp-ot-br.local/node
-
-
-The following feedback result will display on the browser:
-
-.. code-block::
+.. code-block:: json
 
     {
-        "NetworkName":	"OpenThread-4c68",
-        "ExtPanId":	"f4f9437404558d34",
-        "ExtAddress":	"caf97e6ee990b047",
-        "RlocAddress":	"fd12:cb40:859f:287e:0:ff:fe00:3800",
-        "LeaderData":	{
-            "PartitionId":	61563841,
-            "Weighting":	64,
-            "DataVersion":	211,
-            "StableDataVersion":	110,
-            "LeaderRouterId":	14
-        },
-        "State":	4,
-        "Rloc16":	14336,
-        "NumOfRouter":	1
+        "baId": "00112233445566778899aabbccddeeff",
+        "baState": "",
+        "state": "leader",
+        "routerCount": 1,
+        "rlocAddress": "fd12:cb40:859f:287e:0:ff:fe00:3800",
+        "extAddress": "caf97e6ee990b047",
+        "networkName": "OpenThread-4c68",
+        "rloc16": "0x3800",
+        "routerId": 14,
+        "extPanId": "f4f9437404558d34",
+        "leaderData": {
+            "partitionId": 61563841,
+            "weighting": 64,
+            "dataVersion": 211,
+            "stableDataVersion": 110,
+            "leaderRouterId": 14
+        }
     }
 
+Individual scalar endpoints retain their scalar formats: for example,
+``/node/state`` returns a JSON string and ``/node/rloc16`` returns a JSON number.
+PUT ``/node/state`` accepts the JSON strings ``"enable"`` and ``"disable"``.
+DELETE ``/node`` erases persistent Thread settings, sends the HTTP response,
+and then restarts the ESP device to complete the factory reset.
 
-The access method for other APIs is similar to the one described above.
+Use ``Accept: application/json`` for structured datasets, or
+``Accept: text/plain`` for hex-encoded dataset TLVs. Set the matching
+``Content-Type`` when writing a dataset. Active datasets can be written while
+Thread is disabled. Pending datasets require an attached node and are registered
+with the leader using MGMT_PENDING_SET. ``If-None-Match: *`` makes either write
+conditional on the corresponding dataset being absent; an existing dataset
+returns HTTP 412. A pending write can wait up to 30 seconds for the leader's
+response before returning HTTP 504. The HTTP server handles requests serially,
+so other HTTP requests may wait during that operation.
+
+The ``/api/*`` collections support ``application/vnd.api+json`` and
+``application/json``, with the same media-type rules and ``fields[type]`` query
+parameters as POSIX. Actions run asynchronously and can be polled by ID.
+Supported action types are ``addThreadDeviceTask``, ``getEnergyScanTask``,
+``getNetworkDiagnosticTask``, ``resetNetworkDiagCounterTask``, and
+``updateDeviceCollectionTask``. For example:
+
+.. code-block:: shell
+
+    curl -H 'Accept: application/vnd.api+json' http://esp-ot-br.local/api/actions
+    curl http://esp-ot-br.local/node/coprocessor/version
+    curl -X POST -H 'Content-Type: application/vnd.api+json' \
+      -d '{"data":[{"type":"updateDeviceCollectionTask","attributes":{"maxAge":1.5,"maxRetries":3,"deviceCount":5,"timeout":5}}]}' \
+      http://esp-ot-br.local/api/actions
+
+Collections live in RAM and are cleared on reboot. HTTP request bodies are
+limited to 16 KiB; larger requests return HTTP 413. Each collection holds up to 200 items. Provision enough heap (PSRAM is recommended)
+for the network size and diagnostic history, and synchronize the system clock
+if collection timestamps are used externally.
+
+Migration from API 1.x
+^^^^^^^^^^^^^^^^^^^^^^
+
+Structured Thread REST objects now use lower camel case, including nested
+leader data and dataset fields. For example, ``NetworkName`` becomes
+``networkName``, ``NumOfRouter`` becomes ``routerCount``, and numeric ``State``
+becomes the role string ``state``. Update clients that consumed the old
+structured responses or sent datasets with capitalized keys.
+
+Clients should discover the API at ``/.well-known/thread/br-rest`` and use
+``/api/diagnostics`` for collection access.
+
 
 Web GUI REST APIs
--------------------
-The web server of ESP Thread Border Router provides the ``avaiable_network`` API to discover all the available Thread networks.
+-----------------
 
-Entering this link to the browser of Linux machine:
+The reference Web GUI uses the following APIs. Responses contain ``error``,
+``result``, and ``message`` fields. POST requests use ``application/json``.
+
+.. list-table:: Web GUI endpoints
+   :header-rows: 1
+   :widths: 15 30 55
+
+   * - Method
+     - Path
+     - Function
+   * - GET
+     - ``/get_properties``
+     - Read network status, identifiers, firmware versions, uptime, and free heap.
+   * - GET
+     - ``/available_network``
+     - Scan for nearby Thread networks.
+   * - POST
+     - ``/join_network``
+     - Join a scanned network using a network key or PSKd.
+   * - POST
+     - ``/form_network``
+     - Form a Thread network with the supplied parameters.
+   * - POST
+     - ``/commission``
+     - Start the commissioner and configure the supplied joiner PSKd.
+   * - GET
+     - ``/ipaddr``
+     - List Thread interface IPv6 addresses, their origins, and preferred status.
+   * - POST
+     - ``/add_ipaddr``, ``/delete_ipaddr``
+     - Add or remove an IPv6 address.
+   * - POST
+     - ``/add_prefix``, ``/delete_prefix``
+     - Add or remove an on-mesh prefix.
+   * - POST
+     - ``/ping``
+     - Send ICMPv6 echo requests and return replies and summary statistics.
+   * - GET
+     - ``/node_information``
+     - Read the border router's Thread node information.
+   * - GET
+     - ``/topology``
+     - Collect router diagnostics and child table entries for the topology view.
+
+The GUI also uses ``GET /node/state`` from the Thread REST APIs to check
+attachment and monitor network joining and formation.
+
+The ``/available_network`` API returns scan results, for example:
+
+Open this URL in a browser:
 
 .. code-block::
 
@@ -131,7 +255,7 @@ The feedback result may appear as follows:
 
 The web server of ESP Thread Border Router provides the ``get_properties`` API to check the Thread network status.
 
-Entering this link to the browser of Linux machine:
+Open this URL in a browser:
 
 .. code-block::
 
@@ -141,7 +265,7 @@ Entering this link to the browser of Linux machine:
 The feedback result may appear as follows:
 
 .. code-block::
-    
+
     {
         "error":	0,
         "result":	{
@@ -155,7 +279,14 @@ The feedback result may appear as follows:
             "Network:XPANID":	"f4f9437404558d34",
             "OpenThread:Version":	"openthread-esp32/f4446d8819-091f68ed7; esp32s3;  2023-05-05 13:05:02 UTC",
             "OpenThread:Version API":	"292",
-            "RCP:State":	"leader",
+            "Thread:Role":	"leader",
+            "Network:BorderAgentID":	"00112233445566778899aabbccddeeff",
+            "IDF:Version":	"v5.5.4",
+            "App:Version":	"1.0",
+            "App:ProjectName":	"esp_ot_br",
+            "App:CompileTime":	"Oct 09 2026 10:00:00",
+            "System:Uptime":	"00:10:00",
+            "System:FreeHeap":	"100 KB",
             "OpenThread:PSKc":	"e66d93364793c33985280abb639c214c",
             "RCP:Channel":	"12",
             "RCP:EUI64":	"6055f9f72eebfeff",
@@ -169,7 +300,7 @@ The feedback result may appear as follows:
 
 The web server of ESP Thread Border Router provides the ``node_information`` API to obtain the Thread node information.
 
-Entering this link to the browser of Linux machine:
+Open this URL in a browser:
 
 .. code-block::
 
@@ -201,9 +332,9 @@ The feedback result may appear as follows:
         "message":	"Get Node: Success"
     }
 
-The web server of ESP Thread Border Router provides the ``topology`` API to retrieve information about the relationship between Thread networks.
+The ``/topology`` API returns router diagnostics and child table entries from the current Thread network.
 
-Entering this link to the browser of a Linux machine:
+Open this URL in a browser:
 
 .. code-block::
 
@@ -212,71 +343,45 @@ Entering this link to the browser of a Linux machine:
 
 The feedback result may appear as follows:
 
-.. code-block::
+.. code-block:: json
 
     {
-	    "error":	0,
-        "result":	[{
-                "ExtAddress":	"caf97e6ee990b047",
-                "Rloc16":	14336,
-                "Mode":	{
-                    "RxOnWhenIdle":	1,
-                    "DeviceType":	1,
-                    "NetworkData":	1
+        "error": 0,
+        "result": [
+            {
+                "ExtAddress": "caf97e6ee990b047",
+                "Rloc16": 14336,
+                "Mode": {
+                    "RxOnWhenIdle": 1,
+                    "DeviceType": 1,
+                    "NetworkData": 1
                 },
-                "Connectivity":	{
-                    "ParentPriority":	0,
-                    "LinkQuality3":	0,
-                    "LinkQuality2":	0,
-                    "LinkQuality1":	0,
-                    "LeaderCost":	0,
-                    "IdSequence":	131,
-                    "ActiveRouters":	1,
-                    "SedBufferSize":	1280,
-                    "SedDatagramCount":	1
+                "Route": {
+                    "IdSequence": 131,
+                    "RouteData": [
+                        {
+                            "RouteId": 14,
+                            "LinkQualityOut": 0,
+                            "LinkQualityIn": 0,
+                            "RouteCost": 1
+                        }
+                    ]
                 },
-                "Route":	{
-                    "IdSequence":	131,
-                    "RouteData":	[{
-                            "RouteId":	14,
-                            "LinkQualityOut":	0,
-                            "LinkQualityIn":	0,
-                            "RouteCost":	1
-                        }]
+                "LeaderData": {
+                    "PartitionId": 61563841,
+                    "Weighting": 64,
+                    "DataVersion": 229,
+                    "StableDataVersion": 128,
+                    "LeaderRouterId": 14
                 },
-                "LeaderData":	{
-                    "PartitionId":	61563841,
-                    "Weighting":	64,
-                    "DataVersion":	229,
-                    "StableDataVersion":	128,
-                    "LeaderRouterId":	14
-                },
-                "NetworkData":	"08040b02cca60b0e8001010d09380000000500000e1003140040fd634dc9496e000105043800f10007021140030f0040fdf4f94374048d3401033800000b1981015d0d143800fd12cb40859f287ea8b5c617396ba4c2d11f03130060fd634dc9496e00020000000001033800e0",
-                "IP6AddressList":	[
-                                    "fd12:cb40:859f:287e:0:ff:fe00:fc11", 
-                                    "fd63:4dc9:496e:1:9967:1ba3:5fbf:f2e6", 
-                                    "fd12:cb40:859f:287e:0:ff:fe00:fc10", 
-                                    "fd12:cb40:859f:287e:0:ff:fe00:fc38", 
-                                    "fd12:cb40:859f:287e:0:ff:fe00:fc00", 
-                                    "fd12:cb40:859f:287e:0:ff:fe00:3800", 
-                                    "fd12:cb40:859f:287e:a8b5:c617:396b:a4c2", 
-                                    "fe80:0:0:0:c8f9:7e6e:e990:b047"
-                                    ],
-                "MACCounters":	{
-                    "IfInUnknownProtos":	0,
-                    "IfInErrors":	0,
-                    "IfOutErrors":	0,
-                    "IfInUcastPkts":	13,
-                    "IfInBroadcastPkts":	56,
-                    "IfInDiscards":	0,
-                    "IfOutUcastPkts":	0,
-                    "IfOutBroadcastPkts":	201,
-                    "IfOutDiscards":	0
-                },
-                "ChildTable":	[],
-                "ChannelPages":	"00"
-            }],
-        "message":	"Topology: Success"
+                "IP6AddressList": [
+                    "fd12:cb40:859f:287e:0:ff:fe00:3800",
+                    "fd12:cb40:859f:287e:a8b5:c617:396b:a4c2"
+                ],
+                "ChildTable": []
+            }
+        ],
+        "message": "Topology: Success"
     }
 
 
@@ -286,13 +391,11 @@ The JSON format of ``join_network`` API appears as follow:
 
 .. code-block::
 
-    { 
-        "credentialType":   "networkKeyType", 
-        "networkKey"    :   "00112233445566778899aabbccddeeff", 
-        "pskd"          :   "12345678", 
-        "prefix"        :   "fd11:22::", 
-        "defaultRoute"  :   1, 
-        "index"         :   1 
+    {
+        "credentialType":   "networkKeyType",
+        "networkKey"    :   "00112233445566778899aabbccddeeff",
+        "pskd"          :   "",
+        "index"         :   1
     }
 
 
@@ -304,15 +407,15 @@ The JSON format of ``form_network`` API appears as follow:
 
 .. code-block::
 
-    {                                                                      
-        "networkName"   :   "OpenThread-0x99",                             
-        "networkKey"    :   "00112233445566778899aabbccddeeff",            
-        "panId"         :   "0x1234",                                      
-        "channel"       :   16,                                            
-        "extPanId"      :   "1111111122222222",                            
-        "passphrase"    :   "j01Nme",                                      
-        "prefix"        :   "fd11:22::",                                   
-        "defaultRoute"  :   1                                              
+    {
+        "networkName"   :   "OpenThread-0x99",
+        "networkKey"    :   "00112233445566778899aabbccddeeff",
+        "panId"         :   "0x1234",
+        "channel"       :   16,
+        "extPanId"      :   "1111111122222222",
+        "passphrase"    :   "j01Nme",
+        "prefix"        :   "fd11:22::",
+        "defaultRoute"  :   true
     }
 
 
@@ -322,77 +425,64 @@ The JSON format of ``add_prefix`` API appears as follow:
 
 .. code-block::
 
-    { 
-        "prefix":       "fd11:22::", 
-        "defaultRoute":  1 
-    } 
+    {
+        "prefix":       "fd11:22::",
+        "defaultRoute":  true
+    }
 
 
 The JSON format of ``delete_prefix`` API appears as follow:
 
 .. code-block::
 
-    { 
-        "prefix":       "fd11:22::", 
+    {
+        "prefix":       "fd11:22::"
     }
+
+
+Additional Web GUI POST request examples:
+
+.. code-block:: json
+
+    {"pskd": "J01NME"}
+
+Use this body with ``/commission`` to supply a joiner PSKd.
+
+.. code-block:: json
+
+    {"address": "2001:db8::1"}
+
+Use this body with ``/add_ipaddr`` or ``/delete_ipaddr``. The Addresses page
+provides a Remove button for manually added addresses.
+
+.. code-block:: json
+
+    {"address": "fd11:22::1", "count": 4, "size": 32}
+
+Use this body with ``/ping``. Its result contains ``replies`` and ``statistics``,
+including packet counts, packet loss, and round-trip times.
 
 
 Web GUI Application Introduction
 ---------------------------------
-ESP Thread Border Router Web GUI provides practical functions including Thread network discovery, network formation, network settings, status query and network.
 
-Discover
-^^^^^^^^^
-By clicking the ``scan`` button, you can discover for the available Thread networks.
-The networks will be shown in the table with their network name, channel, extended panid, panid, Mac address, txpower and so on.
+The SDK provides a Web GUI implementation as a reference. Customers can customize
+the Web GUI or build their own interface using the REST APIs documented above.
 
-.. figure:: ../../images/thread-border-router-discover.png
-   :align: center
-   :alt: ESP-Thread-Border-Router Discovers Network
-   :figclass: align-center
+The Web GUI provides the following pages:
 
-Join
-^^^^^
-You can select an available network to join by clicking the ``join`` button.
-Enter the relevant information into the pop-up dialog, submit it, and the result will be displayed for you after a moment.
+- **Dashboard**: View Thread network status, IPv6 addresses, uptime, free heap, and device identifiers.
+- **Network**: Scan for Thread networks, join using a network key or PSKd, or form a new network with configurable parameters.
+- **Commissioner**: Start Thread commissioning with a supplied joiner PSKd.
+- **Addresses**: List IPv6 addresses, add or remove manual addresses, and add or remove on-mesh prefixes.
+- **Tools**: Send IPv6 pings with configurable count and payload size, and view replies, packet loss, and round-trip times.
+- **Topology**: Display routers and children, inspect node details, and ping a selected node.
+- **About**: View application, ESP-IDF, OpenThread, and radio coprocessor versions, and related resource links.
 
-.. figure:: ../../images/thread-border-router-join.png
-   :align: center
-   :alt: ESP-Thread-Border-Router Joins network
-   :figclass: align-center
+Network, Commissioner, Addresses, and Tools are grouped under the Management
+menu. Commissioner, Addresses, Tools, and Topology controls require the border
+router to be attached to a Thread network.
 
-Form
-^^^^^
-You can form a Thread network in this section. First, you need to fill network's parameters in the following table. Then click the ``Form Network`` button to submit the message. The server will validate the network information and form the network on success.
-
-.. figure:: ../../images/thread-border-router-form.png
-   :align: center
-   :alt: ESP-Thread-Border-Router Forms Network
-   :figclass: align-center
-
-Settings
-^^^^^^^^^
-The IPv6 network prefix for Thread can be set in the Settings section. To add it, click ``Add``, and to delete it, click ``Delete``.
-
-.. figure:: ../../images/thread-border-router-settings.png
-   :align: center
-   :alt: ESP-Thread-Border-Router Settings
-   :figclass: align-center
-
-Status
-^^^^^^^
-By clicking the ``OverView`` bar, the properties of Thread network will been displayed in the corresponding section.
-
-.. figure:: ../../images/thread-border-router-status.png
-   :align: center
-   :alt: ESP-Thread-Border-Router Properties
-   :figclass: align-center
-
-Topology
-^^^^^^^^^
-By clicking the ``Start Topology`` button, the topology of the current Thread node will be intuitively drawn and displayed.
-
-.. figure:: ../../images/thread-border-router-topology.png
-   :align: center
-   :alt: ESP-Thread-Border-Router Topology
-   :figclass: align-center
+With ``CONFIG_OPENTHREAD_BR_SOFTAP_SETUP`` enabled, a separate Wi-Fi setup portal
+is available in SoftAP setup mode to scan Wi-Fi networks and save connection
+credentials.

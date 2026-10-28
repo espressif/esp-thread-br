@@ -324,10 +324,7 @@ esp_err_t network_formation_param_json_convert2_struct(const cJSON *root, cJSON 
     }
 
     temp = cJSON_GetObjectItem(root, "defaultRoute");
-    if (temp && temp->type != cJSON_NULL)
-        param->default_route = (bool)cJSON_GetNumberValue(temp);
-    else
-        param->default_route = false;
+    param->default_route = cJSON_IsTrue(temp);
 
     return ret;
 }
@@ -399,10 +396,7 @@ esp_err_t network_join_param_json_convert2_struct(const cJSON *root, cJSON *log,
     }
 
     temp = cJSON_GetObjectItem(root, "defaultRoute");
-    if (temp && temp->type != cJSON_NULL && temp->valueint)
-        param->defaultRoute = true;
-    else
-        param->defaultRoute = false;
+    param->defaultRoute = cJSON_IsTrue(temp);
     return ESP_OK;
 }
 

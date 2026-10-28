@@ -18,12 +18,24 @@
 #include "esp_netif_net_stack.h"
 #include "esp_openthread.h"
 #include "esp_openthread_lock.h"
+#include "esp_random.h"
+#include "esp_timer.h"
 #include "malloc.h"
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
+#include <arpa/inet.h>
 #include <assert.h>
+#include <ctype.h>
+#include <inttypes.h>
+#include <math.h>
 #include <stdint.h>
+#include <sys/socket.h>
+#include <time.h>
+#include "freertos/task.h"
+#include "openthread/mesh_diag.h"
+#include "openthread/platform/radio.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/portmacro.h"
 #include "freertos/semphr.h"
@@ -750,7 +762,7 @@ otError handle_openthread_join_network_request(const cJSON *request, cJSON *log)
         config.mSlaac = true;
         config.mStable = true;
         config.mOnMesh = true;
-        config.mDefaultRoute = (bool)param.defaultRoute;
+        config.mDefaultRoute = param.defaultRoute;
         ERROR_EXIT(parse_ipv6_prefix_from_string(param.prefix, &config.mPrefix), exit, API_TAG,
                    "Failed to parse prefix");
         ERROR_EXIT(network_prefix_add(&config), exit, API_TAG, "Failed to add thread prefix");
@@ -1613,5 +1625,2193 @@ void handle_ot_resource_node_epskc_key_delete_request(void)
     esp_openthread_lock_acquire(portMAX_DELAY);
     otBorderAgentEphemeralKeyStop(esp_openthread_get_instance());
     esp_br_web_epskc_set_active_tap(NULL);
+    esp_openthread_lock_release();
+}
+
+/*----------------------------------------------------------------------
+                    Thread REST API operations
+----------------------------------------------------------------------*/
+
+#define THREAD_REST_COLLECTION_LIMIT 200
+#define THREAD_REST_JSON_API "application/vnd.api+json"
+
+/* All collections and action state are protected by the OpenThread lock. */
+typedef struct thread_rest_item {
+    struct thread_rest_item *next;
+    char id[37];
+    const char *type;
+    cJSON *attributes;
+    cJSON *relationships;
+    int64_t started;
+    int64_t deadline;
+    uint32_t attempts;
+    bool active;
+    bool complete;
+    bool deleted;
+    uint32_t token;
+    uint32_t query_remaining;
+    uint8_t query_type;
+    bool query_busy;
+    bool diagnostic_received;
+    bool joiner_registered;
+    cJSON *result;
+    otJoinerInfo joiner;
+} thread_rest_item_t;
+
+static thread_rest_item_t *s_rest_actions, *s_rest_devices, *s_rest_diagnostics;
+static thread_rest_item_t *s_rest_mesh_action, *s_rest_diag_action, *s_rest_energy_action;
+static thread_rest_item_t *s_rest_query_action;
+static uint32_t s_rest_next_token;
+static bool s_rest_commissioner_owned;
+static SemaphoreHandle_t s_rest_pending_done;
+static otError s_rest_pending_result;
+static bool s_rest_pending_busy;
+static TaskHandle_t s_rest_task;
+
+static const char *const s_rest_diag_names[35] = {
+    [0] = "extAddress",
+    [1] = "rloc16",
+    [2] = "mode",
+    [3] = "timeout",
+    [4] = "connectivity",
+    [5] = "route",
+    [6] = "leaderData",
+    [7] = "networkData",
+    [8] = "ipv6Addresses",
+    [9] = "macCounters",
+    [14] = "batteryLevel",
+    [15] = "supplyVoltage",
+    [16] = "childTable",
+    [17] = "channelPages",
+    [19] = "maxChildTimeout",
+    [20] = "lDevIdSubject",
+    [21] = "iDevIdCert",
+    [23] = "eui",
+    [24] = "threadVersion",
+    [25] = "vendorName",
+    [26] = "vendorModel",
+    [27] = "vendorSwVersion",
+    [28] = "threadStackVersion",
+    [29] = "children",
+    [30] = "childIpv6Addresses",
+    [31] = "routerNeighbors",
+    [34] = "mleCounters",
+};
+
+static cJSON *rest_get(const cJSON *json, const char *key)
+{
+    return cJSON_GetObjectItemCaseSensitive(json, key);
+}
+
+static const char *rest_string(const cJSON *json, const char *key)
+{
+    return cJSON_GetStringValue(rest_get(json, key));
+}
+
+/* Reuse the component's JSON helpers on private response objects. */
+static void rest_lower_keys(cJSON *json)
+{
+    for (cJSON *item = json ? json->child : NULL; item; item = item->next) {
+        if (item->string) {
+            if (!strcmp(item->string, "PSKc")) {
+                memcpy(item->string, "pskc", 5);
+            } else {
+                item->string[0] = (char)tolower((unsigned char)item->string[0]);
+            }
+        }
+        rest_lower_keys(item);
+    }
+}
+
+static cJSON *rest_hex(const uint8_t *bytes, size_t length)
+{
+    char text[OT_OPERATIONAL_DATASET_MAX_LENGTH * 2 + 1];
+    if (length > OT_OPERATIONAL_DATASET_MAX_LENGTH) {
+        return NULL;
+    }
+    for (size_t i = 0; i < length; i++) {
+        snprintf(text + i * 2, 3, "%02x", bytes[i]);
+    }
+    text[length * 2] = 0;
+    return cJSON_CreateString(text);
+}
+
+static int rest_unhex(const char *text, uint8_t *bytes, size_t capacity)
+{
+    if (!text) {
+        return -1;
+    }
+    size_t length = strlen(text);
+    if ((length & 1) || length / 2 > capacity) {
+        return -1;
+    }
+    for (size_t i = 0; i < length; i += 2) {
+        if (!isxdigit((unsigned char)text[i]) || !isxdigit((unsigned char)text[i + 1])) {
+            return -1;
+        }
+        char pair[3] = {text[i], text[i + 1], 0};
+        bytes[i / 2] = (uint8_t)strtoul(pair, NULL, 16);
+    }
+    return length / 2;
+}
+
+static cJSON *rest_rloc16(uint16_t rloc)
+{
+    char text[7];
+    snprintf(text, sizeof(text), "0x%04x", rloc);
+    return cJSON_CreateString(text);
+}
+
+static cJSON *rest_address(const otIp6Address *address)
+{
+    char text[INET6_ADDRSTRLEN];
+    return inet_ntop(AF_INET6, address->mFields.m8, text, sizeof(text)) ? cJSON_CreateString(text) : NULL;
+}
+
+static cJSON *rest_mode(otLinkModeConfig mode)
+{
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddBoolToObject(json, "rxOnWhenIdle", mode.mRxOnWhenIdle);
+    cJSON_AddBoolToObject(json, "fullThreadDevice", mode.mDeviceType);
+    cJSON_AddBoolToObject(json, "fullNetworkData", mode.mNetworkData);
+    return json;
+}
+
+static cJSON *rest_leader(const otLeaderData *data)
+{
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddNumberToObject(json, "partitionId", data->mPartitionId);
+    cJSON_AddNumberToObject(json, "weighting", data->mWeighting);
+    cJSON_AddNumberToObject(json, "dataVersion", data->mDataVersion);
+    cJSON_AddNumberToObject(json, "stableDataVersion", data->mStableDataVersion);
+    cJSON_AddNumberToObject(json, "leaderRouterId", data->mLeaderRouterId);
+    return json;
+}
+
+static unsigned rest_router_count(otInstance *instance)
+{
+    unsigned count = 0;
+    otRouterInfo info;
+    for (unsigned id = 0; id <= otThreadGetMaxRouterId(instance); id++) {
+        count += otThreadGetRouterInfo(instance, id, &info) == OT_ERROR_NONE;
+    }
+    return count;
+}
+
+static cJSON *rest_node(otInstance *instance)
+{
+    otBorderAgentId ba;
+    otLeaderData leader = {0};
+    if (otBorderAgentGetId(instance, &ba) != OT_ERROR_NONE) {
+        return NULL;
+    }
+    otThreadGetLeaderData(instance, &leader);
+    cJSON *json = cJSON_CreateObject();
+    uint16_t rloc = otThreadGetRloc16(instance);
+    cJSON_AddItemToObject(json, "baId", rest_hex(ba.mId, sizeof(ba.mId)));
+    cJSON_AddStringToObject(json, "baState", "");
+    cJSON_AddStringToObject(json, "state", s_ot_state[otThreadGetDeviceRole(instance)]);
+    cJSON_AddNumberToObject(json, "routerCount", rest_router_count(instance));
+    cJSON_AddItemToObject(json, "rlocAddress", rest_address(otThreadGetRloc(instance)));
+    cJSON_AddItemToObject(json, "extAddress", rest_hex(otLinkGetExtendedAddress(instance)->m8, 8));
+    cJSON_AddStringToObject(json, "networkName", otThreadGetNetworkName(instance));
+    cJSON_AddItemToObject(json, "rloc16", rest_rloc16(rloc));
+    if (!(rloc & 0x3ff)) {
+        cJSON_AddNumberToObject(json, "routerId", rloc >> 10);
+    }
+    cJSON_AddItemToObject(json, "leaderData", rest_leader(&leader));
+    cJSON_AddItemToObject(json, "extPanId", rest_hex(otThreadGetExtendedPanId(instance)->m8, 8));
+    return json;
+}
+
+static bool rest_number(const cJSON *json, double maximum)
+{
+    return cJSON_IsNumber(json) && isfinite(json->valuedouble) && json->valuedouble >= 0 &&
+        json->valuedouble <= maximum;
+}
+
+static bool rest_timestamp(const cJSON *json, otTimestamp *timestamp)
+{
+    if (!cJSON_IsObject(json)) {
+        return false;
+    }
+    cJSON *seconds = rest_get(json, "seconds"), *ticks = rest_get(json, "ticks");
+    cJSON *authoritative = rest_get(json, "authoritative");
+    if ((seconds && !rest_number(seconds, 281474976710655.0)) || (ticks && !rest_number(ticks, UINT16_MAX)) ||
+        (authoritative && !cJSON_IsBool(authoritative))) {
+        return false;
+    }
+    timestamp->mSeconds = seconds ? (uint64_t)seconds->valuedouble : 0;
+    timestamp->mTicks = ticks ? (uint16_t)ticks->valuedouble : 0;
+    timestamp->mAuthoritative = cJSON_IsTrue(authoritative);
+    return true;
+}
+
+/* Decode only Thread's lower-camel-case dataset contract. */
+static bool rest_parse_dataset(const cJSON *json, otOperationalDataset *dataset, bool pending)
+{
+    if (!cJSON_IsObject(json)) {
+        return false;
+    }
+    const cJSON *active = pending ? rest_get(json, "activeDataset") : json;
+    if (pending) {
+        cJSON *delay = rest_get(json, "delay"), *timestamp = rest_get(json, "pendingTimestamp");
+        if (!rest_number(delay, UINT32_MAX) || (!cJSON_IsObject(active) && !cJSON_IsString(active))) {
+            return false;
+        }
+        dataset->mDelay = (uint32_t)delay->valuedouble;
+        dataset->mComponents.mIsDelayPresent = true;
+        if (cJSON_IsString(active)) {
+            otOperationalDatasetTlvs tlvs;
+            int length = rest_unhex(active->valuestring, tlvs.mTlvs, sizeof(tlvs.mTlvs));
+            if (length <= 0) {
+                return false;
+            }
+            tlvs.mLength = length;
+            if (otDatasetParseTlvs(&tlvs, dataset) != OT_ERROR_NONE) {
+                return false;
+            }
+            dataset->mDelay = (uint32_t)delay->valuedouble;
+            dataset->mComponents.mIsDelayPresent = true;
+            active = NULL;
+        }
+        if (timestamp && !cJSON_IsNull(timestamp)) {
+            if (!rest_timestamp(timestamp, &dataset->mPendingTimestamp)) {
+                return false;
+            }
+            dataset->mComponents.mIsPendingTimestampPresent = true;
+        }
+    }
+    cJSON *value;
+#define REST_DATASET_NUMBER(key, member, flag, maximum)            \
+    if ((value = rest_get(active, key)) && !cJSON_IsNull(value)) { \
+        if (!rest_number(value, maximum)) {                        \
+            return false;                                          \
+        }                                                          \
+        dataset->member = value->valuedouble;                      \
+        dataset->mComponents.flag = true;                          \
+    }
+#define REST_DATASET_HEX(key, member, flag)                                                            \
+    if ((value = rest_get(active, key)) && !cJSON_IsNull(value)) {                                     \
+        if (rest_unhex(cJSON_GetStringValue(value), dataset->member.m8, sizeof(dataset->member.m8)) != \
+            sizeof(dataset->member.m8)) {                                                              \
+            return false;                                                                              \
+        }                                                                                              \
+        dataset->mComponents.flag = true;                                                              \
+    }
+    REST_DATASET_NUMBER("panId", mPanId, mIsPanIdPresent, UINT16_MAX);
+    REST_DATASET_NUMBER("channel", mChannel, mIsChannelPresent, UINT16_MAX);
+    REST_DATASET_NUMBER("channelMask", mChannelMask, mIsChannelMaskPresent, UINT32_MAX);
+    REST_DATASET_HEX("networkKey", mNetworkKey, mIsNetworkKeyPresent);
+    REST_DATASET_HEX("extPanId", mExtendedPanId, mIsExtendedPanIdPresent);
+    REST_DATASET_HEX("pskc", mPskc, mIsPskcPresent);
+#undef REST_DATASET_NUMBER
+#undef REST_DATASET_HEX
+    if ((value = rest_get(active, "activeTimestamp")) && !cJSON_IsNull(value)) {
+        if (!rest_timestamp(value, &dataset->mActiveTimestamp)) {
+            return false;
+        }
+        dataset->mComponents.mIsActiveTimestampPresent = true;
+    }
+    if ((value = rest_get(active, "networkName")) && !cJSON_IsNull(value)) {
+        const char *name = cJSON_GetStringValue(value);
+        if (!name || strlen(name) > OT_NETWORK_NAME_MAX_SIZE) {
+            return false;
+        }
+        strcpy(dataset->mNetworkName.m8, name);
+        dataset->mComponents.mIsNetworkNamePresent = true;
+    }
+    if ((value = rest_get(active, "meshLocalPrefix")) && !cJSON_IsNull(value)) {
+        const char *text = cJSON_GetStringValue(value);
+        otIp6Prefix prefix;
+        if (!text || otIp6PrefixFromString(text, &prefix) != OT_ERROR_NONE || prefix.mLength != 64) {
+            return false;
+        }
+        memcpy(dataset->mMeshLocalPrefix.m8, prefix.mPrefix.mFields.m8, 8);
+        dataset->mComponents.mIsMeshLocalPrefixPresent = true;
+    }
+    if ((value = rest_get(active, "securityPolicy")) && !cJSON_IsNull(value)) {
+        if (!cJSON_IsObject(value)) {
+            return false;
+        }
+        cJSON *rotation = rest_get(value, "rotationTime");
+        if (rotation && !rest_number(rotation, UINT16_MAX)) {
+            return false;
+        }
+        dataset->mSecurityPolicy.mRotationTime = rotation ? rotation->valuedouble : 0;
+#define REST_POLICY(key, field)                              \
+    {                                                        \
+        cJSON *flag = rest_get(value, key);                  \
+        if (flag && !cJSON_IsBool(flag)) {                   \
+            return false;                                    \
+        }                                                    \
+        dataset->mSecurityPolicy.field = cJSON_IsTrue(flag); \
+    }
+        REST_POLICY("obtainNetworkKey", mObtainNetworkKeyEnabled);
+        REST_POLICY("nativeCommissioning", mNativeCommissioningEnabled);
+        REST_POLICY("routers", mRoutersEnabled);
+        REST_POLICY("externalCommissioning", mExternalCommissioningEnabled);
+        REST_POLICY("commercialCommissioning", mCommercialCommissioningEnabled);
+        REST_POLICY("autonomousEnrollment", mAutonomousEnrollmentEnabled);
+        REST_POLICY("networkKeyProvisioning", mNetworkKeyProvisioningEnabled);
+        REST_POLICY("tobleLink", mTobleLinkEnabled);
+        REST_POLICY("nonCcmRouters", mNonCcmRoutersEnabled);
+#undef REST_POLICY
+        dataset->mComponents.mIsSecurityPolicyPresent = true;
+    }
+    return true;
+}
+
+static void rest_pending_callback(otError result, void *context)
+{
+    (void)context;
+    s_rest_pending_result = result;
+    s_rest_pending_busy = false;
+    xSemaphoreGive(s_rest_pending_done);
+}
+
+static void rest_dataset(const esp_br_thread_rest_request_t *request, esp_br_thread_rest_response_t *response,
+                         otInstance *instance, bool pending)
+{
+    otOperationalDataset dataset = {0};
+    otOperationalDatasetTlvs base = {0};
+    otError error;
+    if (request->method == HTTP_GET) {
+        if (!strcmp(request->accept, "text/plain")) {
+            error = pending ? otDatasetGetPendingTlvs(instance, &base) : otDatasetGetActiveTlvs(instance, &base);
+            if (error == OT_ERROR_NONE) {
+                response->text = malloc(base.mLength * 2 + 1);
+                if (!response->text) {
+                    response->status = 500;
+                    return;
+                }
+                for (unsigned i = 0; i < base.mLength; i++) {
+                    snprintf(response->text + i * 2, 3, "%02X", base.mTlvs[i]);
+                }
+                response->text[base.mLength * 2] = 0;
+                response->content_type = "text/plain";
+            }
+        } else {
+            error = pending ? otDatasetGetPending(instance, &dataset) : otDatasetGetActive(instance, &dataset);
+            if (error == OT_ERROR_NONE) {
+                response->json = pending ? PendingDataset2Json(dataset) : ActiveDataset2Json(dataset);
+                rest_lower_keys(response->json);
+                cJSON *active = pending ? rest_get(response->json, "activeDataset") : response->json;
+                if (dataset.mComponents.mIsMeshLocalPrefixPresent) {
+                    otIp6Address address = {0};
+                    char prefix[INET6_ADDRSTRLEN + 4];
+                    memcpy(address.mFields.m8, dataset.mMeshLocalPrefix.m8, 8);
+                    inet_ntop(AF_INET6, address.mFields.m8, prefix, sizeof(prefix) - 4);
+                    strcat(prefix, "/64");
+                    cJSON_ReplaceItemInObjectCaseSensitive(active, "meshLocalPrefix", cJSON_CreateString(prefix));
+                }
+            }
+        }
+        if (error != OT_ERROR_NONE) {
+            response->status = 204;
+        }
+        return;
+    }
+    const char *condition = request->if_none_match;
+    while (*condition == ' ' || *condition == '\t') {
+        condition++;
+    }
+    size_t condition_length = strlen(condition);
+    while (condition_length && (condition[condition_length - 1] == ' ' || condition[condition_length - 1] == '\t')) {
+        condition_length--;
+    }
+    bool only_absent = condition_length == 1 && *condition == '*';
+    if (condition_length && !only_absent) {
+        response->status = 400;
+        return;
+    }
+    otDeviceRole role = otThreadGetDeviceRole(instance);
+    if ((!pending && role != OT_DEVICE_ROLE_DISABLED) || (pending && role < OT_DEVICE_ROLE_CHILD)) {
+        response->status = 409;
+        return;
+    }
+    error = pending ? otDatasetGetPendingTlvs(instance, &base) : otDatasetGetActiveTlvs(instance, &base);
+    if (only_absent && error == OT_ERROR_NONE) {
+        response->status = 412;
+        return;
+    }
+    response->status = error == OT_ERROR_NOT_FOUND ? 201 : 200;
+    if (error == OT_ERROR_NOT_FOUND) {
+        if (pending) {
+            error = otDatasetGetActiveTlvs(instance, &base);
+        } else {
+            error = otDatasetCreateNewNetwork(instance, &dataset);
+            if (error == OT_ERROR_NONE) {
+                otDatasetConvertToTlvs(&dataset, &base);
+            }
+        }
+    }
+    if (error != OT_ERROR_NONE) {
+        response->status = 500;
+        return;
+    }
+    memset(&dataset, 0, sizeof(dataset));
+    if (!strcmp(request->content_type, "text/plain")) {
+        otOperationalDatasetTlvs update;
+        int length = rest_unhex(request->body, update.mTlvs, sizeof(update.mTlvs));
+        if (length < 0) {
+            response->status = 400;
+            return;
+        }
+        update.mLength = length;
+        if (otDatasetParseTlvs(&update, &dataset) != OT_ERROR_NONE) {
+            response->status = 500;
+            return;
+        }
+    } else {
+        cJSON *json = cJSON_Parse(request->body);
+        bool valid = rest_parse_dataset(json, &dataset, pending);
+        cJSON_Delete(json);
+        if (!valid) {
+            response->status = 400;
+            return;
+        }
+        if (pending && !dataset.mComponents.mIsPendingTimestampPresent) {
+            struct timespec now;
+            otOperationalDataset previous;
+            if (clock_gettime(CLOCK_REALTIME, &now)) {
+                response->status = 500;
+                return;
+            }
+            dataset.mPendingTimestamp.mSeconds = now.tv_sec & UINT64_C(0xffffffffffff);
+            dataset.mPendingTimestamp.mTicks = ((uint64_t)now.tv_nsec * 32768 / 1000000000) & 0x7fff;
+            if (otDatasetParseTlvs(&base, &previous) == OT_ERROR_NONE &&
+                previous.mComponents.mIsPendingTimestampPresent &&
+                (dataset.mPendingTimestamp.mSeconds < previous.mPendingTimestamp.mSeconds ||
+                 (dataset.mPendingTimestamp.mSeconds == previous.mPendingTimestamp.mSeconds &&
+                  dataset.mPendingTimestamp.mTicks <= previous.mPendingTimestamp.mTicks))) {
+                dataset.mPendingTimestamp.mSeconds =
+                    (previous.mPendingTimestamp.mSeconds + 1) & UINT64_C(0xffffffffffff);
+                dataset.mPendingTimestamp.mTicks = 0;
+            }
+            dataset.mComponents.mIsPendingTimestampPresent = true;
+        }
+    }
+    if (otDatasetUpdateTlvs(&dataset, &base) != OT_ERROR_NONE) {
+        response->status = 500;
+        return;
+    }
+    if (!pending) {
+        if (otDatasetSetActiveTlvs(instance, &base) != OT_ERROR_NONE) {
+            response->status = 500;
+        }
+        return;
+    }
+    if (otDatasetParseTlvs(&base, &dataset) != OT_ERROR_NONE) {
+        response->status = 500;
+        return;
+    }
+    if (!dataset.mComponents.mIsDelayPresent) {
+        response->status = 400;
+        return;
+    }
+    if (s_rest_pending_busy) {
+        response->status = 409;
+        return;
+    }
+    xSemaphoreTake(s_rest_pending_done, 0);
+    otOperationalDataset empty = {0};
+    s_rest_pending_busy = true;
+    error = otDatasetSendMgmtPendingSet(instance, &empty, base.mTlvs, base.mLength, rest_pending_callback, NULL);
+    if (error != OT_ERROR_NONE) {
+        s_rest_pending_busy = false;
+        response->status =
+            error == OT_ERROR_ALREADY || error == OT_ERROR_BUSY || error == OT_ERROR_INVALID_STATE ? 409 : 500;
+        return;
+    }
+    /* The permanent callback context also absorbs responses after the HTTP timeout. */
+    esp_openthread_lock_release();
+    bool done = xSemaphoreTake(s_rest_pending_done, pdMS_TO_TICKS(30000)) == pdTRUE;
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    if (!done || s_rest_pending_result == OT_ERROR_RESPONSE_TIMEOUT) {
+        response->status = 504;
+        response->detail = "no response from leader";
+    } else if (s_rest_pending_result == OT_ERROR_REJECTED) {
+        response->status = 409;
+        response->detail = "rejected by leader";
+    } else if (s_rest_pending_result == OT_ERROR_ABORT) {
+        response->status = 409;
+        response->detail = "no longer attached";
+    } else if (s_rest_pending_result != OT_ERROR_NONE) {
+        response->status = 500;
+    }
+}
+
+static bool rest_discerner(const char *text, otJoinerDiscerner *discerner)
+{
+    if (!text || !strchr(text, '/')) {
+        return false;
+    }
+    char *end;
+    uint64_t value = strtoull(text, &end, 0);
+    if (*end != '/') {
+        return false;
+    }
+    unsigned long bits = strtoul(end + 1, &end, 10);
+    if (*end || bits == 0 || bits > 64) {
+        return false;
+    }
+    discerner->mLength = bits;
+    discerner->mValue = value;
+    return true;
+}
+
+static bool rest_joiner_id(const char *text, otJoinerInfo *joiner)
+{
+    if (!text) {
+        return false;
+    }
+    if (!strcmp(text, "*")) {
+        joiner->mType = OT_JOINER_INFO_TYPE_ANY;
+        return true;
+    }
+    if (strchr(text, '/')) {
+        joiner->mType = OT_JOINER_INFO_TYPE_DISCERNER;
+        return rest_discerner(text, &joiner->mSharedId.mDiscerner);
+    }
+    joiner->mType = OT_JOINER_INFO_TYPE_EUI64;
+    return rest_unhex(text, joiner->mSharedId.mEui64.m8, 8) == 8;
+}
+
+static bool rest_parse_joiner(const cJSON *json, otJoinerInfo *joiner)
+{
+    if (!cJSON_IsObject(json)) {
+        return false;
+    }
+    memset(joiner, 0, sizeof(*joiner));
+    const char *pskd = rest_string(json, "pskd");
+    if (!pskd || strlen(pskd) > OT_JOINER_MAX_PSKD_LENGTH) {
+        return false;
+    }
+    strcpy(joiner->mPskd.m8, pskd);
+    joiner->mExpirationTime = 60;
+    cJSON *timeout = rest_get(json, "timeout");
+    if (timeout) {
+        if (!rest_number(timeout, UINT32_MAX)) {
+            return false;
+        }
+        joiner->mExpirationTime = timeout->valuedouble;
+    }
+    const char *keys[] = {"joinerId", "eui", "discerner"};
+    unsigned ids = 0;
+    for (unsigned i = 0; i < 3; i++) {
+        cJSON *value = rest_get(json, keys[i]);
+        if (value && (++ids > 1 || !rest_joiner_id(cJSON_GetStringValue(value), joiner))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static cJSON *rest_joiner_json(const otJoinerInfo *joiner)
+{
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "pskd", joiner->mPskd.m8);
+    cJSON_AddNumberToObject(json, "timeout", joiner->mExpirationTime);
+    if (joiner->mType == OT_JOINER_INFO_TYPE_EUI64) {
+        cJSON_AddItemToObject(json, "eui", rest_hex(joiner->mSharedId.mEui64.m8, 8));
+    } else if (joiner->mType == OT_JOINER_INFO_TYPE_DISCERNER) {
+        char text[28];
+        snprintf(text, sizeof(text), "0x%016" PRIx64 "/%u", joiner->mSharedId.mDiscerner.mValue,
+                 joiner->mSharedId.mDiscerner.mLength);
+        cJSON_AddStringToObject(json, "discerner", text);
+    } else {
+        cJSON_AddStringToObject(json, "joinerId", "*");
+    }
+    return json;
+}
+
+static otError rest_add_joiner(otInstance *instance, const otJoinerInfo *joiner)
+{
+    if (joiner->mType == OT_JOINER_INFO_TYPE_DISCERNER) {
+        return otCommissionerAddJoinerWithDiscerner(instance, &joiner->mSharedId.mDiscerner, joiner->mPskd.m8,
+                                                    joiner->mExpirationTime);
+    }
+    const otExtAddress *address = joiner->mType == OT_JOINER_INFO_TYPE_EUI64 ? &joiner->mSharedId.mEui64 : NULL;
+    static const uint8_t zero[8];
+    if (address && !memcmp(address->m8, zero, 8)) {
+        address = NULL;
+    }
+    return otCommissionerAddJoiner(instance, address, joiner->mPskd.m8, joiner->mExpirationTime);
+}
+
+static void rest_remove_joiner(otInstance *instance, const otJoinerInfo *joiner)
+{
+    if (joiner->mType == OT_JOINER_INFO_TYPE_DISCERNER) {
+        otCommissionerRemoveJoinerWithDiscerner(instance, &joiner->mSharedId.mDiscerner);
+    } else {
+        otCommissionerRemoveJoiner(instance,
+                                   joiner->mType == OT_JOINER_INFO_TYPE_EUI64 ? &joiner->mSharedId.mEui64 : NULL);
+    }
+}
+
+static void rest_uuid(char id[37])
+{
+    uint8_t bytes[16];
+    esp_fill_random(bytes, sizeof(bytes));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    snprintf(id, 37, "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x", bytes[0], bytes[1],
+             bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7], bytes[8], bytes[9], bytes[10], bytes[11],
+             bytes[12], bytes[13], bytes[14], bytes[15]);
+}
+
+static void rest_created(cJSON *attributes)
+{
+    char timestamp[32];
+    time_t now = time(NULL);
+    struct tm utc;
+    gmtime_r(&now, &utc);
+    strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", &utc);
+    cJSON_AddStringToObject(attributes, "created", timestamp);
+}
+
+static thread_rest_item_t *rest_find(thread_rest_item_t *head, const char *id)
+{
+    for (; head; head = head->next) {
+        if (!head->deleted && !strcmp(head->id, id)) {
+            return head;
+        }
+    }
+    return NULL;
+}
+
+static unsigned rest_count(thread_rest_item_t *head)
+{
+    unsigned count = 0;
+    for (; head; head = head->next) {
+        count += !head->deleted;
+    }
+    return count;
+}
+
+static void rest_item_free(thread_rest_item_t *item)
+{
+    cJSON_Delete(item->attributes);
+    cJSON_Delete(item->relationships);
+    cJSON_Delete(item->result);
+    free(item);
+}
+
+static thread_rest_item_t *rest_new(thread_rest_item_t **head, const char *type, const char *id, cJSON *attributes)
+{
+    if (!attributes) {
+        return NULL;
+    }
+    thread_rest_item_t *item = calloc(1, sizeof(*item));
+    if (!item) {
+        cJSON_Delete(attributes);
+        return NULL;
+    }
+    if (id) {
+        strlcpy(item->id, id, sizeof(item->id));
+    } else {
+        rest_uuid(item->id);
+    }
+    item->token = ++s_rest_next_token;
+    if (!item->token) {
+        item->token = ++s_rest_next_token;
+    }
+    item->type = type;
+    item->attributes = attributes;
+    rest_created(attributes);
+    item->started = esp_timer_get_time();
+    /* Evict the oldest inactive entry. In-flight callback contexts are retained. */
+    if (rest_count(*head) >= THREAD_REST_COLLECTION_LIMIT) {
+        thread_rest_item_t **oldest = NULL;
+        for (thread_rest_item_t **link = head; *link; link = &(*link)->next) {
+            if (!(*link)->active && (head != &s_rest_actions || (*link)->complete)) {
+                oldest = link;
+            }
+        }
+        if (!oldest) {
+            rest_item_free(item);
+            return NULL;
+        }
+        thread_rest_item_t *evicted = *oldest;
+        *oldest = evicted->next;
+        rest_item_free(evicted);
+    }
+    item->next = *head;
+    *head = item;
+    return item;
+}
+
+static void rest_replace(cJSON *json, const char *key, cJSON *value)
+{
+    cJSON_DeleteItemFromObjectCaseSensitive(json, key);
+    cJSON_AddItemToObject(json, key, value);
+}
+
+static void rest_status(thread_rest_item_t *action, const char *status)
+{
+    rest_replace(action->attributes, "status", cJSON_CreateString(status));
+    action->complete = strcmp(status, "pending") && strcmp(status, "active") && strcmp(status, "waiting") &&
+        strcmp(status, "undiscovered") && strcmp(status, "attempted");
+    if (action->complete) {
+        cJSON_DeleteItemFromObjectCaseSensitive(action->attributes, "timeout");
+    }
+}
+
+static void rest_result(thread_rest_item_t *action, const thread_rest_item_t *result)
+{
+    cJSON_Delete(action->relationships);
+    action->relationships = cJSON_CreateObject();
+    cJSON *relation = cJSON_AddObjectToObject(action->relationships, "result");
+    cJSON *data = cJSON_AddObjectToObject(relation, "data");
+    cJSON_AddStringToObject(data, "type", "diagnostics");
+    cJSON_AddStringToObject(data, "id", result->id);
+}
+
+static void rest_self(otInstance *instance)
+{
+    cJSON *hex = rest_hex(otLinkGetExtendedAddress(instance)->m8, 8);
+    if (!hex) {
+        return;
+    }
+    thread_rest_item_t *self = rest_find(s_rest_devices, hex->valuestring);
+    if (!self) {
+        cJSON *attributes = rest_node(instance);
+        if (!attributes) {
+            cJSON_Delete(hex);
+            return;
+        }
+        uint8_t zero[8] = {0};
+        otIp6Address zero_address = {0};
+        cJSON_AddItemToObject(attributes, "mlEidIid", rest_hex(zero, 8));
+        cJSON_AddItemToObject(attributes, "omrIpv6Address", rest_address(&zero_address));
+        cJSON_AddStringToObject(attributes, "hostname", "");
+        cJSON_AddStringToObject(attributes, "role", "");
+        otLinkModeConfig mode = {0};
+        cJSON_AddItemToObject(attributes, "mode", rest_mode(mode));
+        rest_new(&s_rest_devices, "threadBorderRouter", hex->valuestring, attributes);
+    }
+    cJSON_Delete(hex);
+}
+
+static bool rest_destination_valid(const cJSON *attributes)
+{
+    const char *destination = rest_string(attributes, "destination");
+    const char *type = rest_string(attributes, "destinationType");
+    if (!destination) {
+        return false;
+    }
+    size_t length = strlen(destination);
+    if (!type) {
+        return length == 6 || length == 16;
+    }
+    return ((!strcmp(type, "extended") || !strcmp(type, "mleid")) && length == 16) ||
+        (!strcmp(type, "rloc") && length == 6);
+}
+
+static bool rest_destination(otInstance *instance, const cJSON *attributes, otIp6Address *address)
+{
+    const char *text = rest_string(attributes, "destination");
+    const char *type = rest_string(attributes, "destinationType");
+    if (!text) {
+        *address = *otThreadGetRealmLocalAllThreadNodesMulticastAddress(instance);
+        return true;
+    }
+    if (!rest_destination_valid(attributes)) {
+        return false;
+    }
+    if (!type) {
+        type = strlen(text) == 6 ? "rloc" : "extended";
+    }
+    *address = *otThreadGetRloc(instance);
+    if (!strcmp(type, "rloc")) {
+        char *end;
+        unsigned long rloc = strtoul(text, &end, 16);
+        if (*end || rloc > UINT16_MAX) {
+            return false;
+        }
+        address->mFields.m8[14] = rloc >> 8;
+        address->mFields.m8[15] = rloc;
+        return true;
+    }
+    if (!strcmp(type, "mleid")) {
+        return rest_unhex(text, address->mFields.m8 + 8, 8) == 8;
+    }
+    thread_rest_item_t *device = rest_find(s_rest_devices, text);
+    const char *iid = device ? rest_string(device->attributes, "mlEidIid") : NULL;
+    if (iid && rest_unhex(iid, address->mFields.m8 + 8, 8) == 8) {
+        return true;
+    }
+    const char *rloc = device ? rest_string(device->attributes, "rloc16") : NULL;
+    if (rloc) {
+        unsigned value = strtoul(rloc, NULL, 16);
+        address->mFields.m8[14] = value >> 8;
+        address->mFields.m8[15] = value;
+        return true;
+    }
+    cJSON *self = rest_hex(otLinkGetExtendedAddress(instance)->m8, 8);
+    bool local = self && !strcmp(text, self->valuestring);
+    cJSON_Delete(self);
+    return local;
+}
+
+static int rest_diag_type(const char *name)
+{
+    if (!name) {
+        return -1;
+    }
+    for (unsigned i = 0; i < 35; i++) {
+        if (s_rest_diag_names[i] && !strcmp(s_rest_diag_names[i], name)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static bool rest_validate_action(const cJSON *item)
+{
+    const char *type = rest_string(item, "type");
+    cJSON *attributes = rest_get(item, "attributes");
+    cJSON *timeout = rest_get(attributes, "timeout");
+    if (!type || !cJSON_IsObject(attributes) || (timeout && !cJSON_IsNumber(timeout))) {
+        return false;
+    }
+    if (!strcmp(type, "addThreadDeviceTask")) {
+        otJoinerInfo joiner;
+        if (!rest_parse_joiner(attributes, &joiner)) {
+            return false;
+        }
+        if (!rest_get(attributes, "eui") && !rest_get(attributes, "joinerId") && !rest_get(attributes, "discerner")) {
+            return false;
+        }
+        size_t length = strlen(joiner.mPskd.m8);
+        if (length < 6 || length > 32) {
+            return false;
+        }
+        for (const char *c = joiner.mPskd.m8; *c; c++) {
+            if (!strchr("0123456789ABCDEFGHJKLMNPRSTUVWXY", *c)) {
+                return false;
+            }
+        }
+        return true;
+    }
+    if (!timeout) {
+        return false;
+    }
+    if (!strcmp(type, "updateDeviceCollectionTask")) {
+        return cJSON_IsNumber(rest_get(attributes, "maxAge")) && cJSON_IsNumber(rest_get(attributes, "maxRetries")) &&
+            cJSON_IsNumber(rest_get(attributes, "deviceCount"));
+    }
+    bool reset = !strcmp(type, "resetNetworkDiagCounterTask");
+    if (!reset || rest_get(attributes, "destination")) {
+        if (!rest_destination_valid(attributes)) {
+            return false;
+        }
+    }
+    if (!strcmp(type, "getEnergyScanTask")) {
+        cJSON *mask = rest_get(attributes, "channelMask"), *channel;
+        if (!cJSON_IsArray(mask) || !cJSON_IsNumber(rest_get(attributes, "count")) ||
+            !cJSON_IsNumber(rest_get(attributes, "period")) || !cJSON_IsNumber(rest_get(attributes, "scanDuration"))) {
+            return false;
+        }
+        cJSON_ArrayForEach(channel, mask)
+        {
+            if (!cJSON_IsNumber(channel) || channel->valueint < 11 || channel->valueint > 26) {
+                return false;
+            }
+        }
+        return true;
+    }
+    if (reset || !strcmp(type, "getNetworkDiagnosticTask")) {
+        cJSON *types = rest_get(attributes, "types"), *name;
+        if (!cJSON_IsArray(types)) {
+            return false;
+        }
+        cJSON_ArrayForEach(name, types)
+        {
+            int id = rest_diag_type(cJSON_GetStringValue(name));
+            if (id < 0 || (reset && id != 9 && id != 34)) {
+                return false;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+/* Discovery diagnostics also identify end devices, which are absent from a
+ * router-only topology response. The token discards late responses after delete. */
+static void rest_discover_devices_callback(otError error, otMessage *message, const otMessageInfo *info, void *context)
+{
+    (void)info;
+    thread_rest_item_t *action = s_rest_mesh_action;
+    if (!action || action->complete || (uintptr_t)context != action->token || error != OT_ERROR_NONE || !message) {
+        return;
+    }
+    otNetworkDiagIterator iterator = OT_NETWORK_DIAGNOSTIC_ITERATOR_INIT;
+    otNetworkDiagTlv tlv;
+    cJSON *attributes = cJSON_CreateObject();
+    char id[17] = "";
+    otInstance *instance = esp_openthread_get_instance();
+    while (otThreadGetNextDiagnosticTlv(message, &iterator, &tlv) == OT_ERROR_NONE) {
+        if (tlv.mType == 0) {
+            cJSON *hex = rest_hex(tlv.mData.mExtAddress.m8, 8);
+            if (hex) {
+                strlcpy(id, hex->valuestring, sizeof(id));
+                cJSON_AddItemToObject(attributes, "extAddress", hex);
+            }
+        } else if (tlv.mType == 1) {
+            cJSON_AddItemToObject(attributes, "rloc16", rest_rloc16(tlv.mData.mAddr16));
+            cJSON_AddStringToObject(attributes, "role", tlv.mData.mAddr16 & 0x3ff ? "child" : "router");
+        } else if (tlv.mType == 2) {
+            cJSON_AddItemToObject(attributes, "mode", rest_mode(tlv.mData.mMode));
+        } else if (tlv.mType == 8) {
+            for (unsigned i = 0; i < tlv.mData.mIp6AddrList.mCount; i++) {
+                const otIp6Address *address = &tlv.mData.mIp6AddrList.mList[i];
+                if (!memcmp(address->mFields.m8, otThreadGetMeshLocalPrefix(instance)->m8, 8)) {
+                    const uint8_t rloc_iid[] = {0, 0, 0, 0xff, 0xfe, 0};
+                    if (memcmp(address->mFields.m8 + 8, rloc_iid, 6)) {
+                        rest_replace(attributes, "mlEidIid", rest_hex(address->mFields.m8 + 8, 8));
+                    }
+                } else if (!(address->mFields.m8[0] == 0xfe && (address->mFields.m8[1] & 0xc0) == 0x80) &&
+                           address->mFields.m8[0] != 0xff) {
+                    rest_replace(attributes, "omrIpv6Address", rest_address(address));
+                }
+            }
+        }
+    }
+    if (!*id) {
+        cJSON_Delete(attributes);
+        return;
+    }
+    thread_rest_item_t *device = rest_find(s_rest_devices, id);
+    if (device) {
+        for (cJSON *field = attributes->child; field; field = field->next) {
+            rest_replace(device->attributes, field->string, cJSON_Duplicate(field, true));
+        }
+        device->started = esp_timer_get_time();
+        cJSON_Delete(attributes);
+    } else {
+        uint8_t zero[8] = {0};
+        otIp6Address zero_address = {0};
+        if (!rest_get(attributes, "mlEidIid")) {
+            cJSON_AddItemToObject(attributes, "mlEidIid", rest_hex(zero, 8));
+        }
+        if (!rest_get(attributes, "omrIpv6Address")) {
+            cJSON_AddItemToObject(attributes, "omrIpv6Address", rest_address(&zero_address));
+        }
+        cJSON_AddStringToObject(attributes, "hostname", "");
+        rest_new(&s_rest_devices, "threadDevice", id, attributes);
+    }
+}
+
+static void rest_mesh_callback(otError error, otMeshDiagRouterInfo *router, void *context)
+{
+    (void)context;
+    thread_rest_item_t *action = s_rest_mesh_action;
+    if (!action) {
+        return;
+    }
+    if (router && !action->complete) {
+        cJSON *id = rest_hex(router->mExtAddress.m8, 8);
+        if (id) {
+            thread_rest_item_t *device = rest_find(s_rest_devices, id->valuestring);
+            if (!device) {
+                device = rest_new(&s_rest_devices, "threadDevice", id->valuestring, cJSON_CreateObject());
+            }
+            if (device) {
+                rest_replace(device->attributes, "extAddress", cJSON_Duplicate(id, true));
+                rest_replace(device->attributes, "rloc16", rest_rloc16(router->mRloc16));
+                rest_replace(device->attributes, "role", cJSON_CreateString(router->mIsLeader ? "leader" : "router"));
+                rest_replace(device->attributes, "hostname", cJSON_CreateString(""));
+                otIp6Address address;
+                uint8_t zero[8] = {0};
+                rest_replace(device->attributes, "mlEidIid", rest_hex(zero, 8));
+                memset(&address, 0, sizeof(address));
+                rest_replace(device->attributes, "omrIpv6Address", rest_address(&address));
+                while (router->mIp6AddrIterator &&
+                       otMeshDiagGetNextIp6Address(router->mIp6AddrIterator, &address) == OT_ERROR_NONE) {
+                    if (!memcmp(address.mFields.m8, otThreadGetMeshLocalPrefix(esp_openthread_get_instance())->m8, 8)) {
+                        if (address.mFields.m8[11] != 0xff || address.mFields.m8[12] != 0xfe) {
+                            rest_replace(device->attributes, "mlEidIid", rest_hex(address.mFields.m8 + 8, 8));
+                        }
+                    } else if (!(address.mFields.m8[0] == 0xfe && (address.mFields.m8[1] & 0xc0) == 0x80)) {
+                        rest_replace(device->attributes, "omrIpv6Address", rest_address(&address));
+                    }
+                }
+                otLinkModeConfig mode = {.mRxOnWhenIdle = true, .mDeviceType = true, .mNetworkData = true};
+                rest_replace(device->attributes, "mode", rest_mode(mode));
+            }
+            cJSON_Delete(id);
+        }
+    }
+    if (error != OT_ERROR_PENDING) {
+        action->active = false;
+        s_rest_mesh_action = NULL;
+        unsigned wanted = rest_get(action->attributes, "deviceCount")->valueint;
+        unsigned retries = rest_get(action->attributes, "maxRetries")->valueint;
+        if (error != OT_ERROR_NONE) {
+            rest_status(action, "failed");
+        } else if (action->complete) { /* Cancellation already recorded. */
+        } else if (rest_count(s_rest_devices) >= wanted || action->attempts > retries) {
+            rest_status(action, "completed");
+        } else {
+            rest_status(action, "pending");
+        }
+    }
+}
+
+static cJSON *rest_diag_tlv(const otNetworkDiagTlv *tlv)
+{
+    cJSON *json = NULL;
+    switch (tlv->mType) {
+    case 0:
+        return rest_hex(tlv->mData.mExtAddress.m8, 8);
+    case 1:
+        return rest_rloc16(tlv->mData.mAddr16);
+    case 2:
+        return rest_mode(tlv->mData.mMode);
+    case 3:
+        return cJSON_CreateNumber(tlv->mData.mTimeout);
+    case 4: {
+        const otNetworkDiagConnectivity *c = &tlv->mData.mConnectivity;
+        json = cJSON_CreateObject();
+#define REST_DIAG_NUMBER(key, field) cJSON_AddNumberToObject(json, key, c->field)
+        REST_DIAG_NUMBER("parentPriority", mParentPriority);
+        REST_DIAG_NUMBER("linkQuality1", mLinkQuality1);
+        REST_DIAG_NUMBER("linkQuality2", mLinkQuality2);
+        REST_DIAG_NUMBER("linkQuality3", mLinkQuality3);
+        REST_DIAG_NUMBER("leaderCost", mLeaderCost);
+        REST_DIAG_NUMBER("idSequence", mIdSequence);
+        REST_DIAG_NUMBER("activeRouters", mActiveRouters);
+        REST_DIAG_NUMBER("sedBufferSize", mSedBufferSize);
+        REST_DIAG_NUMBER("sedDatagramCount", mSedDatagramCount);
+#undef REST_DIAG_NUMBER
+        return json;
+    }
+    case 5: {
+        json = cJSON_CreateObject();
+        cJSON_AddNumberToObject(json, "idSequence", tlv->mData.mRoute.mIdSequence);
+        cJSON *routes = cJSON_AddArrayToObject(json, "routeData");
+        for (unsigned i = 0; i < tlv->mData.mRoute.mRouteCount; i++) {
+            const otNetworkDiagRouteData *route = &tlv->mData.mRoute.mRouteData[i];
+            cJSON *entry = cJSON_CreateObject();
+            cJSON_AddNumberToObject(entry, "routeId", route->mRouterId);
+            cJSON_AddNumberToObject(entry, "linkQualityIn", route->mLinkQualityIn);
+            cJSON_AddNumberToObject(entry, "linkQualityOut", route->mLinkQualityOut);
+            cJSON_AddNumberToObject(entry, "routeCost", route->mRouteCost);
+            cJSON_AddItemToArray(routes, entry);
+        }
+        return json;
+    }
+    case 6:
+        return rest_leader(&tlv->mData.mLeaderData);
+    case 7:
+        return rest_hex(tlv->mData.mNetworkData.m8, tlv->mData.mNetworkData.mCount);
+    case 8:
+        json = cJSON_CreateArray();
+        for (unsigned i = 0; i < tlv->mData.mIp6AddrList.mCount; i++) {
+            cJSON_AddItemToArray(json, rest_address(&tlv->mData.mIp6AddrList.mList[i]));
+        }
+        return json;
+    case 9: {
+        const otNetworkDiagMacCounters *c = &tlv->mData.mMacCounters;
+        json = cJSON_CreateObject();
+#define REST_DIAG_NUMBER(key, field) cJSON_AddNumberToObject(json, key, c->field)
+        REST_DIAG_NUMBER("ifInUnknownProtos", mIfInUnknownProtos);
+        REST_DIAG_NUMBER("ifInErrors", mIfInErrors);
+        REST_DIAG_NUMBER("ifOutErrors", mIfOutErrors);
+        REST_DIAG_NUMBER("ifInUcastPkts", mIfInUcastPkts);
+        REST_DIAG_NUMBER("ifInBroadcastPkts", mIfInBroadcastPkts);
+        REST_DIAG_NUMBER("ifInDiscards", mIfInDiscards);
+        REST_DIAG_NUMBER("ifOutUcastPkts", mIfOutUcastPkts);
+        REST_DIAG_NUMBER("ifOutBroadcastPkts", mIfOutBroadcastPkts);
+        REST_DIAG_NUMBER("ifOutDiscards", mIfOutDiscards);
+#undef REST_DIAG_NUMBER
+        return json;
+    }
+    case 14:
+        return cJSON_CreateNumber(tlv->mData.mBatteryLevel);
+    case 15:
+        return cJSON_CreateNumber(tlv->mData.mSupplyVoltage);
+    case 16:
+        json = cJSON_CreateArray();
+        for (unsigned i = 0; i < tlv->mData.mChildTable.mCount; i++) {
+            const otNetworkDiagChildEntry *child = &tlv->mData.mChildTable.mTable[i];
+            cJSON *entry = cJSON_CreateObject();
+            cJSON_AddNumberToObject(entry, "childId", child->mChildId);
+            cJSON_AddNumberToObject(entry, "timeout", child->mTimeout);
+            cJSON_AddItemToObject(entry, "mode", rest_mode(child->mMode));
+            cJSON_AddItemToArray(json, entry);
+        }
+        return json;
+    case 17:
+        return rest_hex(tlv->mData.mChannelPages.m8, tlv->mData.mChannelPages.mCount);
+    case 19:
+        return cJSON_CreateNumber(tlv->mData.mMaxChildTimeout);
+    case 23:
+        return rest_hex(tlv->mData.mEui64.m8, 8);
+    case 24:
+        return cJSON_CreateNumber(tlv->mData.mVersion);
+    case 25:
+        return cJSON_CreateString(tlv->mData.mVendorName);
+    case 26:
+        return cJSON_CreateString(tlv->mData.mVendorModel);
+    case 27:
+        return cJSON_CreateString(tlv->mData.mVendorSwVersion);
+    case 28:
+        return cJSON_CreateString(tlv->mData.mThreadStackVersion);
+    case 34: {
+        const otNetworkDiagMleCounters *c = &tlv->mData.mMleCounters;
+        json = cJSON_CreateObject();
+#define REST_DIAG_NUMBER(key, field) cJSON_AddNumberToObject(json, key, c->field)
+        REST_DIAG_NUMBER("radioDisabledCount", mDisabledRole);
+        REST_DIAG_NUMBER("detachedRoleCount", mDetachedRole);
+        REST_DIAG_NUMBER("childRoleCount", mChildRole);
+        REST_DIAG_NUMBER("routerRoleCount", mRouterRole);
+        REST_DIAG_NUMBER("leaderRoleCount", mLeaderRole);
+        REST_DIAG_NUMBER("attachAttemptsCount", mAttachAttempts);
+        REST_DIAG_NUMBER("partIdChangesCount", mPartitionIdChanges);
+        REST_DIAG_NUMBER("betterPartIdAttachAttemptsCount", mBetterPartitionAttachAttempts);
+        REST_DIAG_NUMBER("newParentCount", mParentChanges);
+        REST_DIAG_NUMBER("totalTrackingTime", mTrackedTime);
+        REST_DIAG_NUMBER("radioDisabledTime", mDisabledTime);
+        REST_DIAG_NUMBER("detachedRoleTime", mDetachedTime);
+        REST_DIAG_NUMBER("childRoleTime", mChildTime);
+        REST_DIAG_NUMBER("routerRoleTime", mRouterTime);
+        REST_DIAG_NUMBER("leaderRoleTime", mLeaderTime);
+#undef REST_DIAG_NUMBER
+        return json;
+    }
+    default:
+        return NULL;
+    }
+}
+
+static void rest_diagnostic_finish(thread_rest_item_t *action)
+{
+    cJSON *attributes = action->result;
+    action->result = NULL;
+    thread_rest_item_t *result = rest_new(&s_rest_diagnostics, "networkDiagnostics", NULL, attributes);
+    if (result) {
+        rest_result(action, result);
+        rest_status(action, "completed");
+    } else {
+        rest_status(action, "failed");
+    }
+    action->active = false;
+    if (s_rest_diag_action == action) {
+        s_rest_diag_action = NULL;
+    }
+}
+
+static cJSON *rest_query_array(thread_rest_item_t *action, const char *key)
+{
+    if (!action->result) {
+        action->result = cJSON_CreateObject();
+    }
+    cJSON *array = rest_get(action->result, key);
+    if (!array) {
+        array = cJSON_AddArrayToObject(action->result, key);
+    }
+    return array;
+}
+
+static void rest_query_done(otError error)
+{
+    if (!s_rest_query_action || error == OT_ERROR_PENDING) {
+        return;
+    }
+    thread_rest_item_t *action = s_rest_query_action;
+    action->query_busy = false;
+    s_rest_query_action = NULL;
+    if (error != OT_ERROR_NONE) {
+        action->active = false;
+        rest_status(action, "failed");
+        if (s_rest_diag_action == action) {
+            s_rest_diag_action = NULL;
+        }
+    } else {
+        action->query_remaining &= ~(UINT32_C(1) << action->query_type);
+    }
+}
+
+static void rest_children_callback(otError error, const otMeshDiagChildEntry *child, void *context)
+{
+    thread_rest_item_t *action = s_rest_query_action;
+    if (!action || (uintptr_t)context != action->token || action->complete) {
+        return;
+    }
+    if (child) {
+        cJSON *entry = cJSON_CreateObject();
+        otLinkModeConfig mode = {.mRxOnWhenIdle = child->mRxOnWhenIdle,
+                                 .mDeviceType = child->mDeviceTypeFtd,
+                                 .mNetworkData = child->mFullNetData};
+        cJSON_AddItemToObject(entry, "mode", rest_mode(mode));
+        cJSON_AddBoolToObject(entry, "cslSynchronized", child->mCslSynchronized);
+        cJSON_AddBoolToObject(entry, "supportsErrorRate", child->mSupportsErrRate);
+        cJSON_AddItemToObject(entry, "rloc16", rest_rloc16(child->mRloc16));
+        cJSON_AddItemToObject(entry, "extAddress", rest_hex(child->mExtAddress.m8, 8));
+#define REST_CHILD_NUMBER(key, field) cJSON_AddNumberToObject(entry, key, child->field)
+        cJSON_AddNumberToObject(entry, "childId", child->mRloc16 & 0x3ff);
+        REST_CHILD_NUMBER("threadVersion", mVersion);
+        REST_CHILD_NUMBER("timeout", mTimeout);
+        REST_CHILD_NUMBER("age", mAge);
+        REST_CHILD_NUMBER("linkAge", mConnectionTime);
+        if (child->mSupervisionInterval) {
+            REST_CHILD_NUMBER("supervisionInterval", mSupervisionInterval);
+        }
+        REST_CHILD_NUMBER("linkMargin", mLinkMargin);
+        REST_CHILD_NUMBER("averageRssi", mAverageRssi);
+        REST_CHILD_NUMBER("lastRssi", mLastRssi);
+        REST_CHILD_NUMBER("queuedMessageCount", mQueuedMessageCount);
+        if (child->mSupportsErrRate) {
+            cJSON_AddNumberToObject(entry, "frameErrorRate", child->mFrameErrorRate / 65535.0);
+            cJSON_AddNumberToObject(entry, "messageErrorRate", child->mMessageErrorRate / 65535.0);
+        }
+        if (child->mCslSynchronized) {
+            REST_CHILD_NUMBER("cslPeriod", mCslPeriod);
+            REST_CHILD_NUMBER("cslTimeout", mCslTimeout);
+            REST_CHILD_NUMBER("cslChannel", mCslChannel);
+        }
+#undef REST_CHILD_NUMBER
+        cJSON_AddItemToArray(rest_query_array(action, "children"), entry);
+    }
+    rest_query_done(error);
+}
+
+static void rest_child_addresses_callback(otError error, uint16_t rloc, otMeshDiagIp6AddrIterator *iterator,
+                                          void *context)
+{
+    thread_rest_item_t *action = s_rest_query_action;
+    if (!action || (uintptr_t)context != action->token || action->complete) {
+        return;
+    }
+    if (iterator) {
+        cJSON *entry = cJSON_CreateObject();
+        cJSON_AddItemToObject(entry, "rloc16", rest_rloc16(rloc));
+        cJSON *addresses = cJSON_AddArrayToObject(entry, "ipv6Addresses");
+        otIp6Address address;
+        while (otMeshDiagGetNextIp6Address(iterator, &address) == OT_ERROR_NONE) {
+            cJSON_AddItemToArray(addresses, rest_address(&address));
+        }
+        cJSON_AddItemToArray(rest_query_array(action, "childIpv6Addresses"), entry);
+    }
+    rest_query_done(error);
+}
+
+static void rest_neighbors_callback(otError error, const otMeshDiagRouterNeighborEntry *neighbor, void *context)
+{
+    thread_rest_item_t *action = s_rest_query_action;
+    if (!action || (uintptr_t)context != action->token || action->complete) {
+        return;
+    }
+    if (neighbor) {
+        cJSON *entry = cJSON_CreateObject();
+        cJSON_AddBoolToObject(entry, "supportsErrorRate", neighbor->mSupportsErrRate);
+        cJSON_AddItemToObject(entry, "rloc16", rest_rloc16(neighbor->mRloc16));
+        cJSON_AddItemToObject(entry, "extAddress", rest_hex(neighbor->mExtAddress.m8, 8));
+        cJSON_AddNumberToObject(entry, "threadVersion", neighbor->mVersion);
+        cJSON_AddNumberToObject(entry, "linkAge", neighbor->mConnectionTime);
+        cJSON_AddNumberToObject(entry, "linkMargin", neighbor->mLinkMargin);
+        cJSON_AddNumberToObject(entry, "averageRssi", neighbor->mAverageRssi);
+        cJSON_AddNumberToObject(entry, "lastRssi", neighbor->mLastRssi);
+        if (neighbor->mSupportsErrRate) {
+            cJSON_AddNumberToObject(entry, "frameErrorRate", neighbor->mFrameErrorRate / 65535.0);
+            cJSON_AddNumberToObject(entry, "messageErrorRate", neighbor->mMessageErrorRate / 65535.0);
+        }
+        cJSON_AddItemToArray(rest_query_array(action, "routerNeighbors"), entry);
+    }
+    rest_query_done(error);
+}
+
+static void rest_start_query(thread_rest_item_t *action, otInstance *instance)
+{
+    if (action->query_busy || s_rest_query_action || s_rest_mesh_action) {
+        return;
+    }
+    if (!action->query_remaining) {
+        rest_diagnostic_finish(action);
+        return;
+    }
+    otIp6Address destination;
+    if (!rest_destination(instance, action->attributes, &destination)) {
+        return;
+    }
+    uint16_t rloc = ((uint16_t)destination.mFields.m8[14] << 8) | destination.mFields.m8[15];
+    /* ML-EID destinations resolve through the device collection's RLOC. */
+    const char *destination_type = rest_string(action->attributes, "destinationType");
+    if (destination_type && !strcmp(destination_type, "mleid")) {
+        const char *iid = rest_string(action->attributes, "destination");
+        for (thread_rest_item_t *device = s_rest_devices; device; device = device->next) {
+            const char *device_iid = rest_string(device->attributes, "mlEidIid");
+            const char *device_rloc = rest_string(device->attributes, "rloc16");
+            if (device_iid && device_rloc && !strcmp(device_iid, iid)) {
+                rloc = strtoul(device_rloc, NULL, 16);
+                break;
+            }
+        }
+    }
+    action->query_type = __builtin_ctz(action->query_remaining);
+    action->query_busy = true;
+    s_rest_query_action = action;
+    rest_query_array(action, s_rest_diag_names[action->query_type]);
+    otError error;
+    void *context = (void *)(uintptr_t)action->token;
+    if (action->query_type == 29) {
+        error = otMeshDiagQueryChildTable(instance, rloc, rest_children_callback, context);
+    } else if (action->query_type == 30) {
+        error = otMeshDiagQueryChildrenIp6Addrs(instance, rloc, rest_child_addresses_callback, context);
+    } else {
+        error = otMeshDiagQueryRouterNeighborTable(instance, rloc, rest_neighbors_callback, context);
+    }
+    if (error != OT_ERROR_NONE) {
+        s_rest_query_action = NULL;
+        action->query_busy = false;
+        if (error != OT_ERROR_BUSY) {
+            action->active = false;
+            rest_status(action, "failed");
+        }
+    }
+}
+
+static void rest_diagnostic_callback(otError error, otMessage *message, const otMessageInfo *info, void *context)
+{
+    (void)context;
+    thread_rest_item_t *action = s_rest_diag_action;
+    if (!action || (uintptr_t)context != action->token || action->complete || !message || error != OT_ERROR_NONE) {
+        return;
+    }
+    cJSON *attributes = cJSON_CreateObject();
+    otNetworkDiagIterator iterator = OT_NETWORK_DIAGNOSTIC_ITERATOR_INIT;
+    otNetworkDiagTlv tlv;
+    while (otThreadGetNextDiagnosticTlv(message, &iterator, &tlv) == OT_ERROR_NONE) {
+        if (tlv.mType < 35 && s_rest_diag_names[tlv.mType]) {
+            cJSON *value = rest_diag_tlv(&tlv);
+            if (value) {
+                rest_replace(attributes, s_rest_diag_names[tlv.mType], value);
+            }
+        }
+    }
+    (void)info;
+    cJSON_Delete(action->result);
+    action->result = attributes;
+    action->diagnostic_received = true;
+    if (!action->query_remaining) {
+        rest_diagnostic_finish(action);
+    }
+}
+
+static void rest_energy_callback(uint32_t mask, const uint8_t *energy, uint8_t count, void *context)
+{
+    (void)context;
+    thread_rest_item_t *action = s_rest_energy_action;
+    if (!action || (uintptr_t)context != action->token || action->complete) {
+        return;
+    }
+    cJSON *attributes = cJSON_CreateObject();
+    otIp6Address destination;
+    if (rest_destination(esp_openthread_get_instance(), action->attributes, &destination)) {
+        cJSON_AddItemToObject(attributes, "origin", rest_hex(destination.mFields.m8 + 8, 8));
+    }
+    cJSON *report = cJSON_AddArrayToObject(attributes, "report");
+    unsigned channels = __builtin_popcount(mask);
+    unsigned channel_index = 0;
+    for (unsigned channel = 0; channel < 32; channel++) {
+        if (!(mask & (UINT32_C(1) << channel))) {
+            continue;
+        }
+        cJSON *entry = cJSON_CreateObject();
+        cJSON_AddNumberToObject(entry, "channel", channel);
+        cJSON *rssi = cJSON_AddArrayToObject(entry, "maxRssi");
+        for (unsigned i = channel_index; i < count; i += channels) {
+            cJSON_AddItemToArray(rssi, cJSON_CreateNumber((int8_t)energy[i]));
+        }
+        cJSON_AddItemToArray(report, entry);
+        channel_index++;
+    }
+    thread_rest_item_t *result = rest_new(&s_rest_diagnostics, "energyScanReport", NULL, attributes);
+    if (result) {
+        rest_result(action, result);
+        rest_status(action, "completed");
+    } else {
+        rest_status(action, "failed");
+    }
+    action->active = false;
+    s_rest_energy_action = NULL;
+}
+
+static void rest_joiner_callback(otCommissionerJoinerEvent event, const otJoinerInfo *joiner,
+                                 const otExtAddress *joiner_id, void *context)
+{
+    (void)joiner_id;
+    (void)context;
+    if (!joiner) {
+        return;
+    }
+    for (thread_rest_item_t *action = s_rest_actions; action; action = action->next) {
+        if (action->complete || strcmp(action->type, "addThreadDeviceTask") || !action->active) {
+            continue;
+        }
+        if (action->joiner.mType != joiner->mType) {
+            continue;
+        }
+        if (joiner->mType == OT_JOINER_INFO_TYPE_EUI64 &&
+            memcmp(action->joiner.mSharedId.mEui64.m8, joiner->mSharedId.mEui64.m8, 8)) {
+            continue;
+        }
+        if (joiner->mType == OT_JOINER_INFO_TYPE_DISCERNER &&
+            (action->joiner.mSharedId.mDiscerner.mValue != joiner->mSharedId.mDiscerner.mValue ||
+             action->joiner.mSharedId.mDiscerner.mLength != joiner->mSharedId.mDiscerner.mLength)) {
+            continue;
+        }
+        const char *status = rest_string(action->attributes, "status");
+        switch (event) {
+        case OT_COMMISSIONER_JOINER_START:
+            status = "attempted";
+            break;
+        case OT_COMMISSIONER_JOINER_CONNECTED:
+            break;
+        case OT_COMMISSIONER_JOINER_FINALIZE:
+            break;
+        case OT_COMMISSIONER_JOINER_END:
+            status = "completed";
+            break;
+        case OT_COMMISSIONER_JOINER_REMOVED:
+            status = !strcmp(status, "attempted") ? "failed" : "stopped";
+            break;
+        }
+        rest_status(action, status);
+        if (action->complete) {
+            action->active = false;
+        }
+    }
+}
+
+static void rest_cancel(thread_rest_item_t *action, otInstance *instance)
+{
+    if (!action->complete) {
+        rest_status(action, "stopped");
+    }
+    if (s_rest_mesh_action == action) {
+        otMeshDiagCancel(instance);
+        s_rest_mesh_action = NULL;
+        action->active = false;
+    }
+    if (!strcmp(action->type, "addThreadDeviceTask") && action->joiner_registered) {
+        rest_remove_joiner(instance, &action->joiner);
+        action->active = false;
+        action->joiner_registered = false;
+    }
+    /* Diagnostic and energy APIs may still deliver callbacks. They use permanent
+     * service slots, never an item pointer supplied by an HTTP request. */
+    if (s_rest_query_action == action) {
+        otMeshDiagCancel(instance);
+        s_rest_query_action = NULL;
+        action->query_busy = false;
+    }
+    if (s_rest_diag_action == action) {
+        s_rest_diag_action = NULL;
+        action->active = false;
+    }
+    if (s_rest_energy_action == action) {
+        s_rest_energy_action = NULL;
+        action->active = false;
+    }
+}
+
+static void rest_poll(otInstance *instance)
+{
+    int64_t now = esp_timer_get_time();
+    for (thread_rest_item_t *action = s_rest_actions; action; action = action->next) {
+        if (action->complete) {
+            if (action->joiner_registered) {
+                rest_remove_joiner(instance, &action->joiner);
+                action->joiner_registered = false;
+            }
+            continue;
+        }
+        if (now >= action->deadline) {
+            rest_cancel(action, instance);
+            if (strcmp(action->type, "addThreadDeviceTask")) {
+                rest_status(action, "failed");
+            }
+            continue;
+        }
+        rest_replace(action->attributes, "timeout", cJSON_CreateNumber((action->deadline - now) / 1000000));
+        if (action->active) {
+            if (action->diagnostic_received && !strcmp(action->type, "getNetworkDiagnosticTask")) {
+                rest_start_query(action, instance);
+            }
+            continue;
+        }
+        if (!strcmp(action->type, "updateDeviceCollectionTask")) {
+            if (s_rest_mesh_action || s_rest_query_action || s_rest_diag_action) {
+                continue;
+            }
+            otMeshDiagDiscoverConfig config = {.mDiscoverIp6Addresses = true, .mDiscoverChildTable = true};
+            s_rest_mesh_action = action;
+            otError error = otMeshDiagDiscoverTopology(instance, &config, rest_mesh_callback, NULL);
+            if (error == OT_ERROR_NONE) {
+                action->active = true;
+                action->attempts++;
+                rest_status(action, "active");
+                const uint8_t types[] = {0, 1, 2, 8, 23};
+                otThreadSendDiagnosticGet(instance, otThreadGetRealmLocalAllThreadNodesMulticastAddress(instance),
+                                          types, sizeof(types), rest_discover_devices_callback,
+                                          (void *)(uintptr_t)action->token);
+            } else {
+                s_rest_mesh_action = NULL;
+            }
+            continue;
+        }
+        if (!strcmp(action->type, "addThreadDeviceTask") || !strcmp(action->type, "getEnergyScanTask")) {
+            otCommissionerState state = otCommissionerGetState(instance);
+            if (state == OT_COMMISSIONER_STATE_DISABLED) {
+                if (otCommissionerStart(instance, NULL, rest_joiner_callback, NULL) == OT_ERROR_NONE) {
+                    s_rest_commissioner_owned = true;
+                }
+                rest_status(action, "waiting");
+                continue;
+            }
+            if (state != OT_COMMISSIONER_STATE_ACTIVE) {
+                continue;
+            }
+        }
+        if (!strcmp(action->type, "addThreadDeviceTask")) {
+            if (rest_add_joiner(instance, &action->joiner) == OT_ERROR_NONE) {
+                action->active = true;
+                action->joiner_registered = true;
+                rest_status(action, "undiscovered");
+            }
+            continue;
+        }
+        otIp6Address destination;
+        if (!rest_destination(instance, action->attributes, &destination)) {
+            continue;
+        }
+        if (!strcmp(action->type, "getEnergyScanTask")) {
+            if (s_rest_energy_action) {
+                continue;
+            }
+            uint32_t mask = 0;
+            cJSON *channel;
+            cJSON_ArrayForEach(channel, rest_get(action->attributes, "channelMask"))
+            {
+                mask |= UINT32_C(1) << channel->valueint;
+            }
+            s_rest_energy_action = action;
+            otError error =
+                otCommissionerEnergyScan(instance, mask, rest_get(action->attributes, "count")->valueint,
+                                         rest_get(action->attributes, "period")->valueint,
+                                         rest_get(action->attributes, "scanDuration")->valueint, &destination,
+                                         rest_energy_callback, (void *)(uintptr_t)action->token);
+            if (error == OT_ERROR_NONE) {
+                action->active = true;
+                rest_status(action, "active");
+            } else {
+                s_rest_energy_action = NULL;
+            }
+            continue;
+        }
+        uint8_t types[35], count = 0;
+        bool included[35] = {false};
+        cJSON *type;
+        cJSON_ArrayForEach(type, rest_get(action->attributes, "types"))
+        {
+            int id = rest_diag_type(type->valuestring);
+            if (id >= 0 && !included[id]) {
+                included[id] = true;
+                if (id >= 29 && id <= 31) {
+                    action->query_remaining |= UINT32_C(1) << id;
+                } else {
+                    types[count++] = id;
+                }
+            }
+        }
+        if (!strcmp(action->type, "resetNetworkDiagCounterTask")) {
+            rest_status(action,
+                        otThreadSendDiagnosticReset(instance, &destination, types, count) == OT_ERROR_NONE ? "completed"
+                                                                                                           : "failed");
+        } else {
+            if (s_rest_diag_action || s_rest_mesh_action) {
+                continue;
+            }
+            s_rest_diag_action = action;
+            if (!count) {
+                action->active = true;
+                action->diagnostic_received = true;
+                action->result = cJSON_CreateObject();
+                rest_status(action, "active");
+                continue;
+            }
+            otError error = otThreadSendDiagnosticGet(instance, &destination, types, count, rest_diagnostic_callback,
+                                                      (void *)(uintptr_t)action->token);
+            if (error == OT_ERROR_NONE) {
+                action->active = true;
+                rest_status(action, "active");
+            } else {
+                s_rest_diag_action = NULL;
+            }
+        }
+    }
+    if (s_rest_commissioner_owned) {
+        bool needed = false;
+        for (thread_rest_item_t *action = s_rest_actions; action; action = action->next) {
+            needed |= !action->complete &&
+                (!strcmp(action->type, "addThreadDeviceTask") || !strcmp(action->type, "getEnergyScanTask"));
+        }
+        if (!needed) {
+            otCommissionerStop(instance);
+            s_rest_commissioner_owned = false;
+        }
+    }
+}
+
+static void rest_process_task(void *argument)
+{
+    (void)argument;
+    while (true) {
+        esp_openthread_lock_acquire(portMAX_DELAY);
+        rest_poll(esp_openthread_get_instance());
+        esp_openthread_lock_release();
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+
+esp_err_t esp_br_thread_rest_init(void)
+{
+    if (s_rest_task) {
+        return ESP_OK;
+    }
+    if (!s_rest_pending_done) {
+        s_rest_pending_done = xSemaphoreCreateBinary();
+    }
+    if (!s_rest_pending_done) {
+        return ESP_ERR_NO_MEM;
+    }
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    rest_self(esp_openthread_get_instance());
+    esp_openthread_lock_release();
+    return xTaskCreate(rest_process_task, "thread_rest", 8192, NULL, 4, &s_rest_task) == pdPASS ? ESP_OK
+                                                                                                : ESP_ERR_NO_MEM;
+}
+
+static bool rest_field_selected(const char *fields, const char *key, bool *nested)
+{
+    *nested = false;
+    if (!fields || !*fields) {
+        return true;
+    }
+    size_t length = strlen(key);
+    for (const char *p = fields; *p;) {
+        while (*p == ' ' || *p == ',') {
+            p++;
+        }
+        const char *end = strchr(p, ',');
+        if (!end) {
+            end = p + strlen(p);
+        }
+        size_t count = end - p;
+        if (count == length && !strncmp(p, key, length)) {
+            return true;
+        }
+        if (count > length && p[length] == '.' && !strncmp(p, key, length)) {
+            *nested = true;
+        }
+        p = *end ? end + 1 : end;
+    }
+    return *nested;
+}
+
+static void rest_filter(cJSON *attributes, const char *fields)
+{
+    if (!fields || !*fields) {
+        return;
+    }
+    for (cJSON *item = attributes->child, *next; item; item = next) {
+        next = item->next;
+        if (!item->string || !strcmp(item->string, "created") || !strcmp(item->string, "updated")) {
+            continue;
+        }
+        bool nested;
+        if (!rest_field_selected(fields, item->string, &nested)) {
+            cJSON_DeleteItemFromObjectCaseSensitive(attributes, item->string);
+        } else if (nested && (cJSON_IsObject(item) || cJSON_IsArray(item))) {
+            size_t key_length = strlen(item->string);
+            char *subfields = calloc(strlen(fields) + 1, 1);
+            if (!subfields) {
+                continue;
+            }
+            size_t written = 0;
+            for (const char *p = fields; *p;) {
+                while (*p == ',' || *p == ' ') {
+                    p++;
+                }
+                const char *end = strchr(p, ',');
+                if (!end) {
+                    end = p + strlen(p);
+                }
+                if ((size_t)(end - p) > key_length && !strncmp(p, item->string, key_length) && p[key_length] == '.') {
+                    size_t count = end - p - key_length - 1;
+                    if (written) {
+                        subfields[written++] = ',';
+                    }
+                    memcpy(subfields + written, p + key_length + 1, count);
+                    written += count;
+                }
+                p = *end ? end + 1 : end;
+            }
+            if (cJSON_IsObject(item)) {
+                rest_filter(item, subfields);
+            } else {
+                for (cJSON *element = item->child; element; element = element->next) {
+                    if (cJSON_IsObject(element)) {
+                        rest_filter(element, subfields);
+                    }
+                }
+            }
+            free(subfields);
+        }
+    }
+}
+
+static cJSON *rest_item_json(thread_rest_item_t *item, const esp_br_thread_rest_request_t *request, bool json_api)
+{
+    const char *fields = NULL;
+    bool any_fields = false;
+    for (cJSON *query = request->query ? request->query->child : NULL; query; query = query->next) {
+        if (query->string && !strncmp(query->string, "fields[", 7)) {
+            size_t length = strlen(query->string);
+            if (length > 8 && query->string[length - 1] == ']') {
+                thread_rest_item_t *collection = !strncmp(request->path, "/api/actions", 12) ? s_rest_actions
+                    : !strncmp(request->path, "/api/diagnostics", 16)                        ? s_rest_diagnostics
+                                                                                             : s_rest_devices;
+                bool recognized = false;
+                for (thread_rest_item_t *entry = collection; entry; entry = entry->next) {
+                    recognized |= length == strlen(entry->type) + 8 &&
+                        !strncmp(query->string + 7, entry->type, strlen(entry->type));
+                }
+                if (!recognized) {
+                    continue;
+                }
+                any_fields = true;
+                if (length == strlen(item->type) + 8 && !strncmp(query->string + 7, item->type, strlen(item->type))) {
+                    fields = query->valuestring;
+                }
+            }
+        }
+    }
+    if (any_fields && !fields) {
+        return NULL;
+    }
+    cJSON *attributes = cJSON_Duplicate(item->attributes, true);
+    if (!attributes) {
+        return NULL;
+    }
+    rest_filter(attributes, fields);
+    if (!json_api) {
+        cJSON_DeleteItemFromObjectCaseSensitive(attributes, "created");
+        cJSON_DeleteItemFromObjectCaseSensitive(attributes, "updated");
+        return attributes;
+    }
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "id", item->id);
+    cJSON_AddStringToObject(json, "type", item->type);
+    cJSON_AddItemToObject(json, "attributes", attributes);
+    if (item->relationships) {
+        cJSON_AddItemToObject(json, "relationships", cJSON_Duplicate(item->relationships, true));
+    }
+    return json;
+}
+
+static cJSON *rest_meta(thread_rest_item_t *head, bool actions)
+{
+    cJSON *meta = cJSON_CreateObject();
+    cJSON *collection = cJSON_AddObjectToObject(meta, "collection");
+    cJSON_AddNumberToObject(collection, "offset", 0);
+    cJSON_AddNumberToObject(collection, "limit", THREAD_REST_COLLECTION_LIMIT);
+    cJSON_AddNumberToObject(collection, "total", rest_count(head));
+    if (actions) {
+        unsigned pending = 0;
+        for (; head; head = head->next) {
+            pending += !head->complete && !head->deleted;
+        }
+        cJSON_AddNumberToObject(collection, "pending", pending);
+    }
+    return meta;
+}
+
+static void rest_collection_delete(thread_rest_item_t **head, const char *id, otInstance *instance)
+{
+    for (thread_rest_item_t **link = head; *link;) {
+        thread_rest_item_t *item = *link;
+        if (id && strcmp(id, item->id)) {
+            link = &item->next;
+            continue;
+        }
+        if (head == &s_rest_actions) {
+            rest_cancel(item, instance);
+        }
+        *link = item->next;
+        rest_item_free(item);
+        if (id) {
+            break;
+        }
+    }
+}
+
+static void rest_actions_post(const esp_br_thread_rest_request_t *request, esp_br_thread_rest_response_t *response)
+{
+    if (!*request->content_type) {
+        response->status = 406;
+        return;
+    }
+    if (strcmp(request->content_type, THREAD_REST_JSON_API)) {
+        response->status = 415;
+        return;
+    }
+    cJSON *root = cJSON_Parse(request->body);
+    if (!root) {
+        response->status = 400;
+        return;
+    }
+    cJSON *data = rest_get(root, "data"), *datum;
+    if (!cJSON_IsArray(data)) {
+        response->status = 422;
+        goto exit;
+    }
+    cJSON_ArrayForEach(datum, data)
+    {
+        if (!rest_validate_action(datum)) {
+            response->status = 422;
+            goto exit;
+        }
+    }
+    unsigned pending = 0;
+    for (thread_rest_item_t *a = s_rest_actions; a; a = a->next) {
+        pending += !a->complete;
+    }
+    if (pending + cJSON_GetArraySize(data) > THREAD_REST_COLLECTION_LIMIT) {
+        response->status = 503;
+        goto exit;
+    }
+    response->content_type = THREAD_REST_JSON_API;
+    response->json = cJSON_CreateObject();
+    cJSON *items = cJSON_AddArrayToObject(response->json, "data");
+    cJSON_ArrayForEach(datum, data)
+    {
+        const char *requested_type = rest_string(datum, "type");
+        static const char *const types[] = {"updateDeviceCollectionTask", "getNetworkDiagnosticTask",
+                                            "getEnergyScanTask", "resetNetworkDiagCounterTask", "addThreadDeviceTask"};
+        const char *type = NULL;
+        for (unsigned i = 0; i < 5; i++) {
+            if (!strcmp(requested_type, types[i])) {
+                type = types[i];
+            }
+        }
+        thread_rest_item_t *action =
+            rest_new(&s_rest_actions, type, NULL, cJSON_Duplicate(rest_get(datum, "attributes"), true));
+        if (!action) {
+            response->status = 503;
+            break;
+        }
+        cJSON *timeout = rest_get(action->attributes, "timeout");
+        double seconds = timeout ? timeout->valuedouble : 60;
+        if (seconds > INT32_MAX) {
+            seconds = INT32_MAX;
+        }
+        if (seconds < INT32_MIN) {
+            seconds = INT32_MIN;
+        }
+        action->deadline = action->started + (int64_t)seconds * 1000000;
+        rest_status(action, "pending");
+        if (!strcmp(type, "addThreadDeviceTask")) {
+            rest_parse_joiner(action->attributes, &action->joiner);
+            action->joiner.mExpirationTime = seconds > 0 ? seconds : 0;
+            cJSON *attributes = rest_joiner_json(&action->joiner);
+            cJSON *created = cJSON_DetachItemFromObjectCaseSensitive(action->attributes, "created");
+            cJSON_Delete(action->attributes);
+            action->attributes = attributes;
+            cJSON_AddItemToObject(attributes, "created", created);
+            rest_status(action, "pending");
+        }
+        if (rest_get(action->attributes, "destination") && !rest_get(action->attributes, "destinationType")) {
+            const char *destination = rest_string(action->attributes, "destination");
+            cJSON_AddStringToObject(action->attributes, "destinationType",
+                                    strlen(destination) == 6 ? "rloc" : "extended");
+        }
+        cJSON_AddItemToArray(items, rest_item_json(action, request, true));
+    }
+    cJSON_AddItemToObject(response->json, "meta", rest_meta(s_rest_actions, false));
+exit:
+    cJSON_Delete(root);
+}
+
+static void rest_collection(const esp_br_thread_rest_request_t *request, esp_br_thread_rest_response_t *response,
+                            otInstance *instance)
+{
+    thread_rest_item_t **head;
+    const char *id = NULL;
+    bool self = !strcmp(request->path, "/api/node");
+    if (!strncmp(request->path, "/api/actions", 12)) {
+        head = &s_rest_actions;
+        if (request->path[12] == '/') {
+            id = request->path + 13;
+        }
+    } else if (!strncmp(request->path, "/api/diagnostics", 16)) {
+        head = &s_rest_diagnostics;
+        if (request->path[16] == '/') {
+            id = request->path + 17;
+        }
+    } else {
+        head = &s_rest_devices;
+        if (!self && request->path[12] == '/') {
+            id = request->path + 13;
+        }
+    }
+    cJSON *local_id = self ? rest_hex(otLinkGetExtendedAddress(instance)->m8, 8) : NULL;
+    if (self) {
+        id = local_id ? local_id->valuestring : "";
+    }
+    thread_rest_item_t *item = id ? rest_find(*head, id) : NULL;
+    if (request->method == HTTP_POST) {
+        rest_actions_post(request, response);
+        goto exit;
+    }
+    if (id && !item) {
+        response->status = 404;
+        goto exit;
+    }
+    if (request->method == HTTP_DELETE) {
+        rest_collection_delete(head, id, instance);
+        response->status = 204;
+        goto exit;
+    }
+    bool json_api = !strcmp(request->accept, THREAD_REST_JSON_API) || !strcmp(request->accept, "*/*");
+    if (!json_api && strcmp(request->accept, "application/json")) {
+        response->status = 406;
+        goto exit;
+    }
+    response->content_type = json_api ? THREAD_REST_JSON_API : "application/json";
+    if (id) {
+        cJSON *data = rest_item_json(item, request, json_api);
+        if (!data) {
+            response->status = 404;
+            goto exit;
+        }
+        if (json_api) {
+            response->json = cJSON_CreateObject();
+            cJSON_AddItemToObject(response->json, "data", data);
+        } else {
+            response->json = data;
+        }
+    } else {
+        cJSON *data = cJSON_CreateArray();
+        for (thread_rest_item_t *entry = *head; entry; entry = entry->next) {
+            if (!entry->deleted) {
+                esp_br_thread_rest_request_t unfiltered = *request;
+                if (!json_api) {
+                    unfiltered.query = NULL;
+                }
+                cJSON *json = rest_item_json(entry, &unfiltered, json_api);
+                if (json) {
+                    cJSON_AddItemToArray(data, json);
+                }
+            }
+        }
+        if (json_api) {
+            response->json = cJSON_CreateObject();
+            cJSON_AddItemToObject(response->json, "data", data);
+            cJSON_AddItemToObject(response->json, "meta", rest_meta(*head, head == &s_rest_actions));
+        } else {
+            response->json = data;
+        }
+    }
+exit:
+    cJSON_Delete(local_id);
+}
+
+void esp_br_thread_rest_request(const esp_br_thread_rest_request_t *request, esp_br_thread_rest_response_t *response)
+{
+    response->status = 200;
+    response->content_type = "application/json";
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    otInstance *instance = esp_openthread_get_instance();
+    const char *path = request->path;
+    if (!strncmp(path, "/api/", 5)) {
+        rest_collection(request, response, instance);
+        goto exit;
+    }
+    if (!strcmp(path, "/node/dataset/active") || !strcmp(path, "/node/dataset/pending")) {
+        rest_dataset(request, response, instance, !strcmp(path, "/node/dataset/pending"));
+        goto exit;
+    }
+    cJSON *body = *request->body ? cJSON_Parse(request->body) : NULL;
+    const char *state = cJSON_GetStringValue(body);
+    otError error = OT_ERROR_NONE;
+    if (!strcmp(path, "/node")) {
+        if (request->method == HTTP_GET) {
+            response->json = rest_node(instance);
+            if (!response->json) {
+                response->status = 500;
+            }
+        } else {
+            error = otThreadSetEnabled(instance, false);
+            if (error == OT_ERROR_NONE) {
+                error = otIp6SetEnabled(instance, false);
+            }
+            if (error == OT_ERROR_NONE) {
+                if (otInstanceErasePersistentInfo(instance) == OT_ERROR_NONE) {
+                    response->reset = true;
+                } else {
+                    response->status = 500;
+                }
+            } else {
+                response->status = 409;
+            }
+        }
+    } else if (!strcmp(path, "/node/state")) {
+        if (request->method == HTTP_GET) {
+            response->json = cJSON_CreateString(s_ot_state[otThreadGetDeviceRole(instance)]);
+        } else if (!state || (strcmp(state, "enable") && strcmp(state, "disable"))) {
+            response->status = 400;
+        } else {
+            if (!strcmp(state, "enable")) {
+                error = otIp6IsEnabled(instance) ? OT_ERROR_NONE : otIp6SetEnabled(instance, true);
+                if (error == OT_ERROR_NONE) {
+                    error = otThreadSetEnabled(instance, true);
+                }
+            } else {
+                error = otThreadSetEnabled(instance, false);
+                if (error == OT_ERROR_NONE) {
+                    error = otIp6SetEnabled(instance, false);
+                }
+            }
+            response->status = error == OT_ERROR_NONE ? 200
+                : error == OT_ERROR_INVALID_STATE     ? 409
+                : error == OT_ERROR_INVALID_ARGS      ? 400
+                                                      : 500;
+        }
+    } else if (!strcmp(path, "/node/rloc")) {
+        response->json = rest_address(otThreadGetRloc(instance));
+    } else if (!strcmp(path, "/node/rloc16")) {
+        response->json = cJSON_CreateNumber(otThreadGetRloc16(instance));
+    } else if (!strcmp(path, "/node/ext-address")) {
+        response->json = rest_hex(otLinkGetExtendedAddress(instance)->m8, 8);
+    } else if (!strcmp(path, "/node/network-name")) {
+        response->json = cJSON_CreateString(otThreadGetNetworkName(instance));
+    } else if (!strcmp(path, "/node/ext-panid")) {
+        response->json = rest_hex(otThreadGetExtendedPanId(instance)->m8, 8);
+    } else if (!strcmp(path, "/node/num-of-router")) {
+        response->json = cJSON_CreateNumber(rest_router_count(instance));
+    } else if (!strcmp(path, "/node/leader-data")) {
+        otLeaderData leader;
+        if (otThreadGetLeaderData(instance, &leader) == OT_ERROR_NONE) {
+            response->json = rest_leader(&leader);
+        } else {
+            response->status = 500;
+        }
+    } else if (!strcmp(path, "/node/ba-id")) {
+        otBorderAgentId id;
+        if (otBorderAgentGetId(instance, &id) == OT_ERROR_NONE) {
+            response->json = rest_hex(id.mId, sizeof(id.mId));
+        } else {
+            response->status = 500;
+        }
+    } else if (!strcmp(path, "/node/coprocessor/version")) {
+        response->json = cJSON_CreateString(otPlatRadioGetVersionString(instance));
+    } else if (!strcmp(path, "/node/commissioner/state")) {
+        if (request->method == HTTP_GET) {
+            static const char *states[] = {"disabled", "petitioning", "active"};
+            response->json = cJSON_CreateString(states[otCommissionerGetState(instance)]);
+        } else if (!state || (strcmp(state, "enable") && strcmp(state, "disable"))) {
+            response->status = 400;
+        } else {
+            s_rest_commissioner_owned = false;
+            error = !strcmp(state, "enable") ? otCommissionerStart(instance, NULL, rest_joiner_callback, NULL)
+                                             : otCommissionerStop(instance);
+            response->status = error == OT_ERROR_NONE ? 200
+                : error == OT_ERROR_INVALID_STATE     ? 409
+                : error == OT_ERROR_INVALID_ARGS      ? 400
+                                                      : 500;
+        }
+    } else if (!strcmp(path, "/node/commissioner/joiner")) {
+        otJoinerInfo joiner = {0};
+        if (request->method == HTTP_GET) {
+            uint16_t iterator = 0;
+            response->json = cJSON_CreateArray();
+            while (otCommissionerGetNextJoinerInfo(instance, &iterator, &joiner) == OT_ERROR_NONE) {
+                cJSON_AddItemToArray(response->json, rest_joiner_json(&joiner));
+            }
+        } else if (request->method == HTTP_POST) {
+            if (otCommissionerGetState(instance) != OT_COMMISSIONER_STATE_ACTIVE) {
+                response->status = 409;
+            } else if (!rest_parse_joiner(body, &joiner)) {
+                response->status = 400;
+            } else {
+                error = rest_add_joiner(instance, &joiner);
+                response->status = error == OT_ERROR_NONE ? 200
+                    : error == OT_ERROR_INVALID_ARGS      ? 400
+                    : error == OT_ERROR_NO_BUFS           ? 507
+                                                          : 500;
+            }
+        } else if (!rest_joiner_id(state, &joiner)) {
+            response->status = 400;
+        } else if (otCommissionerGetState(instance) != OT_COMMISSIONER_STATE_ACTIVE) {
+            response->status = 409;
+        } else {
+            rest_remove_joiner(instance, &joiner);
+        }
+    } else if (!strcmp(path, "/node/ba-epskc/state")) {
+        if (request->method == HTTP_GET) {
+            response->json = cJSON_CreateString(
+                otBorderAgentEphemeralKeyGetState(instance) == OT_BORDER_AGENT_STATE_DISABLED ? "disabled" : "enabled");
+        } else if (!state || (strcmp(state, "enable") && strcmp(state, "disable"))) {
+            response->status = 400;
+        } else {
+            otBorderAgentEphemeralKeySetEnabled(instance, !strcmp(state, "enable"));
+        }
+    } else if (!strcmp(path, "/node/ba-epskc/key")) {
+        if (request->method == HTTP_GET) {
+            response->json = cJSON_CreateObject();
+            cJSON_AddStringToObject(response->json, "state",
+                                    epskc_state_to_string(otBorderAgentEphemeralKeyGetState(instance)));
+            cJSON_AddNumberToObject(response->json, "port", otBorderAgentEphemeralKeyGetUdpPort(instance));
+        } else if (request->method == HTTP_DELETE) {
+            otBorderAgentEphemeralKeyStop(instance);
+            esp_br_web_epskc_set_active_tap(NULL);
+        } else {
+            cJSON *lifetime = rest_get(body, "lifetime"), *port = rest_get(body, "port");
+            if ((*request->body && !cJSON_IsObject(body)) ||
+                (lifetime && !rest_number(lifetime, OT_BORDER_AGENT_MAX_EPHEMERAL_KEY_TIMEOUT)) ||
+                (port && !rest_number(port, UINT16_MAX))) {
+                response->status = 400;
+            } else {
+                otBorderAgentEphemeralKeyTap tap;
+                error = otBorderAgentEphemeralKeyGenerateTap(&tap);
+                if (error == OT_ERROR_NONE) {
+                    error = otBorderAgentEphemeralKeyStart(instance, tap.mTap,
+                                                           lifetime ? lifetime->valuedouble
+                                                                    : OT_BORDER_AGENT_DEFAULT_EPHEMERAL_KEY_TIMEOUT,
+                                                           port ? port->valuedouble : 0);
+                }
+                if (error == OT_ERROR_NONE) {
+                    esp_br_web_epskc_set_active_tap(tap.mTap);
+                    response->json = cJSON_CreateObject();
+                    cJSON_AddStringToObject(response->json, "tap", tap.mTap);
+                    cJSON_AddNumberToObject(response->json, "port", otBorderAgentEphemeralKeyGetUdpPort(instance));
+                } else {
+                    response->status = error == OT_ERROR_INVALID_STATE ? 409
+                        : error == OT_ERROR_INVALID_ARGS               ? 400
+                                                                       : 500;
+                }
+            }
+        }
+    } else {
+        response->status = 404;
+    }
+    cJSON_Delete(body);
+exit:
     esp_openthread_lock_release();
 }

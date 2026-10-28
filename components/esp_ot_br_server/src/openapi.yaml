@@ -1,409 +1,2051 @@
-openapi: 3.0.0
+openapi: 3.0.3
 info:
-  title: Swagger ESP Thread Border Router REST API
-  description: |-
-    This describes the ESP Thread Border Router REST API. The API is provided by ot_task_br_web if the cmake flag `CONFIG_OPENTHREAD_BR_START_WEB=y` is set. By default
-    the REST API listens on any address on port 80.
-
-    Some useful links:
-    - [ESP Thread Rorder Router](https://github.com/espressif/esp-thread-br)
+  title: ESP Thread Border Router REST API
+  version: 2.0.0
+  description: Thread REST endpoints compatible with the ot-br-posix REST API 0.6.0 contract. Enable CONFIG_OPENTHREAD_BR_START_WEB
+    to serve these endpoints on port 80. Structured JSON uses lower camel case. Request bodies are limited to 16
+    KiB; each volatile collection holds up to 200 items.
   license:
-    name: Apache
+    name: Apache-2.0
     url: https://github.com/espressif/esp-thread-br/blob/main/LICENSE
-  version: 1.1.0
 servers:
-  - url: http://localhost:80
-tags:
-  - name: discovery
-    description: REST API version and entry point discovery.
-  - name: node
-    description: Thread parameters of this node.
-  - name: diagnostics
-    description: Thread network diagnostic.
+- url: http://esp-ot-br.local:80
 paths:
-  /.well-known/thread/esp-br-rest:
-    get:
-      tags:
-        - discovery
-      summary: Discover the REST API version and entry points
-      responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/WellKnownBrRest"
-  /diagnostics:
-    get:
-      tags:
-        - diagnostics
-      summary: Get Thread network diagnostics
-      responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: object
   /node:
     get:
-      tags:
-        - node
-      summary: Get current active node parameters
+      summary: Read /node
       responses:
-        "200":
-          description: Successful operation
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Erase persistent Thread configuration and restart
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /node/ba-id:
+    get:
+      summary: Read /node/ba-id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: &id005
+                type: string
+                pattern: ^[0-9a-fA-F]{32}$
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /node/rloc:
+    get:
+      summary: Read /node/rloc
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: string
+                format: ipv6
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /node/rloc16:
+    get:
+      summary: Read /node/rloc16
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: integer
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /node/ext-address:
+    get:
+      summary: Read /node/ext-address
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: &id001
+                type: string
+                pattern: ^[0-9a-fA-F]{16}$
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /node/network-name:
+    get:
+      summary: Read /node/network-name
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: string
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /node/leader-data:
+    get:
+      summary: Read /node/leader-data
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaderData'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /node/num-of-router:
+    get:
+      summary: Read /node/num-of-router
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: integer
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /node/ext-panid:
+    get:
+      summary: Read /node/ext-panid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: *id001
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /node/coprocessor/version:
+    get:
+      summary: Read /node/coprocessor/version
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: string
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /node/state:
+    get:
+      summary: Read /node/state
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: string
+                enum:
+                - disabled
+                - detached
+                - child
+                - router
+                - leader
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Set /node/state
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Payload Too Large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+              enum:
+              - enable
+              - disable
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /node/dataset/active:
+    get:
+      summary: Read /node/dataset/active
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveDataset'
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/DatasetTlvs'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '204':
+          description: Dataset is absent.
+    put:
+      summary: Set /node/dataset/active
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Payload Too Large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '201':
+          description: Created a dataset.
+        '412':
+          description: Precondition Failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActiveDataset'
+          text/plain:
+            schema:
+              $ref: '#/components/schemas/DatasetTlvs'
+      parameters:
+      - name: If-None-Match
+        in: header
+        schema:
+          type: string
+          enum:
+          - '*'
+        description: Write only when no dataset exists.
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /node/dataset/pending:
+    get:
+      summary: Read /node/dataset/pending
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PendingDataset'
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/DatasetTlvs'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '204':
+          description: Dataset is absent.
+    put:
+      summary: Set /node/dataset/pending
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Payload Too Large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '201':
+          description: Created a dataset.
+        '412':
+          description: Precondition Failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '504':
+          description: Gateway Timeout
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PendingDataset'
+          text/plain:
+            schema:
+              $ref: '#/components/schemas/DatasetTlvs'
+      parameters:
+      - name: If-None-Match
+        in: header
+        schema:
+          type: string
+          enum:
+          - '*'
+        description: Write only when no dataset exists.
+      description: Register with the Thread leader. JSON requires activeDataset and delay. The HTTP request waits
+        up to 30 seconds for the leader response.
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /node/commissioner/state:
+    get:
+      summary: Read /node/commissioner/state
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: string
+                enum:
+                - disabled
+                - petitioning
+                - active
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Set /node/commissioner/state
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Payload Too Large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+              enum:
+              - enable
+              - disable
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /node/commissioner/joiner:
+    get:
+      summary: List commissioner joiners
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Joiner'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Add a commissioner joiner
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Payload Too Large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '507':
+          description: Insufficient Storage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Joiner'
+    delete:
+      summary: Remove a joiner by ID, EUI-64, discerner, or wildcard
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /node/ba-epskc/state:
+    get:
+      summary: Read /node/ba-epskc/state
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: string
+                enum:
+                - enabled
+                - disabled
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Set /node/ba-epskc/state
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Payload Too Large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+              enum:
+              - enable
+              - disable
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /node/ba-epskc/key:
+    get:
+      summary: Read the ephemeral key session
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EpskcStatus'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Activate an ephemeral key session
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EpskcKey'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Payload Too Large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EpskcActivation'
+    delete:
+      summary: Stop the ephemeral key session
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/actions:
+    get:
+      summary: Read the actions collection
+      responses:
+        '200':
+          description: Success
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/CollectionDocument'
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '406':
+          description: Not Acceptable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters: &id002
+      - name: fields[type]
+        in: query
+        schema:
+          type: string
+        description: Comma-separated attributes for a resource type. Nested attributes use a dot.
+    delete:
+      summary: Clear the actions collection
+      responses:
+        '204':
+          description: Success
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Queue Thread actions
+      responses:
+        '200':
+          description: Success
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/CollectionDocument'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '406':
+          description: Not Acceptable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Payload Too Large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '415':
+          description: Unsupported Media Type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '#/components/schemas/ActionRequest'
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/actions/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      summary: Read one actions item
+      responses:
+        '200':
+          description: Success
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/ResourceDocument'
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '406':
+          description: Not Acceptable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters: *id002
+    delete:
+      summary: Remove one actions item
+      responses:
+        '204':
+          description: Success
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/devices:
+    get:
+      summary: Read the devices collection
+      responses:
+        '200':
+          description: Success
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/CollectionDocument'
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '406':
+          description: Not Acceptable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters: &id003
+      - name: fields[type]
+        in: query
+        schema:
+          type: string
+        description: Comma-separated attributes for a resource type. Nested attributes use a dot.
+    delete:
+      summary: Clear the devices collection
+      responses:
+        '204':
+          description: Success
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/devices/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      summary: Read one devices item
+      responses:
+        '200':
+          description: Success
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/ResourceDocument'
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '406':
+          description: Not Acceptable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters: *id003
+    delete:
+      summary: Remove one devices item
+      responses:
+        '204':
+          description: Success
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/diagnostics:
+    get:
+      summary: Read the diagnostics collection
+      responses:
+        '200':
+          description: Success
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/CollectionDocument'
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '406':
+          description: Not Acceptable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters: &id004
+      - name: fields[type]
+        in: query
+        schema:
+          type: string
+        description: Comma-separated attributes for a resource type. Nested attributes use a dot.
+    delete:
+      summary: Clear the diagnostics collection
+      responses:
+        '204':
+          description: Success
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/diagnostics/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      summary: Read one diagnostics item
+      responses:
+        '200':
+          description: Success
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/ResourceDocument'
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '406':
+          description: Not Acceptable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters: *id004
+    delete:
+      summary: Remove one diagnostics item
+      responses:
+        '204':
+          description: Success
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/node:
+    get:
+      summary: Read this border router as a device resource
+      responses:
+        '200':
+          description: Success
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/ResourceDocument'
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '406':
+          description: Not Acceptable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /.well-known/thread/br-rest:
+    get:
+      summary: Read /.well-known/thread/br-rest
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Discovery'
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    options:
+      summary: List supported methods
+      responses:
+        '200':
+          description: Allowed methods.
+          headers:
+            Allow:
+              schema:
+                type: string
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /diagnostics:
+    get:
+      summary: Read /diagnostics
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /.well-known/thread/esp-br-rest:
+    get:
+      summary: Read /.well-known/thread/esp-br-rest
+      responses:
+        '200':
+          description: Success
           content:
             application/json:
               schema:
                 type: object
-    delete:
-      tags:
-        - node
-      summary: Erase all persistent information, essentially factory reset the Border Router.
-      responses:
-        "200":
-          description: Successful operation
-        "409":
-          description: Thread interface is in wrong state.
-  /node/ba-id:
-    get:
-      tags:
-        - node
-      summary: Get the border agent ID
-      responses:
-        "200":
-          description: Successful operation
+                additionalProperties: true
+        '405':
+          description: Method Not Allowed
           content:
             application/json:
               schema:
-                type: string
-                description: 16 byte border agent ID as hex string.
-                example: "AA897CA8A67F6E6DD6166133AD1562A5"
-  /node/rloc:
-    get:
-      tags:
-        - node
-      summary: Routing Locator IPv6 address of this Thread node.
-      responses:
-        "200":
-          description: Successful operation
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
           content:
             application/json:
               schema:
-                type: string
-                description: RLOC IPv6 address
-                example: "fda4:728e:4b39:bc4a:0:ff:fe00:1000"
-  /node/rloc16:
-    get:
-      tags:
-        - node
-      summary: Routing Locator Router and Child ID (RLOC16).
-      description: Last 16-bit of the Routing Locator IPv6 consisting of the Router ID and a Child ID.
-      responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: number
-                description: RLOC16 address
-                example: 4096
-  /node/ext-address:
-    get:
-      tags:
-        - node
-      summary: IEEE 802.15.4 Extended Address (EUI-64).
-      responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: string
-                description: 8-byte IEEE 802.15.4 Extended Address of this node as hex string.
-                example: "C21F906BE0352A4C"
-  /node/state:
-    get:
-      tags:
-        - node
-      summary: Get current Thread state.
-      description: |-
-        State describing the current Thread role of this Thread node.
-        - disabled: The Thread stack is disabled.
-        - detached: Not currently participating in a Thread network/partition.
-        - child: The Thread Child role.
-        - router: The Thread Router role.
-        - leader: The Thread Leader role.
-      responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: string
-                description: Current state
-                example: "leader"
-    put:
-      tags:
-        - node
-      summary: Set current Thread state.
-      description: |-
-        Enable and disable the Thread protocol operation. If network interface
-        hasn't been started yet, it will get started automatically.
-      responses:
-        "200":
-          description: Successful operation.
-      requestBody:
-        description: New Thread state
-        content:
-          application/json:
-            schema:
-              type: string
-              description: Can be "enable" or "disable".
-              example: "enable"
-  /node/network-name:
-    get:
-      tags:
-        - node
-      summary: Thread network name this node is part of.
-      responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: string
-                description: Thread network name.
-                example: "OpenThread-e445"
-  /node/leader-data:
-    get:
-      tags:
-        - node
-      summary: Gets the network's leader data.
-      responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/LeaderData"
-  /node/ext-panid:
-    get:
-      tags:
-        - node
-      summary: Extended PAN ID.
-      responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: string
-                description: 8-byte extended PAN ID as hex string.
-                example: "3CAB144450CF407E"
-  /node/num-of-router:
-    get:
-      tags:
-        - node
-      summary: Get number of router devices
-      responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: number
-                description: Number of routers
-                example: 1
-  /node/dataset/active:
-    get:
-      tags:
-        - node
-      summary: Get current active operational dataset
-      responses:
-        "200":
-          description: Returns currently active operational dataset
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ActiveDataset"
-            text/plain:
-              schema:
-                $ref: "#/components/schemas/DatasetTlv"
-        "204":
-          description: No active operational dataset
-    put:
-      tags:
-        - node
-      summary: Creates or updates the active operational dataset
-      description: |-
-        Creates or updates the the active operational dataset on the current node. Only allowed if the Thread node
-        is inactive. If the Thread node is active, a pending dataset should be used to update the current active
-        operational dataset.
-      requestBody:
-        description: |-
-          Operational dataset that will be stored as active operational dataset. Supports request body Content-Type
-          `text/plain` (dataset in TLV format as hex string) or `application/json` (dataset in JSON format). In both
-          cases keys which are not set will be initialized with defaults.
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ActiveDataset"
-          plain/text:
-            schema:
-              $ref: "#/components/schemas/DatasetTlv"
-      responses:
-        "200":
-          description: Successfully updated the active operational dataset.
-        "201":
-          description: Successfully created the active operational dataset.
-        "400":
-          description: Invalid request body.
-        "409":
-          description: Writing active operational dataset rejected because Thread network is active.
-  /node/dataset/pending:
-    get:
-      tags:
-        - node
-      summary: Get current pending operational dataset
-      responses:
-        "200":
-          description: Returns currently pending operational dataset
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PendingDataset"
-            text/plain:
-              schema:
-                $ref: "#/components/schemas/DatasetTlv"
-        "204":
-          description: No pending operational dataset
-    put:
-      tags:
-        - node
-      summary: Creates or updates the pending operational dataset
-      description: |-
-        Creates or updates the the pending operational dataset on the current node. Delay needs to be set to let
-        the pending dataset apply as active dataset in the near future.
-      requestBody:
-        description: |-
-          Operational dataset that will be stored as pending operational dataset. Supports request body Content-Type
-          `text/plain` (dataset in TLV format as hex string) or `application/json` (dataset in JSON format). In both
-          cases keys which are not set will be initialized with defaults.
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PendingDataset"
-          text/plain:
-            schema:
-              $ref: "#/components/schemas/DatasetTlv"
-      responses:
-        "200":
-          description: Successfully updated the pending operational dataset.
-        "201":
-          description: Successfully created the pending operational dataset.
-        "400":
-          description: Invalid request body.
-  /node/ba-epskc/state:
-    get:
-      tags:
-        - node
-      summary: Get whether the Border Agent ephemeral key (ePSKc) feature is enabled.
-      responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: string
-                description: Whether the ephemeral key feature is enabled.
-                enum: ["enabled", "disabled"]
-                example: "enabled"
-    put:
-      tags:
-        - node
-      summary: Enable or disable the Border Agent ephemeral key (ePSKc) feature.
-      description: |-
-        The feature must be enabled before an ephemeral key can be activated
-        with a POST request to `/node/ba-epskc/key`.
-      responses:
-        "200":
-          description: Successful operation.
-        "400":
-          description: Invalid request body.
-      requestBody:
-        description: New ephemeral key feature state.
-        content:
-          application/json:
-            schema:
-              type: string
-              description: Can be "enable" or "disable".
-              example: "enable"
-  /node/ba-epskc/key:
-    get:
-      tags:
-        - node
-      summary: Get the status of the Border Agent ephemeral key (ePSKc) session.
-      responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/EpskcStatus"
-    post:
-      tags:
-        - node
-      summary: Generate and activate an ephemeral key (ePSKc).
-      description: |-
-        Generates a new 9-digit Thread Administration Passcode (TAP) and
-        starts listening for an external commissioner candidate to connect
-        using it. The ephemeral key feature must first be enabled with a PUT
-        request to `/node/ba-epskc/state`.
-      requestBody:
-        description: Optional activation parameters. An empty body uses the device defaults.
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                lifetime:
-                  type: integer
-                  description: |-
-                    The key lifetime in milliseconds. Defaults to 2 minutes
-                    when omitted or zero. Capped at 10 minutes.
-                  example: 120000
-                port:
-                  type: integer
-                  description: The UDP port to use. Defaults to an ephemeral port when omitted.
-                  example: 49152
-      responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/EpskcActivateResult"
-        "400":
-          description: Invalid request body.
-        "409":
-          description: Ephemeral key feature disabled, or a key is already active.
-        "500":
-          description: Failed to start the ephemeral key session.
-    delete:
-      tags:
-        - node
-      summary: Deactivate the currently active ephemeral key (ePSKc), if any.
-      description: |-
-        Stops the ephemeral key use and disconnects any commissioner session
-        using it. Has no effect if there is no ephemeral key in use.
-      responses:
-        "200":
-          description: Successful operation.
+                $ref: '#/components/schemas/Error'
 components:
   schemas:
-    WellKnownBrRest:
+    Error:
+      type: object
+      properties:
+        status:
+          type: integer
+        title:
+          type: string
+        detail:
+          type: string
+      required:
+      - status
+      - title
+    Timestamp:
+      type: object
+      properties:
+        seconds:
+          type: integer
+          minimum: 0
+          maximum: 281474976710655
+        ticks:
+          type: integer
+          minimum: 0
+          maximum: 32767
+        authoritative:
+          type: boolean
+    SecurityPolicy:
+      type: object
+      properties:
+        rotationTime:
+          type: integer
+          minimum: 0
+          maximum: 65535
+        obtainNetworkKey:
+          type: boolean
+        nativeCommissioning:
+          type: boolean
+        routers:
+          type: boolean
+        externalCommissioning:
+          type: boolean
+        commercialCommissioning:
+          type: boolean
+        autonomousEnrollment:
+          type: boolean
+        networkKeyProvisioning:
+          type: boolean
+        tobleLink:
+          type: boolean
+        nonCcmRouters:
+          type: boolean
+    ActiveDataset:
+      type: object
+      properties:
+        activeTimestamp:
+          $ref: '#/components/schemas/Timestamp'
+        networkKey: *id005
+        networkName:
+          type: string
+          maxLength: 16
+        extPanId: *id001
+        meshLocalPrefix:
+          type: string
+          example: fd00::/64
+        panId:
+          type: integer
+          minimum: 0
+          maximum: 65535
+        channel:
+          type: integer
+        pskc: *id005
+        securityPolicy:
+          $ref: '#/components/schemas/SecurityPolicy'
+        channelMask:
+          type: integer
+          minimum: 0
+          maximum: 4294967295
+    PendingDataset:
+      type: object
+      properties:
+        activeDataset:
+          oneOf:
+          - $ref: '#/components/schemas/ActiveDataset'
+          - $ref: '#/components/schemas/DatasetTlvs'
+        pendingTimestamp:
+          $ref: '#/components/schemas/Timestamp'
+        delay:
+          type: integer
+          minimum: 0
+          maximum: 4294967295
+      required:
+      - activeDataset
+      - delay
+    DatasetTlvs:
+      type: string
+      pattern: ^([0-9a-fA-F]{2})*$
+    LeaderData:
+      type: object
+      properties:
+        partitionId:
+          type: integer
+        weighting:
+          type: integer
+        dataVersion:
+          type: integer
+        stableDataVersion:
+          type: integer
+        leaderRouterId:
+          type: integer
+    Node:
+      type: object
+      properties:
+        baId: *id005
+        baState:
+          type: string
+        state:
+          type: string
+          enum:
+          - disabled
+          - detached
+          - child
+          - router
+          - leader
+        routerCount:
+          type: integer
+        rlocAddress:
+          type: string
+          format: ipv6
+        extAddress: *id001
+        networkName:
+          type: string
+        rloc16:
+          type: string
+          pattern: ^0x[0-9a-f]{4}$
+        routerId:
+          type: integer
+        leaderData:
+          $ref: '#/components/schemas/LeaderData'
+        extPanId: *id001
+    Mode:
+      type: object
+      properties:
+        rxOnWhenIdle:
+          type: boolean
+        fullThreadDevice:
+          type: boolean
+        fullNetworkData:
+          type: boolean
+    Joiner:
+      type: object
+      properties:
+        pskd:
+          type: string
+          minLength: 6
+          maxLength: 32
+        joinerId:
+          type: string
+        eui: *id001
+        discerner:
+          type: string
+          example: 0x0000000000000001/16
+        timeout:
+          type: integer
+          default: 60
+      required:
+      - pskd
+    EpskcStatus:
+      type: object
+      properties:
+        state:
+          type: string
+          enum:
+          - disabled
+          - stopped
+          - started
+          - connected
+          - accepted
+        port:
+          type: integer
+      required:
+      - state
+      - port
+    EpskcActivation:
+      type: object
+      properties:
+        lifetime:
+          type: integer
+          minimum: 0
+          maximum: 600000
+          description: Milliseconds; zero selects the OpenThread default.
+        port:
+          type: integer
+          minimum: 0
+          maximum: 65535
+          default: 0
+    EpskcKey:
+      type: object
+      properties:
+        tap:
+          type: string
+          pattern: ^[0-9]{9}$
+        port:
+          type: integer
+      required:
+      - tap
+      - port
+    Discovery:
       type: object
       properties:
         api:
@@ -411,218 +2053,250 @@ components:
           properties:
             version:
               type: string
-              description: The running REST API's semantic version.
-              example: "1.1.0"
             base:
               type: string
-              description: The base path entry points are relative to.
-              example: "/"
+          required:
+          - version
+          - base
         links:
           type: array
-          description: RFC 8288 web links to REST API entry points.
           items:
             type: object
             properties:
               href:
                 type: string
-                example: "/node"
               rel:
                 type: string
-                example: "node"
               type:
                 type: array
                 items:
                   type: string
-                example: ["application/json"]
-    LeaderData:
+            required:
+            - href
+            - rel
+            - type
+      required:
+      - api
+      - links
+    CollectionMeta:
       type: object
       properties:
-        PartitionId:
-          type: number
-          format: uint32
-          description: Partition ID
-          example: 1230046604
-        Weighting:
-          type: number
-          format: uint8
-          description: Leader Weight
-          example: 64
-        DataVersion:
-          type: number
-          description: Full network data version
-          example: 244
-        StableDataVersion:
-          type: number
-          format: uint8
-          description: Stable Network Data Version
-          example: 186
-        LeaderRouterId:
-          type: number
-          format: uint8
-          description: Leader Router ID
-          example: 4
-    ActiveDataset:
+        collection:
+          type: object
+          properties:
+            offset:
+              type: integer
+            limit:
+              type: integer
+            total:
+              type: integer
+            pending:
+              type: integer
+    addThreadDeviceTask:
       type: object
       properties:
-        ActiveTimestamp:
-          $ref: "#/components/schemas/Timestamp"
-        NetworkKey:
+        type:
           type: string
-          description: Network key, 16 bytes long, formatted as a hexadecimal string
-          example: 08277229F21FB7342D705D3CEFDC042A
-          default: random
-        NetworkName:
-          type: string
-          description: Network name, 16 bytes long
-          example: OpenThread-e445
-          default: OpenThread-<PanId>
-        ExtPanId:
-          type: string
-          description: Extended PAN ID, 8 bytes long, formatted as a hexadecimal string
-          example: 996D3BEE320097A3
-          default: random
-        MeshLocalPrefix:
-          type: string
-          description: Mesh local IPv6 prefix
-          example: fd33:d3b9:89e3:72e4::/64
-          default: random
-        PanId:
-          type: integer
-          description: IEEE 802.15.4 PAN ID of the Thread network
-          format: uint16
-          example: 58437
-          default: random
-        Channel:
-          type: integer
-          description: IEEE 802.15.4 channel of the Thread network
-          format: uint16
-          example: 21
-          default: random
-        PSKc:
-          type: string
-          description: The pre-shared commissioner key
-          example: FD943ECA225A28979B991EFAC1218A72
-          default: random
-        SecurityPolicy:
-          $ref: "#/components/schemas/SecurityPolicy"
-        ChannelMask:
-          type: integer
-          description: Channel mask
-          format: uint32
-          example: 134215680
-          default: 134215680
-    PendingDataset:
+          enum:
+          - addThreadDeviceTask
+        attributes:
+          $ref: '#/components/schemas/Joiner'
+      required:
+      - type
+      - attributes
+    updateDeviceCollectionTask:
       type: object
       properties:
-        ActiveDataset:
-          oneOf:
-            - $ref: "#/components/schemas/ActiveDataset"
-            - $ref: "#/components/schemas/DatasetTlv"
-        PendingTimestamp:
-          $ref: "#/components/schemas/Timestamp"
-        Delay:
-          type: integer
-          description: Delay timer in milliseconds
-          format: uint32
-          example: 30000
-          default: not set
-    SecurityPolicy:
-      type: object
-      properties:
-        RotationTime:
-          type: integer
-          description: Thread key rotation time in hours
-          format: uint16
-          example: 672
-          default: 672
-        ObtainNetworkKey:
-          type: boolean
-          description: Obtaining the Network Key for out-of-band commissioning is enabled
-          example: true
-          default: true
-        NativeCommissioning:
-          type: boolean
-          description: Native Commissioning using PSKc is allowed
-          example: true
-          default: true
-        Routers:
-          type: boolean
-          description: Thread 1.0/1.1.x Routers are enabled
-          example: true
-          default: true
-        ExternalCommissioning:
-          type: boolean
-          description: External Commissioner authentication is allowed
-          example: true
-          default: true
-        CommercialCommissioning:
-          type: boolean
-          description: Commercial Commissioning is enabled
-          example: false
-          default: false
-        AutonomousEnrollment:
-          type: boolean
-          description: Autonomous Enrollment is enabled
-          example: false
-          default: false
-        NetworkKeyProvisioning:
-          type: boolean
-          description: Network Key Provisioning is enabled
-          example: false
-          default: false
-        TobleLink:
-          type: boolean
-          description: ToBLE link is enabled
-          example: false
-          default: false
-        NonCcmRouters:
-          type: boolean
-          description: Non-CCM Routers enabled
-          example: false
-          default: false
-    Timestamp:
-      type: object
-      properties:
-        Seconds:
-          type: integer
-          description: Timestamp seconds
-          format: uint64
-          example: 10
-          default: 1
-        Ticks:
-          type: integer
-          description: Timestamp ticks
-          format: uint16
-          example: 0
-          default: 0
-        Authoritative:
-          type: boolean
-          example: false
-          default: false
-    DatasetTlv:
-      type: string
-      description: Operational dataset as hex-encoded TLVs.
-      example: 0E080000000000010000000300000F35060004001FFFE0020811111111222222220708FDAD70BFE5AA15DD051000112233445566778899AABBCCDDEEFF030E4F70656E54687265616444656D6F010212340410445F2B5CA6F2A93A55CE570A70EFEECB0C0402A0F7F8
-    EpskcStatus:
-      type: object
-      properties:
-        state:
+        type:
           type: string
-          description: The Border Agent ephemeral key session state.
-          enum: ["disabled", "stopped", "started", "connected", "accepted"]
-          example: "started"
-        port:
-          type: integer
-          description: The UDP port used by the ephemeral key session, if active.
-          example: 49152
-    EpskcActivateResult:
+          enum:
+          - updateDeviceCollectionTask
+        attributes:
+          type: object
+          properties:
+            maxAge:
+              type: number
+            maxRetries:
+              type: integer
+            deviceCount:
+              type: integer
+            timeout: &id006
+              type: number
+              description: Action deadline in seconds.
+          required:
+          - maxAge
+          - maxRetries
+          - deviceCount
+          - timeout
+      required:
+      - type
+      - attributes
+    getNetworkDiagnosticTask:
       type: object
       properties:
-        tap:
+        type:
           type: string
-          description: The generated 9-digit Thread Administration Passcode (TAP).
-          example: "123456789"
-        port:
-          type: integer
-          description: The UDP port the border agent is listening on for the ePSKc session.
-          example: 49152
+          enum:
+          - getNetworkDiagnosticTask
+        attributes:
+          type: object
+          properties:
+            destination: &id007
+              type: string
+              description: Extended address, ML-EID IID, or RLOC16.
+            destinationType: &id008
+              type: string
+              enum:
+              - extended
+              - mleid
+              - rloc
+            types:
+              type: array
+              items:
+                type: string
+                enum:
+                - extAddress
+                - rloc16
+                - mode
+                - timeout
+                - connectivity
+                - route
+                - leaderData
+                - networkData
+                - ipv6Addresses
+                - macCounters
+                - batteryLevel
+                - supplyVoltage
+                - childTable
+                - channelPages
+                - maxChildTimeout
+                - lDevIdSubject
+                - iDevIdCert
+                - eui
+                - threadVersion
+                - vendorName
+                - vendorModel
+                - vendorSwVersion
+                - threadStackVersion
+                - children
+                - childIpv6Addresses
+                - routerNeighbors
+                - mleCounters
+            timeout: *id006
+          required:
+          - destination
+          - types
+          - timeout
+      required:
+      - type
+      - attributes
+    resetNetworkDiagCounterTask:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+          - resetNetworkDiagCounterTask
+        attributes:
+          type: object
+          properties:
+            destination: *id007
+            destinationType: *id008
+            types:
+              type: array
+              items:
+                type: string
+                enum:
+                - macCounters
+                - mleCounters
+            timeout: *id006
+          required:
+          - types
+          - timeout
+      required:
+      - type
+      - attributes
+    getEnergyScanTask:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+          - getEnergyScanTask
+        attributes:
+          type: object
+          properties:
+            destination: *id007
+            destinationType: *id008
+            channelMask:
+              type: array
+              items:
+                type: integer
+                minimum: 11
+                maximum: 26
+            count:
+              type: integer
+            period:
+              type: integer
+            scanDuration:
+              type: integer
+            timeout: *id006
+          required:
+          - destination
+          - channelMask
+          - count
+          - period
+          - scanDuration
+          - timeout
+      required:
+      - type
+      - attributes
+    ActionRequest:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/addThreadDeviceTask'
+            - $ref: '#/components/schemas/updateDeviceCollectionTask'
+            - $ref: '#/components/schemas/getNetworkDiagnosticTask'
+            - $ref: '#/components/schemas/resetNetworkDiagCounterTask'
+            - $ref: '#/components/schemas/getEnergyScanTask'
+      required:
+      - data
+    Resource:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        attributes:
+          type: object
+          additionalProperties: true
+        relationships:
+          type: object
+          additionalProperties: true
+      required:
+      - id
+      - type
+      - attributes
+    ResourceDocument:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Resource'
+      required:
+      - data
+    CollectionDocument:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Resource'
+        meta:
+          $ref: '#/components/schemas/CollectionMeta'
+      required:
+      - data
