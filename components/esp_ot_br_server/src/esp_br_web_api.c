@@ -3271,6 +3271,10 @@ static void rest_poll(otInstance *instance)
 static void rest_process_task(void *argument)
 {
     (void)argument;
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    rest_self(esp_openthread_get_instance());
+    esp_openthread_lock_release();
+
     while (true) {
         esp_openthread_lock_acquire(portMAX_DELAY);
         rest_poll(esp_openthread_get_instance());
@@ -3290,9 +3294,6 @@ esp_err_t esp_br_thread_rest_init(void)
     if (!s_rest_pending_done) {
         return ESP_ERR_NO_MEM;
     }
-    esp_openthread_lock_acquire(portMAX_DELAY);
-    rest_self(esp_openthread_get_instance());
-    esp_openthread_lock_release();
     return xTaskCreate(rest_process_task, "thread_rest", 8192, NULL, 4, &s_rest_task) == pdPASS ? ESP_OK
                                                                                                 : ESP_ERR_NO_MEM;
 }
