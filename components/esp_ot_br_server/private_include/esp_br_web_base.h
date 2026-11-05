@@ -208,6 +208,8 @@ esp_err_t update_thread_diagnosticTlv_set(thread_diagnosticTlv_set_t *set, char 
                                           thread_diagnosticTlv_list_t *list);
 void destroy_thread_diagnosticTlv_set(thread_diagnosticTlv_set_t *set);
 cJSON *diagnosticTlv_set_convert2_json(const thread_diagnosticTlv_set_t *set);
+/* One router of the set as a JSON object, or NULL if the node carries no TLVs. */
+cJSON *diagnosticTlv_node_convert2_json(const thread_diagnosticTlv_set_t *node);
 
 void thread_node_information_reset(thread_node_information_t *node);
 cJSON *thread_node_struct_convert2_json(thread_node_information_t *node);
