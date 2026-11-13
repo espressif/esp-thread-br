@@ -609,7 +609,6 @@ otError handle_openthread_form_network_request(const cJSON *request, cJSON *log)
 
     otInstance *ins = esp_openthread_get_instance();
     otOperationalDataset dataset;
-    add_prefix_field(param.on_mesh_prefix);
 
     esp_openthread_lock_acquire(portMAX_DELAY);
     ret = OT_ERROR_FAILED;
@@ -625,6 +624,12 @@ otError handle_openthread_form_network_request(const cJSON *request, cJSON *log)
     dataset.mChannel = param.channel;
     dataset.mExtendedPanId = param.extended_panid;
     dataset.mPanId = param.panid;
+    if (param.passphrase[0] != '\0') {
+        ERROR_EXIT(
+            otDatasetGeneratePskc(param.passphrase, &dataset.mNetworkName, &dataset.mExtendedPanId, &dataset.mPskc),
+            exit, API_TAG, "Failed to generate PSKc from passphrase");
+        dataset.mComponents.mIsPskcPresent = true;
+    }
     ESP_LOGI(API_TAG, "dataset init new");
 
     ERROR_EXIT(otDatasetSetActive(ins, &dataset), exit, API_TAG, "Failed to set active dataset");

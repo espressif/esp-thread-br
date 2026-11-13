@@ -307,10 +307,6 @@ esp_err_t network_formation_param_json_convert2_struct(const cJSON *root, cJSON 
         return ESP_ERR_INVALID_ARG;
     }
 
-    if ((temp = cJSON_GetObjectItem(root, "prefix")) && strlen(temp->valuestring) + 1 < OT_IP6_PREFIX_STRING_SIZE) {
-        memcpy(param->on_mesh_prefix, temp->valuestring, strlen(temp->valuestring) + 1);
-    }
-
     if (!(temp = cJSON_GetObjectItem(root, "networkKey")) || strlen(temp->valuestring) != OT_NETWORK_KEY_SIZE * 2 ||
         string_to_hex(temp->valuestring, param->network_key.m8, OT_NETWORK_KEY_SIZE)) {
         ESP_LOGW(BASE_TAG, "Error: Network Key requires 32 bytes");
@@ -318,13 +314,18 @@ esp_err_t network_formation_param_json_convert2_struct(const cJSON *root, cJSON 
         return ESP_ERR_INVALID_ARG;
     }
 
-    if ((temp = cJSON_GetObjectItem(root, "passphrase")) &&
-        strlen(temp->valuestring) + 1 < NETWORK_PASSPHRASE_MAX_SIZE) {
-        memcpy(param->passphrase, temp->valuestring, strlen(temp->valuestring) + 1);
+    temp = cJSON_GetObjectItem(root, "passphrase");
+    if (cJSON_IsString(temp) && temp->valuestring[0] != '\0') {
+        size_t passphrase_len = strlen(temp->valuestring);
+        if (passphrase_len < OT_COMMISSIONING_PASSPHRASE_MIN_SIZE ||
+            passphrase_len > OT_COMMISSIONING_PASSPHRASE_MAX_SIZE) {
+            ESP_LOGW(BASE_TAG, "Error: Passphrase length must be %d-%d", OT_COMMISSIONING_PASSPHRASE_MIN_SIZE,
+                     OT_COMMISSIONING_PASSPHRASE_MAX_SIZE);
+            cJSON_SetValuestring(log, "Error: Passphrase length must be 6-255");
+            return ESP_ERR_INVALID_ARG;
+        }
+        memcpy(param->passphrase, temp->valuestring, passphrase_len + 1);
     }
-
-    temp = cJSON_GetObjectItem(root, "defaultRoute");
-    param->default_route = cJSON_IsTrue(temp);
 
     return ret;
 }
