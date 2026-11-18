@@ -150,7 +150,7 @@ static void wifi_config_dns_server_task(void *arg)
 {
     // Store gateway IP address locally to avoid accessing potentially invalid pointer
     esp_ip4_addr_t gateway_addr;
-    IP4_ADDR(&gateway_addr, 192, 168, 4, 1);
+    IP4_ADDR(&gateway_addr, 172, 217, 28, 1);
 
     char buffer[512];
 
@@ -231,10 +231,11 @@ static esp_err_t wifi_config_start_softap(void)
     s_ap_netif = esp_netif_create_default_wifi_ap();
     ESP_RETURN_ON_FALSE(s_ap_netif != NULL, ESP_FAIL, WIFI_CONFIG_TAG, "Failed to create AP netif");
 
-    // Set AP IP address to 192.168.4.1
+    // Set AP IP address to 172.217.28.1
     esp_netif_ip_info_t ip_info;
-    IP4_ADDR(&ip_info.ip, 192, 168, 4, 1);
-    IP4_ADDR(&ip_info.gw, 192, 168, 4, 1);
+
+    IP4_ADDR(&ip_info.ip, 172, 217, 28, 1);
+    IP4_ADDR(&ip_info.gw, 172, 217, 28, 1);
     IP4_ADDR(&ip_info.netmask, 255, 255, 255, 0);
 
     esp_netif_dhcps_stop(s_ap_netif);
@@ -508,7 +509,7 @@ static esp_err_t wifi_config_captive_portal_handler(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/html");
     httpd_resp_set_status(req, "302 Found");
-    httpd_resp_set_hdr(req, "Location", "http://192.168.4.1/");
+    httpd_resp_set_hdr(req, "Location", "http://172.217.28.1/");
     httpd_resp_set_hdr(req, "Connection", "close");
     httpd_resp_send(req, NULL, 0);
     return ESP_OK;
@@ -594,7 +595,7 @@ esp_err_t esp_br_wifi_config_start(void)
 
     s_wifi_config_mode = true;
     ESP_LOGI(WIFI_CONFIG_TAG, "WiFi configuration mode started");
-    ESP_LOGI(WIFI_CONFIG_TAG, "Access web interface at: http://192.168.4.1");
+    ESP_LOGI(WIFI_CONFIG_TAG, "Access web interface at: http://172.217.28.1");
 
     return ESP_OK;
 
@@ -697,7 +698,7 @@ esp_err_t esp_br_wifi_config_get_softap_info(char *ssid, size_t ssid_len, char *
             snprintf(ip_addr, ip_addr_len, IPSTR, IP2STR(&ip_info.ip));
         } else {
             // Fallback to default IP
-            strncpy(ip_addr, "192.168.4.1", ip_addr_len - 1);
+            strncpy(ip_addr, "172.217.28.1", ip_addr_len - 1);
             ip_addr[ip_addr_len - 1] = '\0';
         }
     }
