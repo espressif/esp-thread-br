@@ -8,7 +8,9 @@ python3 tools/ci/check_rest_api_version_sync.py
 idf.py -C examples/basic_thread_border_router build
 ```
 
-The host runner requires `IDF_PATH`, GCC, and Clang. It compiles the actual C
+The host runner requires `IDF_PATH`, GCC, and Clang. On IDF 6 and newer it also
+needs cJSON sources, from `managed_components` or from `CJSON_PATH`. CI downloads
+that component before running the tests. It compiles the actual C
 REST sections from `esp_br_web.c` and `esp_br_web_api.c`, together with the
 existing dataset JSON encoders, using deterministic HTTP, FreeRTOS, and
 OpenThread stubs. AddressSanitizer and UndefinedBehaviorSanitizer check the

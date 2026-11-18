@@ -1,6 +1,7 @@
 stages:
   - pre_check
   - build
+  - test
   - docs
 
 workflow:
@@ -13,6 +14,8 @@ variables:
     ESP_THREAD_BR_PATH: "$CI_PROJECT_DIR"
     CI_TOOLS_PATH: "$CI_PROJECT_DIR/tools/ci"
     ESP_ENV_IMAGE: "${CI_REGISTRY}/ci/images/idf-v6.2:2"
+    # Same image used by the OpenThread BR target tests that run pytest_otbr.py.
+    TARGET_TEST_ENV_IMAGE: "${CI_REGISTRY}/ci/images/idf-v6.2-target-test:2"
     ESP_IDF_HTTP: "https://gitlab-ci-token:${CI_JOB_TOKEN}@${ESP_GITLAB}/espressif/esp-idf.git"
 
 .submodule_update: &submodule_update
@@ -52,6 +55,21 @@ variables:
   - git fetch origin main
   - python3 $ESP_THREAD_BR_PATH/example_build_version_check.py basic_thread_border_router esp_ot_cli_extension
   - python3 $ESP_THREAD_BR_PATH/example_build_version_check.py basic_thread_border_router esp_rcp_update
+  - rm -rf CMakeLists.txt
+  - cp ${CI_TOOLS_PATH}/basic_thread_border_router.cmake CMakeLists.txt
+  - idf.py build
+
+# Same firmware as the basic border router build, with the REST/Web server enabled.
+.build_br_host_rest_firmware: &build_br_host_rest_firmware
+  - cd $IDF_PATH/examples/openthread/ot_rcp
+  - idf.py set-target esp32h2
+  - git rev-parse HEAD
+  - idf.py build
+  - cd $ESP_THREAD_BR_PATH/examples/basic_thread_border_router
+  - git fetch origin main
+  - python3 $ESP_THREAD_BR_PATH/example_build_version_check.py basic_thread_border_router esp_ot_cli_extension
+  - python3 $ESP_THREAD_BR_PATH/example_build_version_check.py basic_thread_border_router esp_rcp_update
+  - echo "CONFIG_OPENTHREAD_BR_START_WEB=y" >> sdkconfig.defaults
   - rm -rf CMakeLists.txt
   - cp ${CI_TOOLS_PATH}/basic_thread_border_router.cmake CMakeLists.txt
   - idf.py build
@@ -130,6 +148,23 @@ build_examples:
     tags:
         - build
 
+build_br_host_rest:
+    stage: build
+    image: espressif/idf:latest
+    script:
+        - *submodule_update
+        - *build_br_host_rest_firmware
+    artifacts:
+        paths:
+            - examples/basic_thread_border_router/build/flasher_args.json
+            - examples/basic_thread_border_router/build/flash_args
+            - examples/basic_thread_border_router/build/project_description.json
+            - examples/basic_thread_border_router/build/sdkconfig
+            - examples/basic_thread_border_router/build/**/*.bin
+        expire_in: 1 day
+    tags:
+        - build
+
 build_examples_m5stack:
     stage: build
     image: $CI_DOCKER_REGISTRY/esp-env-v5.5:3
@@ -194,6 +229,80 @@ build_docs:
         - build-docs -l en
     tags:
         - build_docs
+
+host_rest_tests:
+    stage: test
+    image:
+        name: espressif/idf:latest
+        entrypoint: [""]
+    tags:
+        - build
+    # Host tests do not use firmware artifacts, so do not wait for the build stage.
+    needs: []
+    before_script:
+        - apt-get update
+        - DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates clang curl unzip
+        # IDF >= 6 does not bundle cJSON. Fetch the same ^1.7.19 component the firmware uses.
+        - |
+          idf_path="${IDF_PATH:-/opt/esp/idf}"
+          if [ -f "${idf_path}/components/json/cJSON/cJSON.c" ]; then
+            echo "Using cJSON bundled with ESP-IDF"
+          else
+            cjson_dir="${CI_PROJECT_DIR}/.cjson"
+            mkdir -p "${cjson_dir}"
+            curl -fsSL --retry 3 --max-time 180 -o "${cjson_dir}/cjson.zip" \
+              "https://components-file.espressif.com/components/espressif/cjson/1.7.19~2/espressif__cjson-v1.7.19_2.zip"
+            echo "2e13f18fa612d85eeec4001dee87b246beac64cf019bc28d4c4e2e1910adc7f1  ${cjson_dir}/cjson.zip" | sha256sum -c -
+            unzip -q -o "${cjson_dir}/cjson.zip" -d "${cjson_dir}"
+            test -f "${cjson_dir}/cJSON/cJSON.c"
+            export CJSON_PATH="${cjson_dir}/cJSON"
+          fi
+    script:
+        - . /opt/esp/idf/export.sh
+        - python3 components/esp_ot_br_server/tests/run_host_tests.py
+
+# Form-network always runs. The webui case runs in the same job when the merge
+# request has the webui label, when any file in esp_ot_br_server differs from
+# the MR target branch, or when a default-branch commit changes that component
+# relative to the previous commit. Do not compare a default-branch pipeline to
+# refs/heads/main: that ref is the commit under test, so the diff is empty and
+# Web UI changes fall back to "not webui". changes without if matches on new
+# branches and tags.
+.webui_change_paths: &webui_change_paths
+    - components/esp_ot_br_server/**/*
+
+pytest_br:
+    stage: test
+    image: $TARGET_TEST_ENV_IMAGE
+    tags:
+        - pytest
+        - esp-thread-br
+    resource_group: esp-thread-br
+    needs:
+        - job: build_br_host_rest
+          artifacts: true
+    variables:
+        PYTEST_BR_MARK: "not webui"
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /(^|,)webui(,|$)/
+          variables:
+              PYTEST_BR_MARK: "webui or not webui"
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+          changes:
+              paths: *webui_change_paths
+              compare_to: refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+          variables:
+              PYTEST_BR_MARK: "webui or not webui"
+        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+          changes:
+              paths: *webui_change_paths
+              compare_to: $CI_COMMIT_BEFORE_SHA
+          variables:
+              PYTEST_BR_MARK: "webui or not webui"
+        - when: on_success
+    script:
+        - cd examples/basic_thread_border_router
+        - pytest "$CI_PROJECT_DIR/components/esp_ot_br_server/tests/pytest_br.py" -m "$PYTEST_BR_MARK" --target esp32s3 --embedded-services esp,idf -s --log-cli-level=INFO
 
 .deploy_docs_template:
     stage: docs

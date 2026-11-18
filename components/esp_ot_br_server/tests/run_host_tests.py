@@ -25,6 +25,27 @@ def functions(node, result):
         functions(child, result)
 
 
+def use_cjson(path):
+    print(f'Using cJSON sources: {path}', flush=True)
+    return path
+
+
+def cjson_dir():
+    candidates = [IDF / 'components/json/cJSON']
+    managed = ROOT.parents[1] / 'examples/basic_thread_border_router/managed_components'
+    candidates.extend(sorted(managed.glob('*cjson/cJSON')))
+    if os.environ.get('CJSON_PATH'):
+        candidates.append(Path(os.environ['CJSON_PATH']))
+    for path in candidates:
+        if (path / 'cJSON.c').is_file():
+            return use_cjson(path)
+    raise SystemExit(
+        'cJSON sources not found. Use ESP-IDF components/json/cJSON, build '
+        'examples/basic_thread_border_router so managed_components is populated, or set '
+        'CJSON_PATH to the directory that contains cJSON.c.'
+    )
+
+
 def main():
     api = (ROOT / 'src/esp_br_web_api.c').read_text()
     web = (ROOT / 'src/esp_br_web.c').read_text()
@@ -38,9 +59,6 @@ def main():
     base = base[:base.rfind('/*------')]
     header = header[header.index('/** Internal Thread REST contract'):header.index('/*---------------------------------------------------------------------\n            ESP Thread Border Router Wer Server REST API')]
     headers = set(re.findall(r'#include [<"](openthread/[^">]+)[">]', (ROOT / 'tests/host_platform.h').read_text()))
-    cjson = IDF / 'components/json/cJSON'
-    if not cjson.exists():
-        cjson = next((ROOT.parents[1] / 'examples/basic_thread_border_router/managed_components').glob('*cjson/cJSON'))
     with tempfile.TemporaryDirectory(prefix='esp-native-rest-tests-') as directory:
         directory = Path(directory)
         declarations = directory / 'declarations.cpp'
@@ -74,6 +92,7 @@ def main():
         (directory / 'openthread_mock.c').write_text(mocks)
         (directory / 'rest_api.inc').write_text(header + '\n' + base + '\n' + api)
         (directory / 'rest_web.inc').write_text(web)
+        cjson = cjson_dir()
         flags = ['-std=gnu11', '-O1', '-g', '-fsanitize=address,undefined', '-fno-omit-frame-pointer',
                  '-I', ROOT / 'tests', '-I', directory, '-I', OT, '-I', cjson]
         binary = directory / 'test_rest'
