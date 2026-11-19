@@ -39,7 +39,7 @@ If the `OPENTHREAD_BR_AUTO_START` option is enabled, the device will connect to 
 - The Wi-Fi network's ssid and psk needs to be pre-configured with `EXAMPLE_WIFI_SSID` and `EXAMPLE_WIFI_PASSWORD`. In this mode, the device will first attempt to use the Wi-Fi SSID and password stored in NVS. If no Wi-Fi information is stored, it will then use the pre-configured ssid and psk.
 - The Thread network parameters could be pre-configured with `OPENTHREAD_NETWORK_xx` options.
 
-If the `OPENTHREAD_BR_START_WEB` option is enabled, [ESP Thread Border Router Web Server](../../components/esp_ot_br_server/README.md) will be provided to configure and query Thread network via a Web GUI.
+The `OPENTHREAD_BR_START_WEB` option is enabled by default. After connecting to Wi-Fi with the CLI, access the [Web GUI](../../docs/en/codelab/web-gui.rst) using the host name ([esp-ot-br.local](http://esp-ot-br.local)) or Wi-Fi IP address to configure and query the Thread network.
 
 The `ESP_CONSOLE_USB_SERIAL_JTAG` option is enabled by default for ESP Thread Border Router Hardware. If you are using other hardware, you may enable `ESP_CONSOLE_UART_DEFAULT` if you wish to use the UART port for serial communication instead. In either case, `OPENTHREAD_CONSOLE_TYPE_USB_SERIAL_JTAG` or `OPENTHREAD_CONSOLE_TYPE_UART` will be selected accordingly. If you enable `ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG`, please manually specify which `OPENTHREAD_CONSOLE_TYPE` you would like to use.
 
@@ -285,21 +285,7 @@ Done
 
 ## Troubleshooting
 
-If you are using the 4MB variant of the Thread Border Router board (h/w V1.2), you may try the following steps:
-
-1. Change the following options in `examples/basic_thread_border_router/sdkconfig.defaults`
-    - Replace `CONFIG_ESPTOOLPY_FLASHSIZE_8MB` with `CONFIG_ESPTOOLPY_FLASHSIZE_4MB`
-2. Change the OTA partitions to use 1500K instead of 2M each
-
-```
-nvs,        data, nvs,      , 0x6000,
-otadata,    data, ota,      , 0x2000,
-phy_init,   data, phy,      , 0x1000,
-ota_0,      app,  ota_0,    , 1500K,
-ota_1,      app,  ota_1,    , 1500K,
-web_storage,data, spiffs,   , 200K,
-rcp_fw,     data, spiffs,   , 640K,
-```
+For the 4MB variant of the Thread Border Router board (h/w V1.2), use the [4MB build configuration](sdkconfig.defaults.4mb). It provides a 3MB factory application partition, Web storage and RCP storage, without host OTA partitions or the OTA command. The default 8MB configuration retains dual OTA partitions.
 
 If you find a need to reduce the binary size even further, please refer to [this link](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/api-guides/performance/size.html#reducing-overall-size).
 

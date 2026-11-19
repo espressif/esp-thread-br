@@ -1,0 +1,6 @@
+# Name,     Type, SubType, Offset, Size, Flags
+nvs,        data, nvs,      , 0x6000,
+phy_init,   data, phy,      , 0x1000,
+factory,    app,  factory,  , 3M,
+web_storage,data, spiffs,   , 200K,
+rcp_fw,     data, spiffs,   , 640K,
