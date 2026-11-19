@@ -1,0 +1,65 @@
+name: Launchpad Deployment
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [4mb, 8mb, m5stack]
+    container:
+      image: espressif/idf:v5.5.6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Build merged firmware
+        shell: bash
+        run: |
+          . "$IDF_PATH/export.sh"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          bash tools/ci/build_launchpad.sh "${{ matrix.variant }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launchpad-${{ matrix.variant }}
+          path: build/launchpad/images/
+          if-no-files-found: error
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: launchpad-*
+          path: build/launchpad/images/
+          merge-multiple: true
+      - uses: actions/configure-pages@v4
+        id: pages
+      - name: Prepare Launchpad site
+        run: python3 tools/ci/prepare_launchpad_site.py --pages-url "${{ steps.pages.outputs.base_url }}"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/launchpad/site/
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
