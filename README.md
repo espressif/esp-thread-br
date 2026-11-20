@@ -2,6 +2,10 @@
 
 ESP-THREAD-BR is the official Espressif Thread Border Router SDK. It supports all fundamental network features to build a [Thread Border Router](https://openthread.io/guides/border-router) (BR) and integrates rich product level features for quick productization.
 
+<a href="https://espressif.github.io/esp-launchpad/?flashConfigURL=https%3A%2F%2Fespressif.github.io%2Fesp-thread-br%2Flaunchpad%2Flaunchpad.toml"><img src="https://img.shields.io/badge/Try_With-ESP_Launchpad-0066CC?logo=espressif" alt="Try it with ESP Launchpad" width="200" height="28"></a>
+<a href="https://docs.espressif.com/projects/esp-thread-br/en/latest/"><img src="https://img.shields.io/badge/ESP_Thread_BR-Documentation-0066CC?logo=espressif" alt="ESP Thread BR Documentation" width="200" height="28"></a>
+<a href="https://developer.espressif.com/tags/thread/"><img src="https://img.shields.io/badge/Espressif_Thread-Blog_Series-0066CC?logo=espressif" alt="Espressif Thread Blogs" width="200" height="28"></a>
+
 # Software Components
 
 ![esp_br_solution](docs/images/esp-thread-border-router-solution.png)
@@ -19,7 +23,7 @@ The hardware required for a Thread BR comprises two separate SoCs:
 
 The [ESP Thread Border Router](https://docs.espressif.com/projects/esp-thread-br/en/latest/hardware_platforms.html) board provides an integrated module of an ESP32-S3 SoC and an ESP32-H2 RCP. A Sub-Ethernet daughter board is available if an Ethernet-based Border Router is required.
 
-![br_dev_kit](docs/images/esp-thread-border-router-board.png)
+![br_dev_kit](docs/images/esp-thread-border-router-board-front.webp)
 
 The two SoCs are connected with following interfaces:
 * UART for serial communication

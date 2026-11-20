@@ -281,7 +281,7 @@ The feedback result may appear as follows:
             "OpenThread:Version API":	"292",
             "Thread:Role":	"leader",
             "Network:BorderAgentID":	"00112233445566778899aabbccddeeff",
-            "IDF:Version":	"v5.5.4",
+            "IDF:Version":	"v5.5.6",
             "App:Version":	"1.0",
             "App:ProjectName":	"esp_ot_br",
             "App:CompileTime":	"Oct 09 2026 10:00:00",
